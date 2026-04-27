@@ -61,29 +61,29 @@ export default function Landing() {
 
   // Theme-aware colors
   const colors = {
-    bg: isDarkMode ? '#09090B' : '#ffffff',
-    text: isDarkMode ? '#FAFAFA' : '#1d1d1f',
+    bg: isDarkMode ? '#050505' : '#f5f5f7',
+    text: isDarkMode ? '#ffffff' : '#1d1d1f',
     muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
     subtle: isDarkMode ? '#52525B' : '#86868b',
-    surface: isDarkMode ? '#121214' : '#f5f5f7',
-    border: isDarkMode ? '#27272A' : '#d2d2d7',
+    surface: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#ffffff',
+    border: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#d2d2d7',
     accent: isDarkMode ? '#10B981' : '#0071e3',
-    accentText: isDarkMode ? '#000' : '#fff',
-    badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 113, 227, 0.1)',
-    badgeBorder: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(0, 113, 227, 0.2)',
-    badgeText: isDarkMode ? '#34D399' : '#0066cc',
-    secondaryBtnBorder: isDarkMode ? '#3F3F46' : '#d2d2d7',
-    secondaryBtnText: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    orb1: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 113, 227, 0.1)',
-    orb2: isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(0, 113, 227, 0.08)',
-    orb3: isDarkMode ? 'rgba(168, 85, 247, 0.1)' : 'rgba(0, 113, 227, 0.06)',
+    accentText: isDarkMode ? '#000000' : '#fff',
+    badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 113, 227, 0.1)',
+    badgeBorder: isDarkMode ? 'rgba(16, 185, 129, 0.5)' : 'rgba(0, 113, 227, 0.2)',
+    badgeText: isDarkMode ? '#6EE7B7' : '#0066cc',
+    secondaryBtnBorder: isDarkMode ? 'rgba(255, 255, 255, 0.25)' : '#d2d2d7',
+    secondaryBtnText: isDarkMode ? '#ffffff' : '#1d1d1f',
+    orb1: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 113, 227, 0.1)',
+    orb2: isDarkMode ? 'rgba(59, 130, 246, 0.25)' : 'rgba(0, 113, 227, 0.08)',
+    orb3: isDarkMode ? 'rgba(168, 85, 247, 0.25)' : 'rgba(0, 113, 227, 0.06)',
     gradient: isDarkMode
-      ? 'linear-gradient(to bottom, rgba(16, 185, 129, 0.05), transparent, transparent)'
+      ? 'linear-gradient(to bottom, rgba(16, 185, 129, 0.15), transparent, transparent)'
       : 'linear-gradient(to bottom, rgba(0, 113, 227, 0.05), transparent, transparent)',
     heroGlow: isDarkMode
-      ? 'rgba(16, 185, 129, 0.05)'
+      ? 'rgba(16, 185, 129, 0.35)'
       : 'rgba(0, 113, 227, 0.05)',
-    heroGlowOpacity: isDarkMode ? 0.3 : 0.2,
+    heroGlowOpacity: isDarkMode ? 0.8 : 0.2,
   }
 
   return (
@@ -149,9 +149,9 @@ export default function Landing() {
         <div style={{
           position: 'relative',
           zIndex: 1,
-          maxWidth: 1600,
+          maxWidth: 1280,
           margin: '0 auto',
-          padding: '64px'
+          padding: '48px 24px'
         }}>
           {/* Header with Theme Toggle */}
           <div style={{
@@ -187,25 +187,27 @@ export default function Landing() {
             </div>
 
             <h1 style={{
-              fontSize: 80,
-              fontWeight: 700,
+              fontSize: 96,
+              fontWeight: 800,
               color: colors.text,
-              marginBottom: 32,
-              letterSpacing: '-0.04em',
+              marginBottom: 24,
+              letterSpacing: '-0.05em',
+              lineHeight: 1.1,
               transition: 'color 0.3s ease'
             }}>
               TradeCraft
             </h1>
 
             <p style={{
-              fontSize: 22,
+              fontSize: 24,
               color: colors.muted,
-              maxWidth: 640,
+              maxWidth: 720,
               margin: '0 auto 56px',
               lineHeight: 1.6,
+              letterSpacing: '-0.01em',
               transition: 'color 0.3s ease'
             }}>
-              Unified trading platform for sector rotation analysis, AI-powered screening, and quantitative strategy building.
+              Leverage cutting-edge AI for smarter stock screening, dynamic sector rotation, and advanced quantitative strategy building.
             </p>
 
             {/* CTA Buttons */}
@@ -213,48 +215,78 @@ export default function Landing() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 20
+              gap: 24,
+              marginBottom: 80
             }}>
               <Link
                 to="/sectors"
                 style={{
                   background: colors.accent,
                   color: colors.accentText,
-                  padding: '20px 48px',
-                  borderRadius: 12,
-                  fontSize: 16,
+                  padding: '18px 42px',
+                  borderRadius: 999, // Pill shape
+                  fontSize: 18,
                   fontWeight: 600,
                   textDecoration: 'none',
                   boxShadow: isDarkMode
-                    ? '0 0 30px rgba(16, 185, 129, 0.25)'
+                    ? '0 0 40px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(255,255,255,0.2)'
                     : '0 0 30px rgba(0, 113, 227, 0.25)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 12,
-                  transition: 'background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease'
+                  transition: 'all 0.3s ease'
                 }}
+                className="hover-lift"
               >
                 Launch Scanner
-                <svg style={{ width: 18, height: 18 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg style={{ width: 20, height: 20 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
               </Link>
               <Link
                 to="/sectors"
                 style={{
-                  background: 'transparent',
+                  background: isDarkMode ? 'rgba(255,255,255,0.03)' : 'transparent',
                   color: colors.secondaryBtnText,
-                  padding: '20px 40px',
-                  borderRadius: 12,
-                  fontSize: 16,
+                  padding: '18px 42px',
+                  borderRadius: 999, // Pill shape
+                  fontSize: 18,
                   fontWeight: 500,
                   textDecoration: 'none',
                   border: `1px solid ${colors.secondaryBtnBorder}`,
-                  transition: 'color 0.3s ease, border-color 0.3s ease'
+                  transition: 'all 0.3s ease'
                 }}
+                className="hover-lift"
               >
                 Explore Features
               </Link>
+            </div>
+
+            {/* Dashboard Mockup Image */}
+            <div style={{
+              position: 'relative',
+              maxWidth: 1200,
+              margin: '0 auto',
+              borderRadius: 24,
+              padding: 12,
+              background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
+              boxShadow: isDarkMode ? '0 30px 60px rgba(0,0,0,0.5), 0 0 100px rgba(16,185,129,0.1)' : '0 30px 60px rgba(0,0,0,0.1)',
+              overflow: 'hidden',
+              transform: 'perspective(1000px) rotateX(2deg)',
+              transformOrigin: 'top center',
+              transition: 'all 0.5s ease'
+            }}>
+              <img 
+                src="/dashboard-mockup.png" 
+                alt="TradeCraft Dashboard" 
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  borderRadius: 16,
+                  display: 'block'
+                }}
+              />
             </div>
           </div>
 
@@ -269,19 +301,23 @@ export default function Landing() {
               <div
                 key={stat.label}
                 style={{
-                  background: colors.surface,
-                  border: `1px solid ${colors.border}`,
+                  background: isDarkMode ? 'rgba(255, 255, 255, 0.02)' : colors.surface,
+                  border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : colors.border}`,
                   borderRadius: 24,
                   padding: '48px 40px',
                   textAlign: 'center',
-                  transition: 'background-color 0.3s ease, border-color 0.3s ease'
+                  boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : 'none',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'transform 0.3s ease, border-color 0.3s ease'
                 }}
+                className="hover-lift"
               >
                 <p style={{
-                  fontSize: 64,
-                  fontWeight: 700,
+                  fontSize: 56,
+                  fontWeight: 800,
                   color: colors.text,
-                  marginBottom: 12,
+                  marginBottom: 8,
+                  letterSpacing: '-0.02em',
                   transition: 'color 0.3s ease'
                 }}>{stat.value}</p>
                 <p style={{
@@ -289,10 +325,11 @@ export default function Landing() {
                   color: colors.muted,
                   textTransform: 'uppercase',
                   letterSpacing: '0.15em',
+                  fontWeight: 600,
                   transition: 'color 0.3s ease'
                 }}>{stat.label}</p>
                 {stat.suffix && (
-                  <span style={{ fontSize: 16, color: colors.subtle, marginLeft: 4, transition: 'color 0.3s ease' }}>
+                  <span style={{ fontSize: 16, color: colors.subtle, marginLeft: 6, fontWeight: 500, transition: 'color 0.3s ease' }}>
                     {stat.suffix}
                   </span>
                 )}

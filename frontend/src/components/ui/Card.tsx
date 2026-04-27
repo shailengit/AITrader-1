@@ -126,28 +126,31 @@ interface FeatureCardProps {
 
 const featureCardStyles = {
   emerald: {
-    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%)',
-    border: 'rgba(16, 185, 129, 0.2)',
-    hoverBorder: 'rgba(16, 185, 129, 0.4)',
-    hoverShadow: '0 0 30px rgba(16, 185, 129, 0.2)',
+    background: 'rgba(255, 255, 255, 0.02)',
+    border: 'rgba(255, 255, 255, 0.05)',
+    hoverBorder: 'rgba(16, 185, 129, 0.3)',
+    hoverShadow: '0 8px 32px rgba(16, 185, 129, 0.15)',
     bullet: '#10B981',
-    icon: '#34D399'
+    icon: '#34D399',
+    glow: 'rgba(16, 185, 129, 0.05)'
   },
   blue: {
-    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%)',
-    border: 'rgba(59, 130, 246, 0.2)',
-    hoverBorder: 'rgba(59, 130, 246, 0.4)',
-    hoverShadow: '0 0 30px rgba(59, 130, 246, 0.2)',
+    background: 'rgba(255, 255, 255, 0.02)',
+    border: 'rgba(255, 255, 255, 0.05)',
+    hoverBorder: 'rgba(59, 130, 246, 0.3)',
+    hoverShadow: '0 8px 32px rgba(59, 130, 246, 0.15)',
     bullet: '#3B82F6',
-    icon: '#60A5FA'
+    icon: '#60A5FA',
+    glow: 'rgba(59, 130, 246, 0.05)'
   },
   purple: {
-    background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(168, 85, 247, 0.02) 100%)',
-    border: 'rgba(168, 85, 247, 0.2)',
-    hoverBorder: 'rgba(168, 85, 247, 0.4)',
-    hoverShadow: '0 0 30px rgba(168, 85, 247, 0.2)',
+    background: 'rgba(255, 255, 255, 0.02)',
+    border: 'rgba(255, 255, 255, 0.05)',
+    hoverBorder: 'rgba(168, 85, 247, 0.3)',
+    hoverShadow: '0 8px 32px rgba(168, 85, 247, 0.15)',
     bullet: '#A855F7',
-    icon: '#C084FC'
+    icon: '#C084FC',
+    glow: 'rgba(168, 85, 247, 0.05)'
   }
 }
 
@@ -157,8 +160,8 @@ export function FeatureCard({ title, description, icon, features, accentColor, l
 
   // Theme-aware colors
   const colors = {
-    iconBg: isDarkMode ? '#1A1A1D' : '#f5f5f7',
-    iconBorder: isDarkMode ? '#27272A' : '#d2d2d7',
+    iconBg: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f5f5f7',
+    iconBorder: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#d2d2d7',
     arrow: isDarkMode ? '#71717A' : '#86868b',
     title: isDarkMode ? '#FAFAFA' : '#1d1d1f',
     description: isDarkMode ? '#A1A1AA' : '#6e6e73',
@@ -170,21 +173,31 @@ export function FeatureCard({ title, description, icon, features, accentColor, l
       to={linkTo}
       style={{
         display: 'block',
-        background: styles.background,
-        border: `1px solid ${styles.border}`,
+        background: isDarkMode ? `linear-gradient(to bottom right, ${styles.background}, ${styles.glow})` : '#ffffff',
+        border: `1px solid ${isDarkMode ? styles.border : '#e5e5ea'}`,
         borderRadius: 24,
         padding: 48,
         textDecoration: 'none',
         cursor: 'pointer',
-        transition: 'border-color 0.2s, box-shadow 0.2s'
+        backdropFilter: 'blur(10px)',
+        transform: 'translateY(0)',
+        transition: 'all 0.3s ease'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = styles.hoverBorder
-        e.currentTarget.style.boxShadow = styles.hoverShadow
+        if (isDarkMode) {
+          e.currentTarget.style.borderColor = styles.hoverBorder
+          e.currentTarget.style.boxShadow = styles.hoverShadow
+        } else {
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)'
+        }
+        e.currentTarget.style.transform = 'translateY(-4px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = styles.border
+        if (isDarkMode) {
+          e.currentTarget.style.borderColor = styles.border
+        }
         e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
       {/* Icon */}
@@ -199,7 +212,8 @@ export function FeatureCard({ title, description, icon, features, accentColor, l
           borderRadius: 16,
           border: `1px solid ${colors.iconBorder}`,
           backgroundColor: colors.iconBg,
-          transition: 'background-color 0.3s ease, border-color 0.3s ease'
+          backdropFilter: 'blur(4px)',
+          transition: 'all 0.3s ease'
         }}>
           <span style={{ color: styles.icon }}>{icon}</span>
         </div>
@@ -209,8 +223,8 @@ export function FeatureCard({ title, description, icon, features, accentColor, l
       </div>
 
       {/* Content */}
-      <h3 style={{ fontSize: 24, fontWeight: 600, color: colors.title, marginBottom: 12, transition: 'color 0.3s ease' }}>{title}</h3>
-      <p style={{ fontSize: 15, color: colors.description, marginBottom: 32, lineHeight: 1.6, transition: 'color 0.3s ease' }}>{description}</p>
+      <h3 style={{ fontSize: 28, fontWeight: 700, color: colors.title, marginBottom: 12, transition: 'color 0.3s ease' }}>{title}</h3>
+      <p style={{ fontSize: 16, color: colors.description, marginBottom: 32, lineHeight: 1.6, transition: 'color 0.3s ease' }}>{description}</p>
 
       {/* Features */}
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -219,7 +233,7 @@ export function FeatureCard({ title, description, icon, features, accentColor, l
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            fontSize: 14,
+            fontSize: 15,
             color: colors.featureText,
             marginBottom: 16,
             transition: 'color 0.3s ease'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import {
   Play,
@@ -67,9 +67,14 @@ const defaultOptConfig: OptimizationConfigData = {
 
 export default function Builder() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isDarkMode } = useTheme();
+  const fromScreenerTicker = searchParams.get('ticker');
   const [strategyPrompt, setStrategyPrompt] = useState('');
-  const [tickers, setTickers] = useState('AAPL');
+  const [tickers, setTickers] = useState(() => {
+    // Pre-fill from AI Stock Screener if navigated with ?ticker=XYZ
+    return fromScreenerTicker || 'AAPL';
+  });
   const [code, setCode] = useState('');
   const [output, setOutput] = useState('');
   const [currentFilename, setCurrentFilename] = useState<string | null>(null);
@@ -521,8 +526,17 @@ export default function Builder() {
 
         <div className="flex flex-col justify-end gap-3 min-w-[180px]">
           <div className="space-y-2">
-            <label className="text-sm font-semibold uppercase tracking-wide" style={{ color: colors.muted }}>
+            <label className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2" style={{ color: colors.muted }}>
               Tickers
+              {fromScreenerTicker && (
+                <span className="text-xs font-normal normal-case px-2 py-0.5 rounded-full" style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  color: '#10B981',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}>
+                  From Screener
+                </span>
+              )}
             </label>
             <input
               type="text"

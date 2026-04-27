@@ -27,6 +27,16 @@ class SectorPerformance(BaseModel):
     is_real_data: bool = True
 
 
+class OHLCV(BaseModel):
+    """OHLCV data model."""
+    time: float
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
 class StockLeader(BaseModel):
     """Stock leader data model."""
     ticker: str
@@ -283,3 +293,53 @@ async def get_sector_stocks(sector: str):
         ]
 
     return leaders
+
+
+@router.get("/ohlcv/{ticker}", response_model=List[OHLCV])
+async def get_ohlcv(ticker: str):
+    """
+    Get OHLCV data for a ticker.
+    Used for charting in the Sector Rotation Scanner.
+    """
+    try:
+        # Get last 150 days of data for technical indicator calculations (Bollinger Bands etc)
+        query = text(f'''
+            SELECT "Date", "Open", "High", "Low", "Close", "Volume"
+            FROM {ticker.lower()}
+            ORDER BY "Date" DESC
+            LIMIT 150
+        ''')
+
+        with engine.connect() as conn:
+            result = conn.execute(query).fetchall()
+
+        if not result:
+            return []
+
+        ohlcv_data = []
+        for row in result:
+            # Convert Date to Unix timestamp (seconds)
+            # Row structure: [Date, Open, High, Low, Close, Volume]
+            import datetime
+            dt = row[0]
+            if isinstance(dt, str):
+                ts = datetime.datetime.fromisoformat(dt.replace('Z', '')).timestamp()
+            else:
+                ts = dt.timestamp()
+
+            ohlcv_data.append({
+                'time': ts,
+                'open': float(row[1]),
+                'high': float(row[2]),
+                'low': float(row[3]),
+                'close': float(row[4]),
+                'volume': float(row[5])
+            })
+
+        # Return sorted by time ascending (requirement for lightweight-charts)
+        return sorted(ohlcv_data, key=lambda x: x['time'])
+
+    except Exception as e:
+        logger.error(f"Error getting OHLCV for {ticker}: {e}")
+        # Return empty list or mock data
+        return []

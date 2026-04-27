@@ -4,7 +4,7 @@ import numpy as np
 
 ticker = 'AAPL'
 start = '2023-01-01'
-end = '2023-12-31'
+end = '2025-12-31'
 data = DataService.get_ohlcv_data(ticker, start, end)
 print(data.head())
 
@@ -21,8 +21,8 @@ slow_ma = vbt.MA.run(close, window=slow_window)
 
 
 # Use VBT comparison methods for optimization compatibility
-entries = fast_ma.ma_above(slow_ma.ma)
-exits = fast_ma.ma_below(slow_ma.ma)
+entries = fast_ma.ma_above(slow_ma.ma) and fast_ma.ma_below(close)
+exits = fast_ma.ma_below(slow_ma.ma) and fast_ma.ma_above(close)
 
 # Create portfolio with OHLC data
 pf = vbt.Portfolio.from_signals(

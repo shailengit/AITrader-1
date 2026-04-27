@@ -16,6 +16,9 @@ numpy>=1.24.0
 vectorbt>=0.26.0
 yfinance>=0.2.0  # Still needed for some features, but will use DB for historical data
 
+# Technical analysis indicators
+ta>=0.10.2
+
 # AI/Agent framework
 agno>=0.0.1
 ollama>=0.1.0
@@ -35,3 +38,6 @@ pydantic-settings>=2.0.0
 
 # Resource monitoring
 psutil>=5.9.0
+
+# PDF generation
+fpdf2>=2.8.0

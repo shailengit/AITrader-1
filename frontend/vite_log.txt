@@ -1,0 +1,10 @@
+
+> tradecraft-frontend@1.0.0 dev
+> vite --force
+
+1:12:53 PM [vite] (client) Forced re-optimization of dependencies
+
+  VITE v7.3.1  ready in 174 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose

@@ -104,7 +104,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Start frontend in background
-npm run dev > /dev/null 2>&1 &
+npm run dev -- --force > /dev/null 2>&1 &
 FRONTEND_PID=$!
 echo -e "${GREEN}✓ Frontend started on http://localhost:$FRONTEND_PORT${NC}"
 

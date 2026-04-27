@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
 
 /* ========================================
    Tailwind v4 Theme Configuration
@@ -6,13 +10,13 @@
 
 @theme {
   /* Colors - Apple System */
-  --color-canvas-dark: #000000;
+  --color-canvas-dark: #050505;
   --color-canvas-light: #f5f5f7;
-  --color-surface-dark: #272729;
-  --color-surface-dark-alt: #262628;
-  --color-surface-dark-elevated: #28282a;
-  --color-surface-dark-highest: #2a2a2d;
-  --color-surface-dark-deepest: #242426;
+  --color-surface-dark: #0a0a0a;
+  --color-surface-dark-alt: #111111;
+  --color-surface-dark-elevated: #171717;
+  --color-surface-dark-highest: #262626;
+  --color-surface-dark-deepest: #000000;
 
   --color-foreground-dark: #ffffff;
   --color-foreground-light: #1d1d1f;
@@ -25,38 +29,38 @@
   --color-link-blue-dark: #2997ff;
 
   /* Typography */
-  --font-sf-pro: 'SF Pro Display', 'SF Pro Icons', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
-  --font-sf-text: 'SF Pro Text', 'SF Pro Icons', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+  --font-sf-pro: 'Inter', 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  --font-sf-text: 'Inter', 'SF Pro Text', 'Helvetica Neue', sans-serif;
 
   /* Spacing & Radius */
-  --radius-apple-micro: 5px;
-  --radius-apple-std: 8px;
-  --radius-apple-comfort: 11px;
-  --radius-apple-large: 12px;
-  --radius-apple-pill: 980px;
+  --radius-apple-micro: 6px;
+  --radius-apple-std: 10px;
+  --radius-apple-comfort: 14px;
+  --radius-apple-large: 20px;
+  --radius-apple-pill: 999px;
 
   /* Shadows */
-  --shadow-apple-card: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+  --shadow-apple-card: rgba(0, 0, 0, 0.4) 0px 8px 32px 0px;
 }
 
 :root {
-  --canvas: #000000;
-  --surface: #272729;
-  --surface-raised: #28282a;
-  --surface-overlay: #2a2a2d;
+  --canvas: #050505;
+  --surface: #0a0a0a;
+  --surface-raised: #111111;
+  --surface-overlay: #171717;
 
   --foreground: #ffffff;
-  --muted: rgba(255, 255, 255, 0.8);
-  --subtle: rgba(255, 255, 255, 0.48);
-  --disabled: rgba(255, 255, 255, 0.48);
+  --muted: rgba(255, 255, 255, 0.7);
+  --subtle: rgba(255, 255, 255, 0.4);
+  --disabled: rgba(255, 255, 255, 0.2);
 
-  --border: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(255, 255, 255, 0.2);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
 
-  --accent: #0071e3;
-  --accent-light: #2997ff;
-  --accent-dark: #0066cc;
-  --accent-glow: rgba(0, 113, 227, 0.15);
+  --accent: #10B981;
+  --accent-light: #34D399;
+  --accent-dark: #059669;
+  --accent-glow: rgba(16, 185, 129, 0.25);
 }
 
 .apple-light-theme {

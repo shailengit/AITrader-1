@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 12
-slow_ema_window = 26
+fast_ema_window = 10
+slow_ema_window = 50
 
 # Download data
 ticker = 'AAPL'

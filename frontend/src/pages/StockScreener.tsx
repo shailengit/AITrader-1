@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Activity,
@@ -15,6 +16,8 @@ import {
   Bot,
   Play,
   Cpu,
+  Terminal,
+  FileDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
@@ -51,7 +54,15 @@ interface ScreenerMode {
   supports_backtesting: boolean;
 }
 
+interface LogEntry {
+  agent: string;
+  message: string;
+  type: string;
+  color: string;
+}
+
 export default function StockScreener() {
+  const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [modes, setModes] = useState<ScreenerMode[]>([]);
   const [selectedMode, setSelectedMode] = useState<string>("dormant_giant");
@@ -64,7 +75,10 @@ export default function StockScreener() {
   const [results, setResults] = useState<ScanResult[]>([]);
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
-  const [, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [showTerminal, setShowTerminal] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const logsEndRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState({
     squeeze_threshold: 1.15,
     accumulation_threshold: 0.005,
@@ -91,6 +105,13 @@ export default function StockScreener() {
       .catch((err) => console.error("Failed to fetch modes:", err));
   }, []);
 
+  // Auto-scroll terminal to bottom
+  useEffect(() => {
+    if (logsEndRef.current && showTerminal) {
+      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs, showTerminal]);
+
   const startScan = async () => {
     setIsScanning(true);
     setError(null);
@@ -98,6 +119,7 @@ export default function StockScreener() {
     setAiReport(null);
     setShowReport(false);
     setLogs([]);
+    setProgress(0);
 
     try {
       const res = await fetch("/api/screener/scan", {
@@ -116,37 +138,63 @@ export default function StockScreener() {
       if (!res.ok) throw new Error("Failed to start scan");
 
       const data = await res.json();
-      pollScanStatus(data.scan_id);
+      const scanId = data.scan_id;
+
+      // Set up SSE connection
+      const eventSource = new EventSource(`/api/screener/stream/${scanId}`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const { type, data: eventData } = payload;
+
+          if (type === "progress") {
+            setProgress(eventData.progress);
+            setScanStatus((prev) =>
+              prev ? { ...prev, progress: eventData.progress } : null
+            );
+          } else if (type === "log") {
+            setLogs((prev) => [...prev, eventData]);
+          } else if (type === "status") {
+            setScanStatus((prev) =>
+              prev ? { ...prev, status: eventData.status, progress: eventData.progress ?? prev.progress } : null
+            );
+            if (eventData.status === "completed") {
+              setIsScanning(false);
+              setProgress(100);
+              fetchResults(scanId);
+              eventSource.close();
+            } else if (eventData.status === "failed") {
+              setIsScanning(false);
+              setError(eventData.error || "Scan failed");
+              eventSource.close();
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse SSE event:", e);
+        }
+      };
+
+      eventSource.onerror = () => {
+        console.warn("SSE connection error, falling back to polling");
+        eventSource.close();
+        pollScanStatusFallback(scanId);
+      };
+
+      // Set initial scan status
+      setScanStatus({
+        scan_id: scanId,
+        mode: selectedMode,
+        status: "running",
+        progress: 0,
+        use_ai: useAi,
+        results_count: 0,
+        has_ai_report: false,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
       setIsScanning(false);
     }
-  };
-
-  const pollScanStatus = async (id: string) => {
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/screener/status/${id}`);
-        const data = await res.json();
-
-        setScanStatus(data);
-        if (data.logs) setLogs(data.logs);
-
-        if (data.status === "running") {
-          setTimeout(poll, 1000);
-        } else if (data.status === "completed") {
-          setIsScanning(false);
-          fetchResults(id);
-        } else if (data.status === "failed") {
-          setIsScanning(false);
-          setError(data.error || "Scan failed");
-        }
-      } catch (err) {
-        setIsScanning(false);
-        setError("Failed to get scan status");
-      }
-    };
-    poll();
   };
 
   const fetchResults = async (id: string) => {
@@ -162,6 +210,56 @@ export default function StockScreener() {
       }
     } catch (err) {
       console.error("Failed to fetch results:", err);
+    }
+  };
+
+  const pollScanStatusFallback = async (id: string) => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/screener/status/${id}`);
+        const data = await res.json();
+
+        setScanStatus(data);
+        setProgress(data.progress);
+        if (data.logs) {
+          setLogs((prev) => {
+            const existingKeys = new Set(prev.map((l) => l.message));
+            const newLogs = data.logs.filter((l: LogEntry) => !existingKeys.has(l.message));
+            return [...prev, ...newLogs];
+          });
+        }
+
+        if (data.status === "running") {
+          setTimeout(poll, 1000);
+        } else if (data.status === "completed") {
+          setIsScanning(false);
+          setProgress(100);
+          fetchResults(id);
+        } else if (data.status === "failed") {
+          setIsScanning(false);
+          setError(data.error || "Scan failed");
+        }
+      } catch (err) {
+        setIsScanning(false);
+        setError("Failed to get scan status");
+      }
+    };
+    poll();
+  };
+
+  const downloadPDF = () => {
+    if (!scanStatus) return;
+    window.open(`/api/screener/report/${scanStatus.scan_id}`, "_blank");
+  };
+
+  const getLogColor = (color: string) => {
+    switch (color) {
+      case "blue": return isDarkMode ? "#60A5FA" : "#2563EB";
+      case "green": return isDarkMode ? "#34D399" : "#059669";
+      case "amber": return isDarkMode ? "#FBBF24" : "#D97706";
+      case "purple": return isDarkMode ? "#A78BFA" : "#7C3AED";
+      case "red": return "#EF4444";
+      default: return isDarkMode ? "#A1A1AA" : "#6e6e73";
     }
   };
 
@@ -416,7 +514,7 @@ export default function StockScreener() {
                     placeholder={
                       selectedMode === "dormant_giant"
                         ? "Begin the daily Dormant Giant screening workflow..."
-                        : "Find me 5 Small or Mid Cap stocks in an uptrend..."
+                        : "Find me candidates for a high-growth breakout. Technically, they should be in a Volatility Squeeze (volatility_bbw). Fundamentally, they must have positive QoQ revenue growth."
                     }
                     className="w-full h-32 border rounded-xl p-4 text-lg focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none resize-none"
                     style={{
@@ -428,7 +526,8 @@ export default function StockScreener() {
                 </div>
               )}
 
-              {scanStatus && scanStatus.status === "running" && (
+              {/* Progress Bar */}
+              {(isScanning || scanStatus?.status === "completed") && (
                 <div
                   className="mt-6 p-6 rounded-2xl"
                   style={{
@@ -437,8 +536,10 @@ export default function StockScreener() {
                   }}
                 >
                   <div className="flex justify-between text-base mb-3">
-                    <span style={{ color: colors.muted }}>Analyzing stocks</span>
-                    <span className="font-bold" style={{ color: colors.text }}>{scanStatus.progress}%</span>
+                    <span style={{ color: colors.muted }}>
+                      {scanStatus?.status === "completed" ? "Analysis complete" : "Analyzing stocks"}
+                    </span>
+                    <span className="font-bold" style={{ color: colors.text }}>{progress}%</span>
                   </div>
                   <div
                     className="w-full h-3 rounded-full overflow-hidden"
@@ -446,11 +547,74 @@ export default function StockScreener() {
                   >
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${scanStatus.progress}%` }}
+                      animate={{ width: `${progress}%` }}
                       transition={{ duration: 0.5, ease: "easeOut" }}
                       className="h-full rounded-full bg-emerald-500"
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Live Terminal — persists after scan so user can review logs */}
+              {logs.length > 0 && (
+                <div
+                  className="mt-6 rounded-2xl overflow-hidden"
+                  style={{
+                    backgroundColor: isDarkMode ? '#000000' : '#1e1e1e',
+                    border: `1px solid ${colors.border}`
+                  }}
+                >
+                  <button
+                    onClick={() => setShowTerminal(!showTerminal)}
+                    className="w-full flex items-center justify-between px-6 py-3"
+                    style={{ backgroundColor: isDarkMode ? '#18181b' : '#2d2d2d' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Terminal className="w-4 h-4 text-emerald-500" />
+                      <span className="text-sm font-medium text-white">
+                        Agent Terminal {scanStatus?.status === "completed" ? "— Complete" : scanStatus?.status === "failed" ? "— Failed" : ""}
+                      </span>
+                      <span className="text-xs text-zinc-400">({logs.length} events)</span>
+                      {isScanning && (
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`w-4 h-4 text-zinc-400 transition-transform ${showTerminal ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  <AnimatePresence>
+                    {showTerminal && (
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: 320 }}
+                        exit={{ height: 0 }}
+                        className="overflow-y-auto"
+                        style={{ maxHeight: 320 }}
+                      >
+                        <div className="p-4 space-y-1 font-mono text-xs">
+                          {logs.map((log, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <span
+                                className="shrink-0 font-bold"
+                                style={{ color: getLogColor(log.color) }}
+                              >
+                                [{log.agent}]
+                              </span>
+                              <span className="text-zinc-300 whitespace-pre-wrap">
+                                {log.message}
+                              </span>
+                            </div>
+                          ))}
+                          <div ref={logsEndRef} />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </motion.div>
@@ -598,6 +762,24 @@ export default function StockScreener() {
                   </>
                 )}
               </button>
+
+              {/* PDF Download */}
+              {scanStatus?.status === "completed" && (
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={downloadPDF}
+                  className="w-full py-4 px-8 rounded-2xl text-lg font-bold transition-all flex items-center justify-center gap-3 border-2"
+                  style={{
+                    borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.7)',
+                    color: isDarkMode ? '#34d399' : '#059669',
+                    backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)'
+                  }}
+                >
+                  <FileDown className="w-6 h-6" />
+                  <span>Download PDF Report</span>
+                </motion.button>
+              )}
             </motion.div>
           </div>
 
@@ -734,7 +916,7 @@ export default function StockScreener() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="rounded-3xl p-6 transition-colors text-center"
+                        className="rounded-3xl p-6 transition-colors text-center cursor-pointer"
                         style={{
                           backgroundColor: colors.surface,
                           border: `1px solid ${colors.border}`,
@@ -745,6 +927,7 @@ export default function StockScreener() {
                         onMouseLeave={(e) => {
                           e.currentTarget.style.borderColor = colors.border;
                         }}
+                        onClick={() => navigate(`/quantgen/build?ticker=${result.ticker}`)}
                       >
                         <div className="flex flex-col items-center mb-4">
                           <div>
@@ -823,6 +1006,14 @@ export default function StockScreener() {
                         </div>
                       </motion.div>
                     ))}
+                    {/* Hint about clicking cards */}
+                    {results.length > 0 && (
+                      <div className="col-span-full text-center mt-4">
+                        <p className="text-sm" style={{ color: colors.muted }}>
+                          Click any stock card to open it in QuantGen Strategy Builder
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

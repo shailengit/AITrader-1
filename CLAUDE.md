@@ -60,6 +60,11 @@ python -m app.main
 uvicorn app.main:app --reload --port 8000
 ```
 
+**IMPORTANT:** When running any Python script, always use the virtual environment's Python interpreter from the `backend/` folder:
+```bash
+cd backend && ./venv/bin/python <script_path>
+```
+
 ### Frontend (from `frontend/` directory)
 
 ```bash

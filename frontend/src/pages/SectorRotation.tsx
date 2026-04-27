@@ -4,7 +4,10 @@ import {
   Activity,
   ArrowUpRight,
   BarChart3,
-  CheckCircle2
+  BarChart2,
+  CheckCircle2,
+  X,
+  Maximize2
 } from 'lucide-react'
 import {
   BarChart,
@@ -21,7 +24,7 @@ import { Card } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/Badge'
 import { ProgressMetric } from '../components/ui/Metric'
 import { useTheme } from '../context/ThemeContext'
-import { X } from 'lucide-react'
+import { CandleStickChart } from '../components/quantgen/CandleStickChart'
 
 interface Sector {
   ticker: string
@@ -55,6 +58,9 @@ export default function SectorRotation() {
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null)
   const [stocks, setStocks] = useState<Stock[]>([])
   const [analyzedStock, setAnalyzedStock] = useState<Stock | null>(null)
+  const [chartTicker, setChartTicker] = useState<string | null>(null)
+  const [chartData, setChartData] = useState<any[]>([])
+  const [isChartLoading, setIsChartLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDbConnected, setIsDbConnected] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString())
@@ -62,17 +68,19 @@ export default function SectorRotation() {
 
   // Theme-aware colors
   const colors = {
-    text: isDarkMode ? '#FAFAFA' : '#1d1d1f',
+    text: isDarkMode ? '#ffffff' : '#1d1d1f',
     muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
     subtle: isDarkMode ? '#52525B' : '#86868b',
-    surface: isDarkMode ? '#27272A' : '#f5f5f7',
-    border: isDarkMode ? '#27272A' : '#d2d2d7',
-    grid: isDarkMode ? '#27272A' : '#e5e5e7',
+    surface: isDarkMode ? 'rgba(255, 255, 255, 0.02)' : '#ffffff',
+    border: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#e5e5ea',
+    grid: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#e5e5e7',
     tooltip: {
-      bg: isDarkMode ? '#18181B' : '#ffffff',
-      border: isDarkMode ? '#27272A' : '#d2d2d7',
+      bg: isDarkMode ? 'rgba(10, 10, 10, 0.85)' : '#ffffff',
+      border: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#d2d2d7',
     },
-    negative: isDarkMode ? '#52525B' : '#9ca3af',
+    negative: isDarkMode ? '#3f3f46' : '#9ca3af',
+    accent: isDarkMode ? '#10B981' : '#0071e3',
+    glow: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 113, 227, 0.05)'
   }
 
   useEffect(() => {
@@ -130,6 +138,58 @@ export default function SectorRotation() {
     }
   }
 
+  const fetchChartData = async (ticker: string) => {
+    try {
+      setIsChartLoading(true)
+      setChartTicker(ticker)
+      const res = await fetch(`/api/ohlcv/${ticker}`)
+      if (!res.ok) throw new Error('Failed to fetch OHLCV')
+      const data = await res.json()
+      
+      // Calculate Bollinger Bands on the client side
+      const period = 20
+      const stdDevMult = 2
+      
+      const processedData = data.map((d: any, i: number) => {
+        const result = { ...d }
+        
+        // Calculate Price SMAs
+        if (i >= 19) {
+          const slice20 = data.slice(i - 19, i + 1)
+          const sum20 = slice20.reduce((a: any, b: any) => a + b.close, 0)
+          result.sma20 = sum20 / 20
+          
+          const volSum20 = slice20.reduce((a: any, b: any) => a + b.volume, 0)
+          result.vol_sma20 = volSum20 / 20
+
+          // BB calculation
+          const variance = slice20.reduce((a: any, b: any) => a + Math.pow(b.close - result.sma20, 2), 0) / 20
+          const stdDev = Math.sqrt(variance)
+          result.bb_middle = result.sma20
+          result.bb_upper = result.sma20 + (2 * stdDev)
+          result.bb_lower = result.sma20 - (2 * stdDev)
+        }
+        
+        if (i >= 49) {
+          const slice50 = data.slice(i - 49, i + 1)
+          const sum50 = slice50.reduce((a: any, b: any) => a + b.close, 0)
+          result.sma50 = sum50 / 50
+          
+          const volSum50 = slice50.reduce((a: any, b: any) => a + b.volume, 0)
+          result.vol_sma50 = volSum50 / 50
+        }
+        
+        return result
+      })
+      
+      setChartData(processedData)
+    } catch (err) {
+      console.error('Error fetching chart data:', err)
+    } finally {
+      setIsChartLoading(false)
+    }
+  }
+
   const formatPercent = (val: number) => (val * 100).toFixed(2) + '%'
 
   const getOrdinal = (n: number): string => {
@@ -164,43 +224,73 @@ export default function SectorRotation() {
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-10">
-        <div className="flex items-center gap-4">
-          <div className="bg-emerald-500 rounded-xl p-3">
-            <TrendingUp className="w-7 h-7 text-black" />
+    <div style={{ 
+      width: '100%', 
+      padding: '40px 4vw', // Responsive padding using viewport width
+      boxSizing: 'border-box',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center'
+    }}>
+      <div style={{ width: '100%', maxWidth: '2400px' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-4">
+            <div 
+              className="rounded-2xl p-3" 
+              style={{ 
+                background: isDarkMode ? 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.05) 100%)' : colors.accent,
+                border: `1px solid ${isDarkMode ? 'rgba(16,185,129,0.3)' : 'transparent'}`,
+                boxShadow: isDarkMode ? '0 0 20px rgba(16,185,129,0.2)' : 'none'
+              }}
+            >
+              <TrendingUp className="w-7 h-7" style={{ color: isDarkMode ? '#34D399' : '#fff' }} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight" style={{ color: colors.text }}>Sector Rotation Scanner</h1>
+              <p className="text-base" style={{ color: colors.muted }}>Identify momentum and rotation patterns</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold" style={{ color: colors.text }}>Sector Rotation Scanner</h1>
-            <p className="text-base" style={{ color: colors.muted }}>Identify momentum and rotation patterns</p>
+          <div className="flex items-center gap-6 text-sm font-mono" style={{ color: colors.muted }}>
+            <StatusBadge
+              status={isDbConnected ? 'connected' : 'disconnected'}
+              label={isDbConnected ? 'S&P 1500 Connected' : 'Demo Mode'}
+            />
+            <button
+              onClick={handleRefresh}
+              className="p-2.5 rounded-xl transition-all"
+              style={{ backgroundColor: 'transparent' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = colors.surface
+                e.currentTarget.style.transform = 'scale(1.05)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+            >
+              <Activity className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} style={{ color: colors.accent }} />
+            </button>
+            <span style={{ color: colors.muted }}>Last: {lastUpdated}</span>
           </div>
         </div>
-        <div className="flex items-center gap-6 text-sm font-mono" style={{ color: colors.muted }}>
-          <StatusBadge
-            status={isDbConnected ? 'connected' : 'disconnected'}
-            label={isDbConnected ? 'S&P 1500 Connected' : 'Demo Mode'}
-          />
-          <button
-            onClick={handleRefresh}
-            className="p-2.5 rounded-xl transition-colors"
-            style={{ backgroundColor: 'transparent' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.surface}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <Activity className={`w-5 h-5 ${loading ? 'animate-spin' : ''} text-emerald-500`} />
-          </button>
-          <span style={{ color: colors.muted }}>Last: {lastUpdated}</span>
-        </div>
-      </div>
 
-      {/* Sector Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        <Card variant="base" className="lg:col-span-2 p-8">
-          <h2 className="text-sm font-semibold uppercase tracking-widest mb-6" style={{ color: colors.muted }}>
+        {/* Sector Performance */}
+        <div className="flex flex-col xl:flex-row gap-8 mb-10">
+          {/* Bar Chart - ~35% width */}
+          <Card variant="base" className="flex-grow xl:w-[35%] shrink-0 p-8 relative overflow-hidden" style={{
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            backdropFilter: 'blur(10px)',
+            boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.3)' : '0 10px 40px rgba(0,0,0,0.05)'
+        }}>
+          {/* Subtle background glow */}
+          {isDarkMode && <div style={{ position: 'absolute', top: '-50%', left: '-20%', width: '150%', height: '150%', background: 'radial-gradient(circle, rgba(16,185,129,0.03) 0%, transparent 60%)', pointerEvents: 'none' }} />}
+          
+          <h2 className="text-sm font-semibold uppercase tracking-widest mb-6 relative z-10" style={{ color: colors.muted }}>
             Sector Acceleration Scan
           </h2>
-          <div className="h-[400px]">
+          <div className="h-[400px] relative z-10">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sectors}>
                 <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} vertical={false} />
@@ -208,19 +298,23 @@ export default function SectorRotation() {
                 <YAxis stroke={colors.muted} fontSize={12} tickLine={false} axisLine={false}
                   tickFormatter={(val) => (val * 100).toFixed(0) + '%'} />
                 <Tooltip
+                  cursor={{ fill: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
                   contentStyle={{
                     backgroundColor: colors.tooltip.bg,
                     border: `1px solid ${colors.tooltip.border}`,
                     borderRadius: '12px',
-                    fontSize: '14px'
+                    backdropFilter: 'blur(10px)',
+                    fontSize: '14px',
+                    color: colors.text
                   }}
+                  itemStyle={{ color: colors.text }}
                 />
                 <Bar dataKey="spread" radius={[6, 6, 0, 0]}>
                   {sectors.map((entry) => {
                     const isSelected = selectedSector?.ticker === entry.ticker
-                    let fill = '#34d399' // Default emerald-400
+                    let fill = isDarkMode ? '#34d399' : '#10B981' // Emerald
                     if (isSelected) {
-                      fill = '#10b981' // Emerald-500 for selected
+                      fill = isDarkMode ? '#10b981' : '#059669' 
                     } else if (entry.spread <= 0) {
                       fill = colors.negative // Theme-aware for negative
                     }
@@ -228,7 +322,7 @@ export default function SectorRotation() {
                       <Cell
                         key={`cell-${entry.ticker}`}
                         fill={fill}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', transition: 'fill 0.3s ease' }}
                         onClick={() => setSelectedSector(entry)}
                       />
                     )
@@ -239,67 +333,72 @@ export default function SectorRotation() {
           </div>
         </Card>
 
-        {/* Selected Sector Details */}
-        <Card
-          className="p-8"
-          style={{
-            background: isDarkMode
-              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%)'
-              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
-            border: `1px solid ${isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.4)'}`
-          }}
-        >
-          <p
-            className="text-sm font-mono uppercase tracking-widest mb-3"
-            style={{ color: isDarkMode ? 'rgba(16, 185, 129, 0.7)' : '#059669' }}
-          >
-            {getOrdinal(getLeaderboardPosition(selectedSector?.ticker || ''))} on Leaderboard
-          </p>
-          <h3 className="text-5xl font-bold mb-2" style={{ color: colors.text }}>{selectedSector?.ticker}</h3>
-          <p className="text-lg mb-8" style={{ color: colors.muted }}>{selectedSector?.name}</p>
+        {/* Top 3 Sectors - ~65% width */}
+        <div className="flex flex-col sm:flex-row xl:w-[65%] gap-4">
+          {sectors.slice(0, 3).map((sector, index) => {
+            const isSelected = selectedSector?.ticker === sector.ticker;
+            return (
+              <Card
+                key={sector.ticker}
+                className="flex-1 p-5 relative overflow-hidden cursor-pointer hover-lift flex flex-col justify-between"
+                onClick={() => setSelectedSector(sector)}
+                style={{
+                  background: isSelected
+                    ? (isDarkMode ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.02) 100%)' : 'rgba(16, 185, 129, 0.08)')
+                    : colors.surface,
+                  border: `1px solid ${isSelected ? (isDarkMode ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.5)') : colors.border}`,
+                  boxShadow: isSelected ? '0 10px 30px rgba(16,185,129,0.15)' : 'none',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {isSelected && isDarkMode && <div style={{ position: 'absolute', top: '0', right: '0', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />}
+                
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div 
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                      style={{ 
+                        backgroundColor: index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : '#b45309',
+                        color: '#000',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                  </div>
+                  
+                  <h3 className="text-3xl font-bold mb-1 tracking-tight" style={{ color: colors.text }}>{sector.ticker}</h3>
+                  <p className="text-xs truncate mb-6" style={{ color: colors.muted }}>{sector.name}</p>
+                </div>
 
-          <div className="space-y-5">
-            <ProgressMetric
-              value={(selectedSector?.perf_3m || 0) * 100}
-              label="3M Performance"
-              progress={Math.min(100, Math.max(0, (selectedSector?.perf_3m || 0) * 1000))}
-              progressColor="emerald"
-              suffix="%"
-            />
-            <ProgressMetric
-              value={(selectedSector?.perf_6m || 0) * 100}
-              label="6M Performance"
-              progress={Math.min(100, Math.max(0, (selectedSector?.perf_6m || 0) * 500))}
-              progressColor="zinc"
-              suffix="%"
-            />
-            <div className="pt-5" style={{ borderTop: `1px solid ${colors.border}` }}>
-              <div className="flex justify-between items-baseline">
-                <span className="text-sm font-semibold" style={{ color: colors.text }}>Acceleration Spread</span>
-                <span className="text-2xl font-mono text-emerald-500">+{formatPercent(selectedSector?.spread || 0)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="mt-10 p-4 rounded-2xl flex items-center gap-4"
-            style={{
-              backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
-              border: `1px solid ${isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.3)'}`
-            }}
-          >
-            <CheckCircle2 className="w-6 h-6 shrink-0" style={{ color: isDarkMode ? '#10B981' : '#059669' }} />
-            <p className="text-sm" style={{ color: isDarkMode ? 'rgba(16, 185, 129, 0.9)' : '#059669' }}>Momentum increasing. Sector primed for stock selection.</p>
-          </div>
-        </Card>
+                <div className="space-y-4 relative z-10">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>Acceleration</p>
+                    <p className="text-xl font-mono text-emerald-500">+{formatPercent(sector.spread)}</p>
+                  </div>
+                  <div className="pt-3" style={{ borderTop: `1px solid ${colors.border}` }}>
+                    <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>3M Perf</p>
+                    <p className="text-sm font-mono" style={{ color: colors.text }}>{(sector.perf_3m * 100).toFixed(2)}%</p>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
       </div>
 
       {/* Stock Leaders */}
-      <div className="mb-8">
-        <h2 className="text-sm font-semibold uppercase tracking-widest mb-6" style={{ color: colors.muted }}>
-          Momentum Leaders in {selectedSector?.ticker}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div style={{ marginTop: '100px', marginBottom: '60px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <h2 className="text-3xl font-bold tracking-tight mb-2" style={{ color: colors.text }}>
+            Momentum Leaders in {selectedSector?.ticker}
+          </h2>
+          <p className="text-base" style={{ color: colors.muted }}>Top performing stocks currently exhibiting technical strength</p>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
           {stocks.map((stock) => {
             const volumeRatio = stock.volume_today / stock.volume_avg_20d
             const isVolumeSpike = volumeRatio > 1.5
@@ -311,17 +410,25 @@ export default function SectorRotation() {
                 key={stock.ticker}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="border rounded-2xl p-7 overflow-hidden relative"
+                className="border rounded-2xl p-7 overflow-hidden relative hover-lift"
                 style={{
-                  backgroundColor: colors.surface,
-                  borderColor: isSqueezeTriggered ? 'rgba(16, 185, 129, 0.5)' : colors.border,
-                  boxShadow: isSqueezeTriggered ? '0 0 20px rgba(16, 185, 129, 0.2)' : 'none'
+                  backgroundColor: isDarkMode ? (isSqueezeTriggered ? 'rgba(16, 185, 129, 0.05)' : colors.surface) : (isSqueezeTriggered ? '#f0fdf4' : '#ffffff'),
+                  borderColor: isSqueezeTriggered ? 'rgba(16, 185, 129, 0.6)' : colors.border,
+                  boxShadow: isSqueezeTriggered 
+                    ? (isDarkMode ? '0 0 30px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16,185,129,0.1)' : '0 10px 30px rgba(16, 185, 129, 0.2)') 
+                    : (isDarkMode ? '0 10px 30px rgba(0,0,0,0.4)' : '0 5px 15px rgba(0,0,0,0.05)'),
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
               >
                 {isSqueezeTriggered && (
                   <div
-                    className="absolute top-0 right-0 text-xs font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-tight"
-                    style={{ backgroundColor: '#10B981', color: '#ffffff' }}
+                    className="absolute top-0 right-0 text-xs font-bold px-4 py-1.5 rounded-bl-2xl uppercase tracking-tight"
+                    style={{ 
+                      backgroundColor: '#10B981', 
+                      color: '#ffffff',
+                      boxShadow: '0 4px 15px rgba(16,185,129,0.4)'
+                    }}
                   >
                     Triggered
                   </div>
@@ -339,7 +446,7 @@ export default function SectorRotation() {
                 </div>
 
                 <ProgressMetric
-                  value={(stock.perf_3m - stock.sector_perf_3m) * 100}
+                  value={((stock.perf_3m - stock.sector_perf_3m) * 100).toFixed(2)}
                   label="3M Outperformance"
                   progress={Math.min(100, Math.max(0, ((stock.perf_3m - stock.sector_perf_3m) * 100 + 50)))}
                   progressColor="emerald"
@@ -347,8 +454,9 @@ export default function SectorRotation() {
                 />
 
                 <div className="grid grid-cols-3 gap-3 mt-6">
-                  <div
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2"
+                  <button
+                    onClick={() => fetchChartData(stock.ticker)}
+                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
                     style={{
                       backgroundColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
                       borderColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.4)' : colors.border
@@ -356,9 +464,13 @@ export default function SectorRotation() {
                   >
                     <ArrowUpRight className={`w-5 h-5 ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
                     <span className={`text-xs uppercase font-bold ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Price</span>
-                  </div>
-                  <div
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2"
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Maximize2 className="w-3 h-3 text-emerald-500" />
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => fetchChartData(stock.ticker)}
+                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
                     style={{
                       backgroundColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
                       borderColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.4)' : colors.border
@@ -366,35 +478,46 @@ export default function SectorRotation() {
                   >
                     <Activity className={`w-5 h-5 ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
                     <span className={`text-xs uppercase font-bold ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Volume</span>
-                  </div>
-                  <div
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2"
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Maximize2 className="w-3 h-3 text-emerald-500" />
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => fetchChartData(stock.ticker)}
+                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
                     style={{
                       backgroundColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
                       borderColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.4)' : colors.border
                     }}
                   >
-                    <BarChart3 className={`w-5 h-5 ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                    <BarChart2 className={`w-5 h-5 ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
                     <span className={`text-xs uppercase font-bold ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Bands</span>
-                  </div>
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Maximize2 className="w-3 h-3 text-emerald-500" />
+                    </div>
+                  </button>
                 </div>
 
                 <button
                   onClick={() => setAnalyzedStock(stock)}
-                  className="w-full mt-6 py-4 rounded-xl text-sm font-bold uppercase tracking-widest transition-all"
+                  className="w-full mt-6 py-4 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover-lift"
                   style={{
-                    backgroundColor: isSqueezeTriggered ? '#10B981' : isDarkMode ? '#27272A' : '#f5f5f7',
-                    color: isSqueezeTriggered ? '#000' : isDarkMode ? '#A1A1AA' : '#6e6e73',
+                    backgroundColor: isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
+                    color: isSqueezeTriggered ? '#000000' : colors.text,
+                    border: `1px solid ${isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.1)' : '#d2d2d7'}`,
+                    boxShadow: isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none'
                   }}
                   onMouseEnter={(e) => {
                     if (isSqueezeTriggered) {
                       e.currentTarget.style.backgroundColor = '#34D399';
+                      e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
                     } else {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#3F3F46' : '#e5e5e7';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.1)' : '#e5e5e7';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isSqueezeTriggered ? '#10B981' : isDarkMode ? '#27272A' : '#f5f5f7';
+                    e.currentTarget.style.backgroundColor = isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7';
+                    e.currentTarget.style.boxShadow = isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none';
                   }}
                 >
                   Analyze Setup
@@ -421,32 +544,41 @@ export default function SectorRotation() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="rounded-3xl p-10 max-w-lg w-full"
-              style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
+              className="rounded-3xl max-w-lg w-full relative overflow-hidden"
+              style={{ 
+                backgroundColor: isDarkMode ? 'rgba(20,20,22,0.95)' : '#ffffff', 
+                border: `1px solid ${colors.border}`,
+                boxShadow: isDarkMode ? '0 30px 60px rgba(0,0,0,0.6), 0 0 100px rgba(16,185,129,0.15)' : '0 20px 40px rgba(0,0,0,0.1)',
+                backdropFilter: 'blur(20px)',
+                padding: '40px'
+              }}
             >
-              <div className="flex justify-between items-start mb-8">
+              {isDarkMode && <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '120%', height: '120%', background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.15) 0%, transparent 60%)', pointerEvents: 'none' }} />}
+              
+              <div className="flex justify-between items-start mb-8 relative z-10">
                 <div>
-                  <h3 className="text-3xl font-bold" style={{ color: colors.text }}>{analyzedStock.ticker}</h3>
-                  <p className="text-base mt-1" style={{ color: colors.muted }}>{analyzedStock.name}</p>
+                  <h3 className="text-4xl font-bold tracking-tight" style={{ color: colors.text }}>{analyzedStock.ticker}</h3>
+                  <p className="text-lg mt-1 font-mono uppercase" style={{ color: colors.muted }}>{analyzedStock.name}</p>
                 </div>
                 <button
                   onClick={() => setAnalyzedStock(null)}
-                  className="p-1 rounded-lg transition-colors"
-                  style={{ color: colors.muted }}
+                  className="p-2 rounded-full transition-colors backdrop-blur-sm"
+                  style={{ color: colors.muted, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.color = colors.text;
-                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.color = colors.muted;
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
                   }}
                 >
                   <X size={24} />
                 </button>
               </div>
 
-              <Card variant="raised" className="p-6 mb-6" style={{ backgroundColor: isDarkMode ? '#2a2a2d' : '#ffffff' }}>
+              <div className="relative z-10">
+                <Card variant="raised" className="mb-6" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : '#ffffff', border: `1px solid ${colors.border}`, padding: '24px' }}>
                 <h4 className="text-sm font-mono uppercase mb-4" style={{ color: colors.muted }}>Bollinger Bands (20, 2)</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
@@ -470,10 +602,10 @@ export default function SectorRotation() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <Card
-                  className="p-5"
                   style={{
                     backgroundColor: analyzedStock.price > (analyzedStock.sma50 || 0) ? 'rgba(16, 185, 129, 0.1)' : colors.surface,
-                    borderColor: analyzedStock.price > (analyzedStock.sma50 || 0) ? 'rgba(16, 185, 129, 0.3)' : colors.border
+                    borderColor: analyzedStock.price > (analyzedStock.sma50 || 0) ? 'rgba(16, 185, 129, 0.3)' : colors.border,
+                    padding: '20px'
                   }}
                 >
                   <span className="text-xs uppercase" style={{ color: colors.muted }}>Price vs SMA50</span>
@@ -482,10 +614,10 @@ export default function SectorRotation() {
                   </p>
                 </Card>
                 <Card
-                  className="p-5"
                   style={{
                     backgroundColor: analyzedStock.price > (analyzedStock.sma200 || 0) ? 'rgba(16, 185, 129, 0.1)' : colors.surface,
-                    borderColor: analyzedStock.price > (analyzedStock.sma200 || 0) ? 'rgba(16, 185, 129, 0.3)' : colors.border
+                    borderColor: analyzedStock.price > (analyzedStock.sma200 || 0) ? 'rgba(16, 185, 129, 0.3)' : colors.border,
+                    padding: '20px'
                   }}
                 >
                   <span className="text-xs uppercase" style={{ color: colors.muted }}>Price vs SMA200</span>
@@ -495,7 +627,7 @@ export default function SectorRotation() {
                 </Card>
               </div>
 
-              <Card variant="raised" className="p-5" style={{ backgroundColor: isDarkMode ? '#2a2a2d' : '#ffffff' }}>
+              <Card variant="raised" style={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : '#ffffff', border: `1px solid ${colors.border}`, padding: '20px' }}>
                 <h4 className="text-sm font-mono uppercase mb-3" style={{ color: colors.muted }}>Setup Strength</h4>
                 <div className="flex items-center gap-5">
                   <div
@@ -507,7 +639,7 @@ export default function SectorRotation() {
                       style={{
                         width: `${getStrengthScore(analyzedStock)}%`,
                         background: getStrengthScore(analyzedStock) >= 75
-                          ? 'linear-gradient(to right, #059669, #34d399)'
+                          ? 'linear-gradient(to right, #059669, #34D399)'
                           : getStrengthScore(analyzedStock) >= 50
                             ? 'linear-gradient(to right, #d97706, #fbbf24)'
                             : 'linear-gradient(to right, #dc2626, #f87171)'
@@ -518,7 +650,7 @@ export default function SectorRotation() {
                     className="text-xl font-mono font-bold"
                     style={{
                       color: getStrengthScore(analyzedStock) >= 75
-                        ? '#34d399'
+                        ? '#34D399'
                         : getStrengthScore(analyzedStock) >= 50
                           ? '#fbbf24'
                           : '#f87171'
@@ -528,10 +660,148 @@ export default function SectorRotation() {
                   </span>
                 </div>
               </Card>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Chart Modal */}
+      <AnimatePresence>
+        {chartTicker && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setChartTicker(null)}
+            className="fixed inset-0 backdrop-blur-md z-[60] flex items-center justify-center p-4 md:p-12"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0c0c0e] border border-white/10 rounded-3xl w-full max-w-[90vw] max-h-[95vh] overflow-y-auto shadow-2xl shadow-emerald-500/10"
+            >
+              {/* Chart Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/5 sticky top-0 z-20 backdrop-blur-md">
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/30">
+                    <TrendingUp className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white leading-tight">{chartTicker} Technical Chart</h3>
+                    <p className="text-sm text-zinc-400 font-mono uppercase tracking-widest mt-0.5">Bollinger Bands (20, 2) Overlay</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setChartTicker(null)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Chart Content */}
+              <div className="p-2 relative min-h-[750px]">
+                {isChartLoading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <Activity className="w-12 h-12 text-emerald-500 animate-spin" />
+                    <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">Fetching Market Data...</p>
+                  </div>
+                ) : chartData.length > 0 ? (
+                  <div className="p-4">
+                    <CandleStickChart
+                      key={chartTicker}
+                      height={750}
+                      data={chartData}
+                      indicators={[
+                        {
+                          name: 'Upper Band',
+                          type: 'line',
+                          color: 'rgba(16, 185, 129, 0.4)',
+                          data: chartData.filter(d => d.bb_upper !== undefined).map(d => ({ time: d.time, value: d.bb_upper }))
+                        },
+                        {
+                          name: 'Middle Band',
+                          type: 'line',
+                          color: 'rgba(16, 185, 129, 0.2)',
+                          data: chartData.filter(d => d.bb_middle !== undefined).map(d => ({ time: d.time, value: d.bb_middle }))
+                        },
+                        {
+                          name: 'Lower Band',
+                          type: 'line',
+                          color: 'rgba(16, 185, 129, 0.4)',
+                          data: chartData.filter(d => d.bb_lower !== undefined).map(d => ({ time: d.time, value: d.bb_lower }))
+                        },
+                        {
+                          name: 'SMA 50',
+                          type: 'line',
+                          color: 'rgba(59, 130, 246, 0.4)',
+                          data: chartData.filter(d => d.sma50 !== undefined).map(d => ({ time: d.time, value: d.sma50 }))
+                        }
+                      ]}
+                    />
+                    
+                    <div className="mt-8 grid grid-cols-3 gap-6 px-4 pb-6">
+                      <div className="bg-white/5 border border-white/5 rounded-3xl p-8">
+                        <div className="flex justify-between items-end mb-6">
+                          <p className="text-sm text-emerald-500 uppercase font-bold tracking-widest">Price Action</p>
+                          <p className="text-4xl font-mono text-white font-bold leading-none">${chartData[chartData.length - 1]?.close.toFixed(2)}</p>
+                        </div>
+                        <div className="space-y-4 pt-6 border-t border-white/5">
+                          <div className="flex justify-between text-xl font-mono">
+                            <span className="text-zinc-500 uppercase">SMA 20</span>
+                            <span className="text-emerald-400 font-bold">${chartData[chartData.length - 1]?.sma20?.toFixed(2) || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between text-xl font-mono">
+                            <span className="text-zinc-500 uppercase">SMA 50</span>
+                            <span className="text-emerald-400 font-bold">${chartData[chartData.length - 1]?.sma50?.toFixed(2) || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white/5 border border-white/5 rounded-3xl p-8">
+                        <div className="flex justify-between items-end mb-6">
+                          <p className="text-sm text-blue-500 uppercase font-bold tracking-widest">Volume Metrics</p>
+                          <p className="text-4xl font-mono text-white font-bold leading-none">{(chartData[chartData.length - 1]?.volume / 1000000).toFixed(2)}M</p>
+                        </div>
+                        <div className="space-y-4 pt-6 border-t border-white/5">
+                          <div className="flex justify-between text-xl font-mono">
+                            <span className="text-zinc-500 uppercase">SMA 20 (V)</span>
+                            <span className="text-blue-400 font-bold">{(chartData[chartData.length - 1]?.vol_sma20 / 1000000).toFixed(2)}M</span>
+                          </div>
+                          <div className="flex justify-between text-xl font-mono">
+                            <span className="text-zinc-500 uppercase">SMA 50 (V)</span>
+                            <span className="text-blue-400 font-bold">{(chartData[chartData.length - 1]?.vol_sma50 / 1000000).toFixed(2)}M</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/5 rounded-3xl p-8 flex flex-col justify-center items-center">
+                        <div className="text-center w-full">
+                          <p className="text-sm text-zinc-500 uppercase font-bold tracking-widest mb-2">Timeframe</p>
+                          <p className="text-4xl font-mono text-white font-bold">Daily (150D)</p>
+                          <div className="mt-6 pt-6 border-t border-white/5 w-full">
+                            <p className="text-sm text-zinc-500 uppercase font-bold tracking-widest mb-2">Market Status</p>
+                            <p className="text-xl font-mono text-emerald-500 font-bold uppercase tracking-widest">Live Data Active</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+                    Unable to load chart data for {chartTicker}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      </div>
     </div>
   )
 }
