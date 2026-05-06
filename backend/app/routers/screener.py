@@ -7,13 +7,12 @@ Supports two screening modes:
 Includes real-time SSE streaming of agent logs and progress.
 """
 
-import os
 import uuid
 import json
 import logging
 import asyncio
 from typing import List, Optional, Dict, Any, Literal
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -154,9 +153,9 @@ async def parse_filters(request: ParseFiltersRequest):
             "raw_prompt": request.prompt,
             "message": "Filters parsed successfully. Review and edit before scanning."
         }
-    except Exception as e:
-        logger.error(f"Filter parsing failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Filter parsing failed: {str(e)}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Filter parsing failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Filter parsing failed: {str(e)}") from e
 
 
 @router.post("/scan", response_model=Dict[str, Any])
@@ -386,12 +385,12 @@ async def download_report(scan_id: str):
             ai_report=ai_report,
             stats=stats
         )
-    except Exception as e:
-        logger.error(f"PDF generation failed for scan {scan_id}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("PDF generation failed for scan %s: %s", scan_id, e)
         raise HTTPException(
             status_code=500,
             detail=f"PDF generation failed: {str(e)}"
-        )
+        ) from e
 
     safe_mode = mode.replace("_", "-")
     filename = f"tradecraft-screener-{safe_mode}-{scan_id[:8]}.pdf"
@@ -527,8 +526,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
         _push_event(scan_id, "status", {"status": "completed", "progress": 100})
         update_agent_log("System", f"Scan complete. {len(result.get('results', []))} stocks found.")
 
-    except Exception as e:
-        logger.error(f"Scan {scan_id} failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Scan %s failed: %s", scan_id, e)
         scan_status[scan_id]["status"] = "failed"
         scan_status[scan_id]["error"] = str(e)
         _push_event(scan_id, "status", {"status": "failed", "error": str(e)})

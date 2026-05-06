@@ -3,14 +3,10 @@ TradeCraft - Unified Trading Application Backend
 FastAPI application combining Sector Rotation, Stock Screener, and QuantGen.
 """
 
-import os
 import logging
-from datetime import datetime
-from typing import Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.db import database
 
@@ -67,9 +63,9 @@ async def startup_event():
     connected = database.test_connection()
     database.set_db_connected(connected)
     if connected:
-        logger.info(f"✓ Database connected: {database.DB_HOST}:{database.DB_PORT}/{database.DB_NAME}")
+        logger.info("Database connected: %s:%s/%s", database.DB_HOST, database.DB_PORT, database.DB_NAME)
     else:
-        logger.warning(f"✗ Database connection failed - some features will use fallback data")
+        logger.warning("Database connection failed - some features will use fallback data")
 
 
 # Import routers

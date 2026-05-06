@@ -6,7 +6,7 @@ Ported from Sector-Rotation-Scanner Express.js server.
 
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.db.database import engine, SECTOR_ETFS, SECTOR_NAME_MAP
@@ -83,8 +83,8 @@ async def get_forward_return(ticker: str, from_date: str, holding_days: int = 30
         if result and result[0] is not None:
             return float(result[0])
         return None
-    except Exception as e:
-        logger.debug(f"Error getting forward return for {ticker}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Error getting forward return for %s: %s", ticker, e)
         return None
 
 
@@ -130,8 +130,8 @@ async def get_ticker_performance(ticker: str, cutoff_date: Optional[str] = None)
                 'perf_6m': float(result[3]) if result[3] else 0.0
             }
         return None
-    except Exception as e:
-        logger.debug(f"Error getting performance for {ticker}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Error getting performance for %s: %s", ticker, e)
         return None
 
 
@@ -168,7 +168,7 @@ async def get_sectors(
             failures.append(sector['ticker'])
 
     if failures:
-        logger.warning(f"Failed to fetch performance for sectors: {', '.join(failures)}")
+        logger.warning("Failed to fetch performance for sectors: %s", ", ".join(failures))
 
     if not sector_data:
         # Return mock data if database is unavailable
@@ -224,7 +224,7 @@ async def get_sector_stocks(
             result = conn.execute(metadata_query, {"sector": sector_name})
             stocks = result.fetchall()
 
-        logger.info(f"Found {len(stocks)} stocks in sector {sector_name}")
+        logger.info("Found %d stocks in sector %s", len(stocks), sector_name)
 
         # Analyze each stock (limit to first 50 for performance)
         for stock in stocks[:50]:
@@ -358,15 +358,15 @@ async def get_sector_stocks(
                             'is_real_data': True
                         })
 
-            except Exception as e:
-                logger.debug(f"Skipping {ticker}: {e}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logger.debug("Skipping %s: %s", ticker, e)
                 continue
 
         # Sort by performance
         leaders.sort(key=lambda x: x['perf_3m'], reverse=True)
 
-    except Exception as e:
-        logger.error(f"Error getting stocks for sector {sector}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting stocks for sector %s: %s", sector, e)
         # Return mock data if database fails
         return [
             {
@@ -426,7 +426,7 @@ async def get_ohlcv(ticker: str):
         # Return sorted by time ascending (requirement for lightweight-charts)
         return sorted(ohlcv_data, key=lambda x: x['time'])
 
-    except Exception as e:
-        logger.error(f"Error getting OHLCV for {ticker}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting OHLCV for %s: %s", ticker, e)
         # Return empty list or mock data
         return []

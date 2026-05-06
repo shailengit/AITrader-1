@@ -4,7 +4,6 @@ import {
   TrendingUp,
   Activity,
   ArrowUpRight,
-  BarChart3,
   BarChart2,
   CheckCircle2,
   X,
@@ -174,10 +173,6 @@ export default function SectorRotation() {
       if (!res.ok) throw new Error('Failed to fetch OHLCV')
       const data = await res.json()
       
-      // Calculate Bollinger Bands on the client side
-      const period = 20
-      const stdDevMult = 2
-      
       const processedData = data.map((d: any, i: number) => {
         const result = { ...d }
         
@@ -219,16 +214,6 @@ export default function SectorRotation() {
   }
 
   const formatPercent = (val: number) => (val * 100).toFixed(2) + '%'
-
-  const getOrdinal = (n: number): string => {
-    const s = ['th', 'st', 'nd', 'rd']
-    const v = n % 100
-    return n + (s[(v - 20) % 10] || s[v] || s[0])
-  }
-
-  const getLeaderboardPosition = (ticker: string): number => {
-    return sectors.findIndex(s => s.ticker === ticker) + 1
-  }
 
   const getStrengthScore = (stock: Stock): number => {
     let score = 0

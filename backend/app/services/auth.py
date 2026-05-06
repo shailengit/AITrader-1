@@ -44,8 +44,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
     try:
         return pwd_context.verify(plain_password, hashed_password)
-    except Exception as e:
-        logger.error(f"Password verification failed: {e}")
+    except (ValueError, TypeError) as e:
+        logger.error("Password verification failed: %s", e)
         return False
 
 
@@ -55,9 +55,9 @@ def get_password_hash(password: str) -> str:
         raise ValueError("Password hashing not available")
     try:
         return pwd_context.hash(password)
-    except Exception as e:
-        logger.error(f"Password hashing failed: {e}")
-        raise ValueError("Failed to hash password")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Password hashing failed: %s", e)
+        raise ValueError("Failed to hash password") from e
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -80,9 +80,9 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     try:
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
-    except Exception as e:
-        logger.error(f"Failed to create access token: {e}")
-        raise ValueError("Failed to create access token")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to create access token: %s", e)
+        raise ValueError("Failed to create access token") from e
 
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
@@ -101,9 +101,9 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     try:
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
-    except Exception as e:
-        logger.error(f"Failed to create refresh token: {e}")
-        raise ValueError("Failed to create refresh token")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Failed to create refresh token: %s", e)
+        raise ValueError("Failed to create refresh token") from e
 
 
 def verify_token(token: str) -> Optional[Dict[str, Any]]:
@@ -114,10 +114,10 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except JWTError as e:
-        logger.warning(f"Token verification failed: {e}")
+        logger.warning("Token verification failed: %s", e)
         return None
-    except Exception as e:
-        logger.error(f"Unexpected token error: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Unexpected token error: %s", e)
         return None
 
 

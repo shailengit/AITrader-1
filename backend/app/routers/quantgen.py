@@ -6,15 +6,12 @@ Ported from QuantGen FastAPI backend with database integration.
 
 import os
 import logging
-import itertools
-import numpy as np
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.llm_engine import (
     generate_strategy_code,
-    fix_strategy_code,
     chat_about_code,
     is_llm_available,
     get_model_name
@@ -25,7 +22,6 @@ from app.services.validators import (
     validate_api_request,
     BaseValidationError,
     SecurityValidationError,
-    DataValidationError,
     sanitize_filename,
     validate_file_path,
     StrategyValidator
@@ -83,7 +79,7 @@ def _extract_error_details_from_result(result: dict, code: str) -> dict:
             else _get_default_suggestion(error_type, error_str, line_content)
         )
         related_lesson = lesson["id"] if lesson else None
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         error_type = "UNKNOWN"
         suggestion = _get_default_suggestion("UNKNOWN", error_str, line_content)
         related_lesson = None
@@ -101,7 +97,7 @@ def _extract_error_details_from_result(result: dict, code: str) -> dict:
     }
 
 
-def _get_default_suggestion(error_type: str, error_message: str, line_content: Optional[str]) -> str:
+def _get_default_suggestion(error_type: str, error_message: str, _line_content: Optional[str]) -> str:
     """Generate a default suggestion based on error type."""
     suggestions = {
         "VBT_COMPARISON_OPERATOR": (
@@ -199,7 +195,7 @@ async def generate_strategy(request: GenerateRequest):
     Uses database (PostgreSQL) for historical data instead of yfinance.
     """
     try:
-        logger.info(f"Generating strategy for tickers: {request.tickers}")
+        logger.info("Generating strategy for tickers: %s", request.tickers)
 
         if not is_llm_available():
             return {
@@ -239,7 +235,7 @@ async def generate_strategy(request: GenerateRequest):
         )
 
         if code is None:
-            logger.error(f"Strategy generation failed: {error_msg}")
+            logger.error("Strategy generation failed: %s", error_msg)
             return {
                 "success": False,
                 "error": {
@@ -294,8 +290,9 @@ async def generate_strategy(request: GenerateRequest):
             }
 
         logger.error(
-            f"Strategy generation failed after {verification.fix_attempts} attempts. "
-            f"Error: {verification.error_details.message if verification.error_details else 'Unknown'}"
+            "Strategy generation failed after %d attempts. Error: %s",
+            verification.fix_attempts,
+            verification.error_details.message if verification.error_details else "Unknown"
         )
         return {
             "success": False,
@@ -311,8 +308,8 @@ async def generate_strategy(request: GenerateRequest):
             }
         }
 
-    except Exception as e:
-        logger.error(f"Strategy generation failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Strategy generation failed: %s", e)
         return {
             "success": False,
             "error": str(e)
@@ -326,7 +323,7 @@ async def run_strategy_endpoint(request: RunRequest):
     If use_database is True, fetches data from PostgreSQL instead of yfinance.
     """
     try:
-        logger.info(f"Running strategy (length: {len(request.code)} chars)")
+        logger.info("Running strategy (length: %d chars)", len(request.code))
 
         # Validate input
         try:
@@ -363,7 +360,7 @@ async def run_strategy_endpoint(request: RunRequest):
             }
         else:
             error_str = result.get("error", "Unknown error")
-            logger.error(f"Strategy execution failed: {error_str}")
+            logger.error("Strategy execution failed: %s", error_str)
 
             # Extract structured error details
             error_details = _extract_error_details_from_result(result, validated.code)
@@ -380,8 +377,8 @@ async def run_strategy_endpoint(request: RunRequest):
                 }
             }
 
-    except Exception as e:
-        logger.error(f"Strategy execution failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Strategy execution failed: %s", e)
         return {
             "success": False,
             "error": str(e)
@@ -395,7 +392,7 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
     Uses walk-forward optimization by default.
     """
     try:
-        logger.info(f"Starting optimization with params: {request.strategy_params}")
+        logger.info("Starting optimization with params: %s", request.strategy_params)
 
         # Validate input
         try:
@@ -425,7 +422,7 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
 
         # Check if there was an error
         if result.get("output", "").startswith("Optimization Error") or result.get("output", "").startswith("\nOptimization Error"):
-            logger.error(f"Optimization failed: {result.get('output', '')}")
+            logger.error("Optimization failed: %s", result.get("output", ""))
             return {
                 "success": False,
                 "error": {
@@ -443,9 +440,9 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
             "message": "Optimization completed successfully"
         }
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         import traceback
-        logger.error(f"Optimization failed: {e}")
+        logger.error("Optimization failed: %s", e)
         logger.error(traceback.format_exc())
         return {
             "success": False,
@@ -489,7 +486,7 @@ async def chat_about_code_endpoint(request: ChatRequest):
     Maintains conversation context for iterative refinement.
     """
     try:
-        logger.info(f"Chat request (code length: {len(request.code)} chars, messages: {len(request.messages)})")
+        logger.info("Chat request (code length: %d chars, messages: %d)", len(request.code), len(request.messages))
 
         if not is_llm_available():
             return {
@@ -508,7 +505,7 @@ async def chat_about_code_endpoint(request: ChatRequest):
         )
 
         if error_msg:
-            logger.error(f"Chat error: {error_msg}")
+            logger.error("Chat error: %s", error_msg)
             return {
                 "success": False,
                 "error": {
@@ -528,8 +525,8 @@ async def chat_about_code_endpoint(request: ChatRequest):
             }
         }
 
-    except Exception as e:
-        logger.error(f"Chat failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Chat failed: %s", e)
         return {
             "success": False,
             "error": str(e)
@@ -558,9 +555,9 @@ async def list_strategies():
             "message": f"Found {len(strategy_names)} strategies"
         }
 
-    except Exception as e:
-        logger.error(f"Error listing strategies: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error listing strategies: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/strategies")
@@ -597,12 +594,12 @@ async def save_strategy(strategy: StrategyModel):
         if os.path.exists(path):
             backup_path = f"{path}.backup"
             shutil.copy2(path, backup_path)
-            logger.info(f"Created backup: {backup_path}")
+            logger.info("Created backup: %s", backup_path)
 
         with open(path, "w", encoding="utf-8") as f:
             f.write(strategy.code)
 
-        logger.info(f"Strategy saved: {safe_name}")
+        logger.info("Strategy saved: %s", safe_name)
 
         return {
             "success": True,
@@ -614,9 +611,9 @@ async def save_strategy(strategy: StrategyModel):
             "message": f"Strategy '{safe_name}' saved successfully"
         }
 
-    except Exception as e:
-        logger.error(f"Error saving strategy: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error saving strategy: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/strategies/{name}")
@@ -637,7 +634,7 @@ async def get_strategy(name: str):
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        logger.info(f"Strategy loaded: {safe_name}")
+        logger.info("Strategy loaded: %s", safe_name)
 
         return {
             "success": True,
@@ -652,9 +649,9 @@ async def get_strategy(name: str):
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error loading strategy: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error loading strategy: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.delete("/strategies/{name}")
@@ -678,7 +675,7 @@ async def delete_strategy(name: str):
         shutil.copy2(path, backup_path)
         os.remove(path)
 
-        logger.info(f"Strategy deleted: {safe_name} (backup: {backup_path})")
+        logger.info("Strategy deleted: %s (backup: %s)", safe_name, backup_path)
 
         return {
             "success": True,
@@ -691,9 +688,9 @@ async def delete_strategy(name: str):
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting strategy: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error deleting strategy: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/indicators")
@@ -709,9 +706,9 @@ async def list_indicators():
             },
             "message": f"Found {len(indicators)} indicators"
         }
-    except Exception as e:
-        logger.error(f"Error listing indicators: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error listing indicators: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/latest-date")
@@ -733,8 +730,8 @@ async def get_latest_date():
                 "data": {"latest_date": latest},
                 "message": f"Latest available date: {latest}"
             }
-    except Exception as e:
-        logger.warning(f"Could not fetch latest date from DB: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.warning("Could not fetch latest date from DB: %s", e)
 
     # Fallback to today if DB is unavailable
     from datetime import datetime

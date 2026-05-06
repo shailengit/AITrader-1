@@ -7,7 +7,7 @@ import os
 import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
@@ -74,10 +74,10 @@ def test_connection():
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        logger.info(f"Successfully connected to database: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        logger.info("Successfully connected to database: %s:%s/%s", DB_HOST, DB_PORT, DB_NAME)
         return True
-    except Exception as e:
-        logger.error(f"Database connection failed: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Database connection failed: %s", e)
         return False
 
 
@@ -117,5 +117,5 @@ db_connected = False
 
 def set_db_connected(connected: bool):
     """Set the database connection status."""
-    global db_connected
+    global db_connected  # pylint: disable=global-statement
     db_connected = connected
