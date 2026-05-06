@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-28T12:00:00Z",
+  "title": "Design System: TradeCraft",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Execution Green",
+        "canonical": "oklch(62% 0.18 160)",
+        "tonalRamp": [
+          "oklch(15% 0.04 160)",
+          "oklch(25% 0.07 160)",
+          "oklch(35% 0.10 160)",
+          "oklch(45% 0.13 160)",
+          "oklch(55% 0.16 160)",
+          "oklch(62% 0.18 160)",
+          "oklch(72% 0.16 160)",
+          "oklch(85% 0.10 160)"
+        ]
+      },
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Abyss",
+        "canonical": "oklch(5% 0.005 160)",
+        "tonalRamp": [
+          "oklch(2% 0.003 160)",
+          "oklch(5% 0.005 160)",
+          "oklch(8% 0.005 160)",
+          "oklch(12% 0.005 160)",
+          "oklch(16% 0.005 160)",
+          "oklch(24% 0.005 160)",
+          "oklch(40% 0.005 160)",
+          "oklch(95% 0.005 160)"
+        ]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Void",
+        "canonical": "oklch(8% 0.005 160)",
+        "tonalRamp": [
+          "oklch(5% 0.005 160)",
+          "oklch(8% 0.005 160)",
+          "oklch(11% 0.005 160)",
+          "oklch(14% 0.005 160)",
+          "oklch(18% 0.005 160)",
+          "oklch(26% 0.005 160)",
+          "oklch(42% 0.005 160)",
+          "oklch(96% 0.005 160)"
+        ]
+      },
+      "foreground-dark": {
+        "role": "neutral",
+        "displayName": "Chalk",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "oklch(30% 0.003 160)",
+          "oklch(45% 0.003 160)",
+          "oklch(55% 0.003 160)",
+          "oklch(65% 0.003 160)",
+          "oklch(75% 0.003 160)",
+          "oklch(85% 0.003 160)",
+          "oklch(95% 0.003 160)",
+          "oklch(100% 0 0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero page titles. Once per view."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Primary reading text. Reports, descriptions, analysis."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Category markers, filter names, badge text. Uppercase."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Code, tickers, numerical output, strategy parameters."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-card",
+        "value": "rgba(0,0,0,0.4) 0px 8px 32px 0px",
+        "purpose": "Default card shadow. Soft, diffuse, atmospheric."
+      },
+      {
+        "name": "elevated-modal",
+        "value": "0 20px 60px rgba(0,0,0,0.5), 0 0 100px rgba(16,185,129,0.1)",
+        "purpose": "Modals and highest-level overlays. Green glow accent."
+      },
+      {
+        "name": "hover-lift",
+        "value": "0 8px 25px rgba(0,0,0,0.3)",
+        "purpose": "Interactive element hover state. Paired with translateY(-2px)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default state transitions: hover, focus, active."
+      },
+      {
+        "name": "ease-out-quint",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Entrance animations: fade-in-up, scale-in."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "Micro-interactions: hover, focus rings."
+      },
+      {
+        "name": "duration-standard",
+        "value": "300ms",
+        "purpose": "Component transitions: expand, collapse, modal open."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "768px" },
+      { "name": "md", "value": "1280px" },
+      { "name": "lg", "value": "1440px" },
+      { "name": "xl", "value": "1728px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call-to-action. The button that commits. Appears once per section.",
+      "html": "<button class=\"ds-btn-primary\">\n  <svg class=\"ds-btn-primary-icon\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M5 12h14M12 5l7 7-7 7\"/></svg>\n  Launch Scanner\n</button>",
+      "css": ".ds-btn-primary {\n  background: #10B981;\n  color: #000000;\n  padding: 18px 42px;\n  border-radius: 999px;\n  font-family: 'Inter', 'SF Pro Display', sans-serif;\n  font-size: 18px;\n  font-weight: 600;\n  letter-spacing: -0.01em;\n  border: none;\n  cursor: pointer;\n  display: inline-flex;\n  align-items: center;\n  gap: 12px;\n  box-shadow: 0 0 40px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(255,255,255,0.2);\n  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n}\n.ds-btn-primary:hover {\n  background: #34D399;\n  transform: translateY(-2px);\n  box-shadow: 0 0 60px rgba(16, 185, 129, 0.6), inset 0 2px 4px rgba(255,255,255,0.3);\n}\n.ds-btn-primary:active {\n  background: #059669;\n  transform: translateY(0);\n  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);\n}\n.ds-btn-primary:focus-visible {\n  outline: 2px solid #10B981;\n  outline-offset: 4px;\n}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action. Present but not dominant. Used alongside primary buttons.",
+      "html": "<button class=\"ds-btn-ghost\">\n  <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"M21 21l-4.3-4.3\"/></svg>\n  Explore Features\n</button>",
+      "css": ".ds-btn-ghost {\n  background: rgba(255,255,255,0.03);\n  color: #ffffff;\n  padding: 18px 42px;\n  border-radius: 999px;\n  font-family: 'Inter', 'SF Pro Display', sans-serif;\n  font-size: 18px;\n  font-weight: 500;\n  letter-spacing: -0.01em;\n  border: 1px solid rgba(255,255,255,0.25);\n  cursor: pointer;\n  display: inline-flex;\n  align-items: center;\n  gap: 10px;\n  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n}\n.ds-btn-ghost:hover {\n  background: rgba(255,255,255,0.08);\n  border-color: rgba(255,255,255,0.4);\n  transform: translateY(-2px);\n}\n.ds-btn-ghost:focus-visible {\n  outline: 2px solid #10B981;\n  outline-offset: 4px;\n}"
+    },
+    {
+      "name": "Content Card",
+      "kind": "card",
+      "refersTo": "card-base",
+      "description": "Primary content container. Holds charts, data, and analysis. Resting surface.",
+      "html": "<div class=\"ds-card\">\n  <span class=\"ds-card-label\">Sector Acceleration Scan</span>\n  <div class=\"ds-card-content\">Chart content here</div>\n</div>",
+      "css": ".ds-card {\n  background: #0a0a0a;\n  color: #ffffff;\n  padding: 32px;\n  border-radius: 20px;\n  border: 1px solid rgba(255,255,255,0.08);\n  box-shadow: rgba(0,0,0,0.4) 0px 8px 32px 0px;\n  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n}\n.ds-card-label {\n  font-family: 'Inter', sans-serif;\n  font-size: 12px;\n  font-weight: 600;\n  text-transform: uppercase;\n  letter-spacing: 0.15em;\n  color: rgba(255,255,255,0.7);\n  display: block;\n  margin-bottom: 16px;\n}\n.ds-card-content {\n  color: rgba(255,255,255,0.4);\n  font-size: 14px;\n}"
+    },
+    {
+      "name": "Selected Card",
+      "kind": "card",
+      "refersTo": "card-raised",
+      "description": "Active/selected card variant. Execution Green border signals selection.",
+      "html": "<div class=\"ds-card-selected\">\n  <div class=\"ds-card-selected-header\">\n    <span class=\"ds-card-badge\">1</span>\n    <svg class=\"ds-card-check\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#10B981\" stroke-width=\"2.5\"><path d=\"M20 6L9 17l-5-5\"/></svg>\n  </div>\n  <h3>XLK</h3>\n  <p>Technology Select Sector SPDR</p>\n  <span class=\"ds-card-value\">+12.45%</span>\n</div>",
+      "css": ".ds-card-selected {\n  background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.02) 100%);\n  color: #ffffff;\n  padding: 20px;\n  border-radius: 20px;\n  border: 1px solid rgba(16,185,129,0.4);\n  box-shadow: 0 10px 30px rgba(16,185,129,0.15);\n  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);\n  cursor: pointer;\n  position: relative;\n  overflow: hidden;\n}\n.ds-card-selected::before {\n  content: '';\n  position: absolute;\n  top: 0;\n  right: 0;\n  width: 150px;\n  height: 150px;\n  background: radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%);\n  pointer-events: none;\n}\n.ds-card-selected-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  margin-bottom: 16px;\n}\n.ds-card-badge {\n  width: 24px;\n  height: 24px;\n  border-radius: 50%;\n  background: #fbbf24;\n  color: #000;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-size: 12px;\n  font-weight: 700;\n}\n.ds-card-check {\n  width: 20px;\n  height: 20px;\n}\n.ds-card-value {\n  font-family: 'JetBrains Mono', monospace;\n  font-size: 20px;\n  color: #10B981;\n}"
+    },
+    {
+      "name": "Modal Container",
+      "kind": "custom",
+      "refersTo": "modal",
+      "description": "Focus-forcing overlay for detailed analysis and charts. Heavy backdrop, elevated container.",
+      "html": "<div class=\"ds-modal-backdrop\">\n  <div class=\"ds-modal\">\n    <div class=\"ds-modal-header\">\n      <h3>AAPL</h3>\n      <button class=\"ds-modal-close\">\n        <svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M18 6L6 18M6 6l12 12\"/></svg>\n      </button>\n    </div>\n    <div class=\"ds-modal-body\">Modal content</div>\n  </div>\n</div>",
+      "css": ".ds-modal-backdrop {\n  position: fixed;\n  inset: 0;\n  background: rgba(0,0,0,0.85);\n  backdrop-filter: blur(4px);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  padding: 32px;\n  z-index: 50;\n}\n.ds-modal {\n  background: rgba(23,23,23,0.95);\n  border: 1px solid rgba(255,255,255,0.08);\n  border-radius: 24px;\n  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 100px rgba(16,185,129,0.1);\n  padding: 40px;\n  max-width: 560px;\n  width: 100%;\n  position: relative;\n  overflow: hidden;\n}\n.ds-modal-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  margin-bottom: 32px;\n}\n.ds-modal-header h3 {\n  font-size: 40px;\n  font-weight: 700;\n  color: #ffffff;\n}\n.ds-modal-close {\n  padding: 8px;\n  border-radius: 50%;\n  background: rgba(255,255,255,0.05);\n  color: rgba(255,255,255,0.7);\n  border: none;\n  cursor: pointer;\n  transition: all 0.15s ease;\n}\n.ds-modal-close:hover {\n  background: rgba(255,255,255,0.15);\n  color: #ffffff;\n}\n.ds-modal-body {\n  color: rgba(255,255,255,0.7);\n  font-size: 17px;\n}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge-connected",
+      "description": "System status indicator. Green with pulsing dot = connected/live.",
+      "html": "<span class=\"ds-status-badge\">\n  <span class=\"ds-status-badge-dot\"></span>\n  S&P 1500 Connected\n</span>",
+      "css": ".ds-status-badge {\n  display: inline-flex;\n  align-items: center;\n  gap: 8px;\n  padding: 6px 16px;\n  border-radius: 999px;\n  background: rgba(16,185,129,0.15);\n  color: #34D399;\n  font-family: 'Inter', sans-serif;\n  font-size: 12px;\n  font-weight: 600;\n  letter-spacing: 0.15em;\n  text-transform: uppercase;\n  border: 1px solid rgba(16,185,129,0.2);\n}\n.ds-status-badge-dot {\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n  background: #10B981;\n  animation: ds-pulse 2s ease-in-out infinite;\n}\n@keyframes ds-pulse {\n  0%, 100% { opacity: 1; }\n  50% { opacity: 0.5; }\n}"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Primary text input for search, commands, and custom prompts. Dark, minimal, focused.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Find me candidates for a high-growth breakout...\" />",
+      "css": ".ds-input {\n  width: 100%;\n  background: #000000;\n  color: rgba(255,255,255,0.85);\n  padding: 48px;\n  border-radius: 20px;\n  border: 1px solid rgba(255,255,255,0.05);\n  font-family: 'JetBrains Mono', 'Fira Code', monospace;\n  font-size: 24px;\n  line-height: 1.6;\n  outline: none;\n  transition: border-color 0.3s ease, box-shadow 0.3s ease;\n}\n.ds-input::placeholder {\n  color: rgba(255,255,255,0.2);\n}\n.ds-input:focus {\n  border-color: rgba(16,185,129,0.5);\n  box-shadow: 0 0 20px rgba(16,185,129,0.1);\n}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Instrument",
+    "overview": "TradeCraft's interface is a precision instrument for financial decision-making. Every surface, number, and chart feels machined — dark, cool, and exact. The tool disappears behind the data; what remains is clarity and the confidence to act. This is software built by people who understand that milliseconds and basis points matter, and that the interface should never be the thing you're thinking about when you're thinking about a trade.\n\nThe system is dark by default. Traders and analysts work early mornings and late nights, often in dim rooms facing large displays. The canvas recedes — a near-black (#050505) substrate that lets charts and numbers hold the visual field. Execution Green (#10B981) is the sole accent color: it signals positive momentum, confirmed breakouts, and actionable insight. Its rarity is its power. When you see green, it means something.\n\nThis system explicitly rejects the clutter and chaos of Yahoo Finance (ad-choked, no visual hierarchy), the consumer gamification of Robinhood (confetti, oversized padding), and the generic SaaS dashboard template (identical card grids with gradient accents). It is a tool for experts, and it looks like one.",
+    "keyCharacteristics": [
+      "Dark-first, precision-oriented. The canvas recedes; data advances.",
+      "Single accent (Execution Green) used sparingly. Color = signal, not decoration.",
+      "High information density with deliberate whitespace. Density is never chaos.",
+      "Tactile, assured components. Buttons commit. Cards have physical presence.",
+      "Native-quality charts and data visualization. TradingView-level craft."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Rule",
+        "body": "Execution Green is never decorative. It appears only where it communicates a positive signal: breakout confirmed, scan passed, backtest profitable, action available. If a green element doesn't mean \"go,\" it shouldn't be green.",
+        "section": "colors"
+      },
+      {
+        "name": "The Abyss Rule",
+        "body": "The canvas (#050505) is intentionally darker than the surfaces that sit on it. This creates ambient lift without shadows — surfaces advance by being slightly lighter than the void behind them. Never set a card background to the canvas color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Any column of numbers must use font-variant-numeric: tabular-nums. Aligned digits are non-negotiable in a financial interface.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Interactive elements are flat at rest. Shadows appear on hover, focus, or elevated state — they signal interactivity, not decoration. A card with a shadow but no hover response is a broken promise.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Use Execution Green only for positive signals and primary actions. It means \"go.\"",
+      "Use the tonal surface ramp (Void → Basalt → Shadow) for depth instead of multiple shadows on the same element.",
+      "Use tabular-nums on every column of numbers. Always.",
+      "Maintain 4.5:1 minimum contrast on body text.",
+      "Let data fill available width. Reading-length constraints (70ch) apply to prose, not tables.",
+      "Use 8px as the base spacing unit. Every gap should be a multiple of 8.",
+      "Animate only transform and opacity. Never animate layout properties."
+    ],
+    "donts": [
+      "Don't use border-left or border-right greater than 1px as a colored accent stripe.",
+      "Don't use gradient text (background-clip: text).",
+      "Don't use glassmorphism as a default surface treatment.",
+      "Don't nest cards inside cards.",
+      "Don't use Yahoo Finance-style clutter — multiple ad-sized cards, competing CTAs.",
+      "Don't use identical card grids with icon + heading + text repeated.",
+      "Don't wrap content in unnecessary containers.",
+      "Don't use Execution Green on negative signals or destructive actions.",
+      "Don't use em dashes."
+    ]
+  }
+}

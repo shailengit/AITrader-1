@@ -267,4 +267,4 @@ def generate_screener_report(
     # Methodology
     pdf.add_methodology(mode)
 
-    return pdf.output(dest="S")
+    return bytes(pdf.output(dest="S"))

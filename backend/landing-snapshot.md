@@ -1,0 +1,85 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Dashboard" [level=1] [ref=e10]
+    - button "Switch to dark mode" [ref=e12]:
+      - generic [ref=e13]:
+        - img [ref=e14]
+        - img [ref=e20]
+  - main [ref=e22]:
+    - generic [ref=e30]:
+      - button "Switch to dark mode" [ref=e32]:
+        - generic [ref=e33]:
+          - img [ref=e34]
+          - img [ref=e40]
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - img [ref=e44]
+          - generic [ref=e48]: PostgreSQL Powered
+        - heading "TradeCraft" [level=1] [ref=e49]
+        - paragraph [ref=e50]: Leverage cutting-edge AI for smarter stock screening, dynamic sector rotation, and advanced quantitative strategy building.
+        - generic [ref=e51]:
+          - link "Launch Scanner" [ref=e52] [cursor=pointer]:
+            - /url: /sectors
+            - text: Launch Scanner
+            - img [ref=e53]
+          - link "Explore Features" [ref=e55] [cursor=pointer]:
+            - /url: /sectors
+        - img "TradeCraft Dashboard" [ref=e57]
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - paragraph [ref=e60]: ~1,500
+          - paragraph [ref=e61]: S&P 1500 Coverage
+          - text: stocks
+        - generic [ref=e62]:
+          - paragraph [ref=e63]: "11"
+          - paragraph [ref=e64]: Sector ETFs
+          - text: sectors
+        - generic [ref=e65]:
+          - paragraph [ref=e66]: Daily
+          - paragraph [ref=e67]: Historical Data
+          - text: OHLCV
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: Agno
+          - paragraph [ref=e70]: AI Models
+          - text: + Ollama
+      - heading "Platform Tools" [level=2] [ref=e72]
+      - generic [ref=e73]:
+        - link "Sector Rotation Scanner Analyze sector ETF performance to identify momentum and rotation patterns. Find leading stocks within outperforming sectors. Sector acceleration metrics Momentum leader identification Bollinger Bands squeeze detection 3M/6M performance spread analysis" [ref=e74] [cursor=pointer]:
+          - /url: /sectors
+          - generic [ref=e75]:
+            - img [ref=e78]
+            - img [ref=e80]
+          - heading "Sector Rotation Scanner" [level=3] [ref=e82]
+          - paragraph [ref=e83]: Analyze sector ETF performance to identify momentum and rotation patterns. Find leading stocks within outperforming sectors.
+          - list [ref=e84]:
+            - listitem [ref=e85]: Sector acceleration metrics
+            - listitem [ref=e87]: Momentum leader identification
+            - listitem [ref=e89]: Bollinger Bands squeeze detection
+            - listitem [ref=e91]: 3M/6M performance spread analysis
+        - link "AI Stock Screener Multi-agent AI screening with technical and fundamental analysis. Find stocks with breakouts, accumulation patterns, and EPS acceleration. Volatility contraction detection OBV hidden accumulation EPS inflection verification AI-powered analysis workflow" [ref=e93] [cursor=pointer]:
+          - /url: /screener
+          - generic [ref=e94]:
+            - img [ref=e97]
+            - img [ref=e98]
+          - heading "AI Stock Screener" [level=3] [ref=e100]
+          - paragraph [ref=e101]: Multi-agent AI screening with technical and fundamental analysis. Find stocks with breakouts, accumulation patterns, and EPS acceleration.
+          - list [ref=e102]:
+            - listitem [ref=e103]: Volatility contraction detection
+            - listitem [ref=e105]: OBV hidden accumulation
+            - listitem [ref=e107]: EPS inflection verification
+            - listitem [ref=e109]: AI-powered analysis workflow
+        - link "QuantGen Strategy Builder AI-powered quantitative strategy generator with VectorBT backtesting. Create, test, and optimize trading strategies. AI code generation VectorBT backtesting Walk-forward optimization Strategy management" [ref=e111] [cursor=pointer]:
+          - /url: /quantgen
+          - generic [ref=e112]:
+            - img [ref=e115]
+            - img [ref=e117]
+          - heading "QuantGen Strategy Builder" [level=3] [ref=e119]
+          - paragraph [ref=e120]: AI-powered quantitative strategy generator with VectorBT backtesting. Create, test, and optimize trading strategies.
+          - list [ref=e121]:
+            - listitem [ref=e122]: AI code generation
+            - listitem [ref=e124]: VectorBT backtesting
+            - listitem [ref=e126]: Walk-forward optimization
+            - listitem [ref=e128]: Strategy management
+      - paragraph [ref=e131]: Combined from StockScreener, Sector-Rotation-Scanner, and QuantGen

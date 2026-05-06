@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Editor from "@monaco-editor/react";
 import {
   Play,
   Save,
@@ -13,15 +13,23 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Sparkles,
-} from 'lucide-react';
-import { OptimizationConfig } from '@/components/quantgen';
-import { useTheme } from '../../context/ThemeContext';
+  AlertCircle,
+  Bot,
+  User,
+  Code2,
+  Lightbulb,
+  FileCode,
+} from "lucide-react";
+import { OptimizationConfig } from "@/components/quantgen";
 
-const API_URL = '/api';
+import { useTheme } from "../../context/ThemeContext";
+
+const API_URL = "/api";
 
 interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -33,10 +41,10 @@ interface ParamRange {
 }
 
 interface WFOConfig {
-  type: 'rolling' | 'expanding';
+  type: "rolling" | "expanding";
   windows: number;
   ratio: number;
-  splitMethod: 'ratio' | 'fixed';
+  splitMethod: "ratio" | "fixed";
   train_days: number;
   test_days: number;
   start_date: string;
@@ -44,190 +52,667 @@ interface WFOConfig {
 }
 
 interface OptimizationConfigData {
-  mode: 'simple' | 'wfo' | 'true_wfo';
-  metric: 'total_return' | 'sharpe' | 'sortino' | 'max_dd';
+  mode: "simple" | "wfo" | "true_wfo";
+  metric: "total_return" | "sharpe" | "sortino" | "max_dd";
   wfo: WFOConfig;
 }
 
-// Default config
-const defaultOptConfig: OptimizationConfigData = {
-  mode: 'true_wfo',
-  metric: 'total_return',
+const makeDefaultOptConfig = (exportedStart?: string | null): OptimizationConfigData => ({
+  mode: "true_wfo",
+  metric: "total_return",
   wfo: {
-    type: 'rolling',
+    type: "rolling",
     windows: 10,
     ratio: 0.7,
-    splitMethod: 'ratio',
+    splitMethod: "ratio",
     train_days: 252,
     test_days: 63,
-    start_date: '2023-01-01',
-    end_date: '2024-01-01',
+    start_date: exportedStart || "2023-01-01",
+    end_date: "2024-01-01",
   },
-};
+});
 
 export default function Builder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isDarkMode } = useTheme();
-  const fromScreenerTicker = searchParams.get('ticker');
-  const [strategyPrompt, setStrategyPrompt] = useState('');
-  const [tickers, setTickers] = useState(() => {
-    // Pre-fill from AI Stock Screener if navigated with ?ticker=XYZ
-    return fromScreenerTicker || 'AAPL';
-  });
-  const [code, setCode] = useState('');
-  const [output, setOutput] = useState('');
+  const fromScreenerTickers = searchParams.get("tickers");
+  const fromScreenerDate = searchParams.get("from_date");
+  const importedTickers = fromScreenerTickers
+    ? fromScreenerTickers.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
+  const [strategyPrompt, setStrategyPrompt] = useState("");
+  const [tickers, setTickers] = useState(() => importedTickers[0] || "AAPL");
+  const [code, setCode] = useState("");
+  const [output, setOutput] = useState("");
   const [currentFilename, setCurrentFilename] = useState<string | null>(null);
   const isFirstLoad = useRef(true);
-
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [strategies, setStrategies] = useState<string[]>([]);
-
-  // Run mode
-  const [runMode, setRunMode] = useState<'backtest' | 'optimize'>('backtest');
-  const [optConfig, setOptConfig] = useState<OptimizationConfigData>(defaultOptConfig);
+  const [runMode, setRunMode] = useState<"backtest" | "optimize">("backtest");
+  const [optConfig, setOptConfig] =
+    useState<OptimizationConfigData>(() => makeDefaultOptConfig(fromScreenerDate));
   const [optParams, setOptParams] = useState<ParamRange[]>([]);
-
-  // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
+  const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const [showSaveDropdown, setShowSaveDropdown] = useState(false);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Theme-aware colors
-  const colors = {
-    text: isDarkMode ? '#FAFAFA' : '#1d1d1f',
-    muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    subtle: isDarkMode ? '#52525B' : '#86868b',
-    surface: isDarkMode ? '#27272A' : '#ffffff',
-    surfaceAlt: isDarkMode ? '#27272A' : '#f5f5f7',
-    border: isDarkMode ? '#3F3F46' : '#d2d2d7',
-    inputBg: isDarkMode ? '#18181B' : '#ffffff',
-    codeBg: isDarkMode ? '#1E1E1E' : '#ffffff',
-    consoleBg: isDarkMode ? '#09090B' : '#f5f5f7',
-    consoleText: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    chatUserBg: isDarkMode ? '#10B981' : '#059669',
-    chatAssistantBg: isDarkMode ? '#27272A' : '#e5e5e7',
-    chatAssistantText: isDarkMode ? '#D4D4D8' : '#1d1d1f',
-    accentBg: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
-    accentBorder: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.3)',
+  // Structured error state for rich error cards
+  const [structuredError, setStructuredError] = useState<{
+    type: string;
+    category: string;
+    message: string;
+    line?: number;
+    line_content?: string;
+    traceback?: string;
+    stdout?: string;
+    suggestion?: string;
+    related_lesson?: string;
+    fix_attempts?: number;
+  } | null>(null);
+
+  /** Replace ticker = '...' in strategy code with selected ticker */
+  const replaceTickerInCode = useCallback((codeStr: string, newTicker: string): string => {
+    return codeStr.replace(
+      /^(\s*)ticker\s*=\s*['"][^'"]*['"]/m,
+      `$1ticker = '${newTicker}'`
+    );
+  }, []);
+
+  /** Replace start/end dates in strategy code with selected dates */
+  const replaceDatesInCode = useCallback((codeStr: string, newStart: string, newEnd: string): string => {
+    let updated = codeStr;
+    // Replace start = 'YYYY-MM-DD' or start = "YYYY-MM-DD"
+    updated = updated.replace(
+      /^(\s*)start\s*=\s*['"]\d{4}-\d{2}-\d{2}['"]/m,
+      `$1start = '${newStart}'`
+    );
+    // Replace end = 'YYYY-MM-DD' or end = "YYYY-MM-DD"
+    updated = updated.replace(
+      /^(\s*)end\s*=\s*['"]\d{4}-\d{2}-\d{2}['"]/m,
+      `$1end = '${newEnd}'`
+    );
+    return updated;
+  }, []);
+
+  /** Extract python code block from AI response text */
+  const extractCodeFromMessage = (text: string): string | null => {
+    const match = text.match(/```python\n?([\s\S]*?)```/);
+    return match ? match[1].trim() : null;
   };
+
+  /** Render markdown-like formatting as JSX (bold, italic, inline code, lists) */
+  const formatText = (text: string): React.ReactNode[] => {
+    // Split by inline code first
+    const parts = text.split(/(`[^`]+`)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return (
+          <code
+            key={idx}
+            style={{
+              backgroundColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#e2e8f0",
+              padding: "2px 5px",
+              borderRadius: "4px",
+              fontSize: "0.9em",
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              color: isDarkMode ? "#c7d2fe" : "#475569",
+            }}
+          >
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+      // Then handle bold and italic
+      return (
+        <span key={idx} style={{ lineHeight: 1.6 }}>
+          {part.split(/(\*\*.+?\*\*|\*.+?\*)/).map((sub, sIdx) => {
+            if (sub.startsWith("**") && sub.endsWith("**")) {
+              return <strong key={sIdx}>{sub.slice(2, -2)}</strong>;
+            }
+            if (sub.startsWith("*") && sub.endsWith("*")) {
+              return <em key={sIdx}>{sub.slice(1, -1)}</em>;
+            }
+            return <span key={sIdx}>{sub}</span>;
+          })}
+        </span>
+      );
+    });
+  };
+
+  const renderMessageContent = (text: string): React.ReactNode[] => {
+    const blocks = text.split(/(```[\s\S]*?```)/g);
+    return blocks.map((block, i) => {
+      if (block.startsWith("```")) {
+        const code = block.replace(/^```(python)?\n?/, "").replace(/```$/, "");
+        return (
+          <div
+            key={i}
+            style={{
+              margin: "10px 0",
+              borderRadius: "8px",
+              overflow: "hidden",
+              border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.08)" : "#e2e8f0"}`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 12px",
+                fontSize: "11px",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                backgroundColor: isDarkMode ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                color: "var(--subtle)",
+                borderBottom: `1px solid ${isDarkMode ? "rgba(255,255,255,0.05)" : "#e2e8f0"}`,
+              }}
+            >
+              <Code2 size={12} />
+              Strategy Code
+            </div>
+            <pre
+              style={{
+                margin: 0,
+                padding: "10px 12px",
+                backgroundColor: isDarkMode ? "#0f0f1a" : "#f1f5f9",
+                fontSize: "12px",
+                lineHeight: 1.5,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                color: isDarkMode ? "#a5b4fc" : "#334155",
+                overflowX: "auto",
+                whiteSpace: "pre",
+              }}
+            >
+              {code}
+            </pre>
+          </div>
+        );
+      }
+      // Split by lines to handle lists
+      const lines = block.split("\n");
+      const elements: React.ReactNode[] = [];
+      let listItems: string[] = [];
+      const flushList = () => {
+        if (listItems.length === 0) return;
+        elements.push(
+          <ul
+            key={`list-${i}-${elements.length}`}
+            style={{ margin: "6px 0", paddingLeft: "18px", lineHeight: 1.6 }}
+          >
+            {listItems.map((item, li) => (
+              <li key={li} style={{ marginBottom: "2px" }}>
+                {formatText(item.replace(/^\s*[-*]\s+/, ""))}
+              </li>
+            ))}
+          </ul>
+        );
+        listItems = [];
+      };
+      for (const line of lines) {
+        if (/^\s*[-*]\s+/.test(line)) {
+          listItems.push(line);
+          continue;
+        }
+        if (listItems.length > 0) flushList();
+        if (line.trim()) {
+          elements.push(
+            <p
+              key={`p-${i}-${elements.length}`}
+              style={{ margin: "6px 0", lineHeight: 1.6 }}
+            >
+              {formatText(line)}
+            </p>
+          );
+        } else {
+          elements.push(
+            <div
+              key={`sp-${i}-${elements.length}`}
+              style={{ height: "4px" }}
+            />
+          );
+        }
+      }
+      flushList();
+      return <div key={i}>{elements}</div>;
+    });
+  };
+
+  /** Render a rich error card with type badge, line info, suggestion, collapsible traceback */
+  const ErrorCard = ({ error }: { error: NonNullable<typeof structuredError> }) => {
+    const [showTraceback, setShowTraceback] = useState(false);
+    const [showStdout, setShowStdout] = useState(false);
+
+    const isSyntax = error.category === "syntax";
+    const isValidation = error.category === "validation";
+    const isSecurity = error.category === "security";
+
+    let badgeColor = "#EF4444"; // red - execution
+    let badgeBg = "rgba(239,68,68,0.08)";
+    let borderColor = "rgba(239,68,68,0.15)";
+    if (isSyntax) {
+      badgeColor = "#F59E0B"; // amber
+      badgeBg = "rgba(245,158,11,0.08)";
+      borderColor = "rgba(245,158,11,0.15)";
+    } else if (isValidation) {
+      badgeColor = "#8B5CF6"; // purple
+      badgeBg = "rgba(139,92,246,0.08)";
+      borderColor = "rgba(139,92,246,0.15)";
+    } else if (isSecurity) {
+      badgeColor = "#DC2626"; // dark red
+      badgeBg = "rgba(220,38,38,0.08)";
+      borderColor = "rgba(220,38,38,0.15)";
+    }
+
+    return (
+      <div
+        style={{
+          padding: "16px",
+          borderRadius: "12px",
+          backgroundColor: badgeBg,
+          border: `1px solid ${borderColor}`,
+          marginBottom: "12px",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "10px",
+          }}
+        >
+          <AlertCircle size={18} color={badgeColor} />
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: badgeColor,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            {error.type}
+            {error.line ? ` (Line ${error.line})` : ""}
+          </span>
+          {error.fix_attempts != null && error.fix_attempts > 0 && (
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "var(--muted)",
+                marginLeft: "auto",
+              }}
+            >
+              {error.fix_attempts} fix attempt(s)
+            </span>
+          )}
+        </div>
+
+        {/* Message */}
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--foreground)",
+            marginBottom: "10px",
+            lineHeight: 1.5,
+          }}
+        >
+          {error.message}
+        </p>
+
+        {/* Line content */}
+        {error.line_content && (
+          <div
+            style={{
+              marginBottom: "10px",
+              padding: "10px 12px",
+              borderRadius: "8px",
+              backgroundColor: isDarkMode
+                ? "rgba(0,0,0,0.3)"
+                : "rgba(0,0,0,0.04)",
+              border: `1px solid ${borderColor}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--subtle)",
+                marginBottom: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <FileCode size={11} />
+              Line {error.line}
+            </div>
+            <pre
+              style={{
+                margin: 0,
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                color: "var(--foreground)",
+                overflowX: "auto",
+              }}
+            >
+              {error.line_content}
+            </pre>
+          </div>
+        )}
+
+        {/* Suggestion */}
+        {error.suggestion && (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "10px 12px",
+              borderRadius: "8px",
+              backgroundColor: isDarkMode
+                ? "rgba(16,185,129,0.06)"
+                : "rgba(16,185,129,0.06)",
+              border: `1px solid ${
+                isDarkMode ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.12)"
+              }`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                marginBottom: "4px",
+              }}
+            >
+              <Lightbulb size={13} color="#10B981" />
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#10B981",
+                }}
+              >
+                Suggestion
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "var(--foreground)",
+                lineHeight: 1.5,
+              }}
+            >
+              {error.suggestion}
+            </span>
+          </div>
+        )}
+
+        {/* Collapsible Traceback */}
+        {error.traceback && (
+          <div style={{ marginTop: "10px" }}>
+            <button
+              onClick={() => setShowTraceback(!showTraceback)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--subtle)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "4px 0",
+              }}
+            >
+              {showTraceback ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              Traceback
+            </button>
+            {showTraceback && (
+              <pre
+                style={{
+                  margin: "6px 0 0",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  backgroundColor: isDarkMode
+                    ? "rgba(0,0,0,0.3)"
+                    : "rgba(0,0,0,0.04)",
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  color: "var(--muted)",
+                  overflowX: "auto",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  lineHeight: 1.5,
+                }}
+              >
+                {error.traceback}
+              </pre>
+            )}
+          </div>
+        )}
+
+        {/* Collapsible Stdout */}
+        {error.stdout && (
+          <div style={{ marginTop: "8px" }}>
+            <button
+              onClick={() => setShowStdout(!showStdout)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--subtle)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "4px 0",
+              }}
+            >
+              {showStdout ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              Stdout
+            </button>
+            {showStdout && (
+              <pre
+                style={{
+                  margin: "6px 0 0",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  backgroundColor: isDarkMode
+                    ? "rgba(0,0,0,0.3)"
+                    : "rgba(0,0,0,0.04)",
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  color: "var(--muted)",
+                  overflowX: "auto",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  lineHeight: 1.5,
+                }}
+              >
+                {error.stdout}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const { isDarkMode } = useTheme();
+
+  // Responsive breakpoint
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Auto-dismiss error toast
+  useEffect(() => {
+    if (!errorToast) return;
+    const t = setTimeout(() => setErrorToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [errorToast]);
+
+  // Close dropdown on click outside
+  const saveDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showSaveDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      if (saveDropdownRef.current && !saveDropdownRef.current.contains(e.target as Node)) {
+        setShowSaveDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showSaveDropdown]);
 
   // Load saved state
   useEffect(() => {
     if (!isFirstLoad.current) return;
     isFirstLoad.current = false;
 
-    const saved = localStorage.getItem('builderState');
+    const saved = localStorage.getItem("builderState");
     if (saved) {
       try {
         const state = JSON.parse(saved);
-        if (state.code) setCode(state.code);
+        if (state.code) setCode(replaceDatesInCode(state.code, optConfig.wfo.start_date, optConfig.wfo.end_date));
         if (state.strategyPrompt) setStrategyPrompt(state.strategyPrompt);
         if (state.currentFilename) setCurrentFilename(state.currentFilename);
         if (state.runMode) setRunMode(state.runMode);
         if (state.optConfig) {
+          const base = makeDefaultOptConfig();
           setOptConfig({
-            ...defaultOptConfig,
+            ...base,
             ...state.optConfig,
-            wfo: {
-              ...defaultOptConfig.wfo,
-              ...(state.optConfig.wfo || {}),
-            },
+            wfo: { ...base.wfo, ...(state.optConfig.wfo || {}) },
           });
         }
         if (state.optParams) setOptParams(state.optParams);
         if (state.tickers) setTickers(state.tickers);
       } catch (e) {
-        console.error('Failed to restore state:', e);
+        console.error("Failed to restore state:", e);
       }
     }
     loadStrategies();
   }, []);
 
-  // Save state
-  const saveState = useCallback(() => {
-    const state = {
-      code,
-      strategyPrompt,
-      currentFilename,
-      runMode,
-      optConfig,
-      optParams,
-      tickers,
+  // Fetch latest DB date and apply exported dates from Sector Rotation
+  useEffect(() => {
+    const applyExportedDates = async () => {
+      try {
+        const res = await fetch("/api/latest-date");
+        const data = await res.json();
+        const latest = data.data?.latest_date || "2024-01-01";
+
+        setOptConfig((prev) => ({
+          ...prev,
+          wfo: {
+            ...prev.wfo,
+            start_date: fromScreenerDate || prev.wfo.start_date,
+            end_date: latest,
+          },
+        }));
+      } catch (e) {
+        console.error("Failed to fetch latest date:", e);
+      }
     };
-    localStorage.setItem('builderState', JSON.stringify(state));
-  }, [code, strategyPrompt, currentFilename, runMode, optConfig, optParams, tickers]);
+    applyExportedDates();
+  }, []);
+
+  const saveState = useCallback(() => {
+    localStorage.setItem(
+      "builderState",
+      JSON.stringify({
+        code,
+        strategyPrompt,
+        currentFilename,
+        runMode,
+        optConfig,
+        optParams,
+        tickers,
+      }),
+    );
+  }, [
+    code,
+    strategyPrompt,
+    currentFilename,
+    runMode,
+    optConfig,
+    optParams,
+    tickers,
+  ]);
 
   useEffect(() => {
-    if (!isFirstLoad.current) {
-      saveState();
-    }
+    if (!isFirstLoad.current) saveState();
   }, [saveState]);
 
   // Extract parameters from code
   useEffect(() => {
     if (!code) return;
-
-    const lines = code.split('\n');
+    const lines = code.split("\n");
     let inParamsSection = false;
     const foundParams: { name: string; value: number }[] = [];
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (
-        trimmed.toLowerCase().startsWith('# parameters') ||
-        trimmed.toLowerCase().startsWith('#parameters')
+        trimmed.toLowerCase().startsWith("# parameters") ||
+        trimmed.toLowerCase().startsWith("#parameters")
       ) {
         inParamsSection = true;
         continue;
       }
-
       if (inParamsSection) {
         if (!trimmed) continue;
-        if (trimmed.startsWith('#')) continue;
-
+        if (trimmed.startsWith("#")) continue;
         const match = trimmed.match(
-          /^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9.]+)(\s*#.*)?$/
+          /^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9.]+)(\s*#.*)?$/,
         );
         if (match) {
           const val = parseFloat(match[2]);
-          foundParams.push({
-            name: match[1],
-            value: isNaN(val) ? 10 : val,
-          });
-        } else {
-          break;
-        }
+          foundParams.push({ name: match[1], value: isNaN(val) ? 10 : val });
+        } else break;
       }
     }
 
     if (foundParams.length > 0) {
       setOptParams((prev) => {
         const existingMap = new Map(prev.map((p) => [p.name, p]));
-
         const newParams = foundParams.map((p) => {
-          if (existingMap.has(p.name)) {
-            return existingMap.get(p.name)!;
-          }
+          if (existingMap.has(p.name)) return existingMap.get(p.name)!;
           const start = p.value;
           const stop = p.value * 2 || 100;
           const step = p.value >= 10 ? Math.floor(p.value / 10) : 1;
-
-          return {
-            name: p.name,
-            start,
-            stop,
-            step: step || 1,
-          };
+          return { name: p.name, start, stop, step: step || 1 };
         });
-
-        if (JSON.stringify(newParams) === JSON.stringify(prev)) {
-          return prev;
-        }
-        return newParams;
+        return JSON.stringify(newParams) === JSON.stringify(prev)
+          ? prev
+          : newParams;
       });
     }
   }, [code]);
@@ -239,34 +724,59 @@ export default function Builder() {
       const list = data.data?.strategies || data.strategies || [];
       setStrategies(Array.isArray(list) ? list : []);
     } catch (e) {
-      console.error('Failed to load strategies:', e);
+      console.error("Failed to load strategies:", e);
     }
   };
 
   const handleGenerate = async () => {
     if (!strategyPrompt.trim()) return;
     setIsGenerating(true);
-
+    setStructuredError(null);
     try {
       const res = await fetch(`${API_URL}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: strategyPrompt,
-          tickers: tickers.split(',').map((t) => t.trim()),
-          start_date: '2020-01-01',
-          end_date: '2024-01-01',
+          tickers: tickers.split(",").map((t) => t.trim()),
+          start_date: optConfig.wfo.start_date,
+          end_date: optConfig.wfo.end_date,
         }),
       });
-
       const data = await res.json();
-
       if (data.success && data.data?.code) {
-        setCode(data.data.code);
-        setOutput(data.data.output || 'Strategy generated successfully!');
+        setCode(replaceDatesInCode(data.data.code, optConfig.wfo.start_date, optConfig.wfo.end_date));
+        const attempts = data.data?.fix_attempts || 0;
+        const lessons = data.data?.lessons_applied || [];
+        let msg = data.data.output || "Strategy generated successfully!";
+        if (attempts > 0) {
+          msg = `✅ Strategy generated and auto-fixed after ${attempts} attempt(s).`;
+          if (lessons.length > 0) {
+            msg += `\nApplied lesson: ${lessons.join(", ")}`;
+          }
+          msg += `\n\n${data.data.output || ""}`;
+        }
+        setOutput(msg);
       } else {
-        const errorMsg = data.error?.message || data.error || 'Unknown error';
-        setOutput(`GENERATION FAILED\n\nError: ${errorMsg}\n\nPartial Output:\n${data.data?.output || ''}`);
+        // Parse structured error details if available
+        const details = data.error?.details;
+        if (details && typeof details === "object") {
+          setStructuredError({
+            type: details.type || "UNKNOWN",
+            category: details.category || "execution",
+            message: details.message || data.error?.message || "Unknown error",
+            line: details.line,
+            line_content: details.line_content,
+            traceback: details.traceback,
+            stdout: details.stdout,
+            suggestion: details.suggestion,
+            related_lesson: details.related_lesson,
+            fix_attempts: data.data?.fix_attempts,
+          });
+        }
+        setOutput(
+          `GENERATION FAILED\n\nError: ${data.error?.message || data.error || "Unknown error"}\n\nPartial Output:\n${data.data?.output || ""}`,
+        );
       }
     } catch (e: any) {
       setOutput(`API Error: ${e.message}`);
@@ -278,105 +788,109 @@ export default function Builder() {
   const handleRun = async () => {
     if (!code) return;
     setIsRunning(true);
-
+    setStructuredError(null);
     try {
+      const tickerList = tickers.split(",").map((t) => t.trim()).filter(Boolean);
       let endpoint = `${API_URL}/run`;
-      let body: any = { code };
-
-      if (runMode === 'optimize') {
+      let body: any = { code, tickers: tickerList };
+      if (runMode === "optimize") {
         endpoint = `${API_URL}/optimize`;
-        const strategy_params: Record<string, { start: number; stop: number; step: number }> = {};
+        const strategy_params: Record<
+          string,
+          { start: number; stop: number; step: number }
+        > = {};
         optParams.forEach((p) => {
-          if (p.name) {
+          if (p.name)
             strategy_params[p.name] = {
               start: p.start,
               stop: p.stop,
               step: p.step,
             };
-          }
         });
-        body = { code, strategy_params, config: optConfig };
+        body = { code, strategy_params, config: optConfig, tickers: tickerList };
       }
-
       const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errorText || res.statusText}`);
+      if (!res.ok)
+        throw new Error(
+          `HTTP ${res.status}: ${(await res.text()) || res.statusText}`,
+        );
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(
+          `Expected JSON but got ${contentType}: ${(await res.text()).substring(0, 200)}`,
+        );
       }
-
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text();
-        throw new Error(`Expected JSON but got ${contentType}: ${text.substring(0, 200)}`);
-      }
-
       const data = await res.json();
-
       if (data.output) setOutput(data.output);
       if (data.data?.output) setOutput(data.data.output);
       if (data.error) {
-        const errorMsg = data.error.message || data.error;
-        setOutput((prev) => prev + `\n\nERROR:\n${errorMsg}`);
+        // Parse structured error details if available
+        const details = data.error?.details;
+        if (details && typeof details === "object") {
+          setStructuredError({
+            type: details.type || "UNKNOWN",
+            category: details.category || "execution",
+            message: details.message || data.error?.message || "Unknown error",
+            line: details.line,
+            line_content: details.line_content,
+            traceback: details.traceback,
+            stdout: details.stdout,
+            suggestion: details.suggestion,
+            related_lesson: details.related_lesson,
+          });
+        }
+        setOutput(
+          (prev) => prev + `\n\nERROR:\n${data.error.message || data.error}`,
+        );
       }
-
-      if (data.data?.stats || data.data?.best_equity || data.data?.equity || data.data?.windows) {
-        // Truncate large arrays to avoid localStorage quota errors
+      if (
+        data.data?.stats ||
+        data.data?.best_equity ||
+        data.data?.equity ||
+        data.data?.windows
+      ) {
         const maxEquityPoints = 1000;
         const maxTrades = 500;
-
-        let equity = data.data.equity || [];
-        let bestEquity = data.data.best_equity || [];
-        let trades = data.data.trades || [];
-
-        // Truncate if needed
-        if (equity.length > maxEquityPoints) {
-          equity = equity.slice(0, maxEquityPoints);
-        }
-        if (bestEquity.length > maxEquityPoints) {
-          bestEquity = bestEquity.slice(0, maxEquityPoints);
-        }
-        if (trades.length > maxTrades) {
-          trades = trades.slice(0, maxTrades);
-        }
-
-        // Always create optimization object for optimization runs
+        const equity = (data.data.equity || []).slice(0, maxEquityPoints);
+        const bestEquity = (data.data.best_equity || []).slice(
+          0,
+          maxEquityPoints,
+        );
+        const trades = (data.data.trades || []).slice(0, maxTrades);
         const runData = {
           stats: data.data.stats,
-          equity: equity,
+          equity,
           ohlcv: data.data.ohlcv,
           drawdown: data.data.drawdown,
           benchmark_drawdown: data.data.benchmark_drawdown,
-          trades: trades,
+          trades,
           indicators: data.data.indicators || [],
-          optimization: runMode === 'optimize'
-            ? {
-                mode: data.data.mode,
-                heatmap: data.data.heatmap?.slice(0, 50),
-                windows: data.data.windows,
-                best_equity: bestEquity,
-                oos_equity: data.data.oos_equity,
-                benchmark_equity: data.data.benchmark_equity,
-                stats: data.data.stats,
-                equity: equity,
-                ohlcv: data.data.ohlcv,
-                indicators: data.data.indicators || [],
-                trades: trades,
-              }
-            : null,
+          optimization:
+            runMode === "optimize"
+              ? {
+                  mode: data.data.mode,
+                  heatmap: data.data.heatmap?.slice(0, 50),
+                  windows: data.data.windows,
+                  best_equity: bestEquity,
+                  oos_equity: data.data.oos_equity,
+                  benchmark_equity: data.data.benchmark_equity,
+                  stats: data.data.stats,
+                  equity,
+                  ohlcv: data.data.ohlcv,
+                  indicators: data.data.indicators || [],
+                  trades,
+                }
+              : null,
           output: data.data.output,
         };
         try {
-          localStorage.setItem('lastRunData', JSON.stringify(runData));
-        } catch (e) {
-          console.warn('Failed to save to localStorage:', e);
-          // Continue anyway - results will still be displayed
-        }
-        navigate('/quantgen/dashboard');
+          localStorage.setItem("lastRunData", JSON.stringify(runData));
+        } catch {}
+        navigate("/quantgen/dashboard");
       }
     } catch (e: any) {
       setOutput(`Execution Error: ${e.message}`);
@@ -386,114 +900,125 @@ export default function Builder() {
   };
 
   const handleSave = async () => {
-    if (currentFilename) {
-      await saveStrategy(currentFilename);
-    } else {
-      handleSaveAs();
-    }
+    if (currentFilename) await saveStrategy(currentFilename);
+    else handleSaveAs();
   };
 
+  const [savePrompt, setSavePrompt] = useState<{ open: boolean; name: string }>({ open: false, name: "" });
+
   const handleSaveAs = async () => {
-    const name = prompt('Enter strategy name:', '');
-    if (!name) return;
-    await saveStrategy(name);
+    setSavePrompt({ open: true, name: "" });
+  };
+
+  const submitSaveAs = async () => {
+    if (savePrompt.name.trim()) {
+      await saveStrategy(savePrompt.name.trim());
+    }
+    setSavePrompt({ open: false, name: "" });
   };
 
   const saveStrategy = async (name: string) => {
     try {
       const res = await fetch(`${API_URL}/strategies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, code }),
       });
       if (res.ok) {
-        const safeName = name.endsWith('.py') ? name : `${name}.py`;
+        const safeName = name.endsWith(".py") ? name : `${name}.py`;
         setCurrentFilename(safeName);
         setOutput((prev) => prev + `\nSaved to ${safeName}`);
         loadStrategies();
       } else {
-        const error = await res.text();
-        alert(`Failed to save: ${error}`);
+        setErrorToast(`Failed to save: ${await res.text()}`);
       }
     } catch (e: any) {
-      alert(`Failed: ${e.message}`);
+      setErrorToast(`Failed: ${e.message}`);
     }
   };
 
   const handleLoad = async (name: string) => {
     try {
-      const res = await fetch(`${API_URL}/strategies/${encodeURIComponent(name)}`);
-      if (!res.ok) throw new Error('Failed to load');
+      const res = await fetch(
+        `${API_URL}/strategies/${encodeURIComponent(name)}`,
+      );
+      if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       if (data.data?.code) {
-        setCode(data.data.code);
+        let loadedCode = data.data.code;
+        loadedCode = replaceDatesInCode(loadedCode, optConfig.wfo.start_date, optConfig.wfo.end_date);
+        setCode(loadedCode);
         setCurrentFilename(name);
         setStrategyPrompt(`Loaded: ${name}`);
         setOutput(`Loaded ${name}`);
       }
     } catch {
-      alert('Failed to load strategy');
+      setErrorToast("Failed to load strategy");
     }
   };
 
-  const handleDelete = async (name: string) => {
-    if (!confirm(`Delete ${name}?`)) return;
-    try {
-      const res = await fetch(`${API_URL}/strategies/${encodeURIComponent(name)}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        loadStrategies();
-      } else {
-        alert('Failed to delete');
-      }
-    } catch {
-      alert('Failed to delete');
-    }
+  const handleDelete = (name: string) => {
+    setConfirmDialog({
+      open: true,
+      message: `Delete ${name}?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(
+            `${API_URL}/strategies/${encodeURIComponent(name)}`,
+            { method: "DELETE" },
+          );
+          if (res.ok) loadStrategies();
+          else setErrorToast("Failed to delete strategy");
+        } catch {
+          setErrorToast("Failed to delete strategy");
+        }
+        setConfirmDialog(null);
+      },
+    });
   };
 
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatLoading) return;
     const userMessage = chatInput.trim();
-    setChatInput('');
+    setChatInput("");
     setIsChatLoading(true);
-
-    const newMessages: ChatMessage[] = [...chatMessages, { role: 'user', content: userMessage }];
+    const newMessages: ChatMessage[] = [
+      ...chatMessages,
+      { role: "user", content: userMessage },
+    ];
     setChatMessages(newMessages);
-
-    // If no code yet, suggest using the prompt box above
     if (!code) {
       setChatMessages([
         ...newMessages,
-        { role: 'assistant', content: "I can help you build a strategy! Enter a description in the 'Strategy Description' box above and click 'Generate' to create code first. Then come back here to ask questions about it!" },
+        {
+          role: "assistant",
+          content:
+            "Generate or load a strategy above first using 'Generate', then ask questions about it.",
+        },
       ]);
       setIsChatLoading(false);
       return;
     }
-
     try {
       const res = await fetch(`${API_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, messages: newMessages }),
       });
-
       const data = await res.json();
-      if (data.success && data.data?.response) {
-        setChatMessages([
-          ...newMessages,
-          { role: 'assistant', content: data.data.response },
-        ]);
-      } else {
-        setChatMessages([
-          ...newMessages,
-          { role: 'assistant', content: `Error: ${data.error?.message || 'Unknown error'}` },
-        ]);
-      }
+      setChatMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: data.success
+            ? data.data?.response
+            : `Error: ${data.error?.message || "Unknown error"}`,
+        },
+      ]);
     } catch (e: any) {
       setChatMessages([
         ...newMessages,
-        { role: 'assistant', content: `Error: ${e.message}` },
+        { role: "assistant", content: `Error: ${e.message}` },
       ]);
     } finally {
       setIsChatLoading(false);
@@ -501,429 +1026,1449 @@ export default function Builder() {
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 p-6" style={{ backgroundColor: colors.surfaceAlt }}>
-      {/* Input Area */}
+    <div
+      className="h-full flex flex-col"
+      style={{ backgroundColor: "var(--canvas)" }}
+    >
       <div
-        className="p-6 rounded-xl shadow-sm grid md:grid-cols-[1fr_auto] gap-6"
-        style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          padding: "16px 24px 24px",
+          overflow: "hidden",
+        }}
       >
-        <div className="space-y-2">
-          <label className="text-sm font-semibold uppercase tracking-wide" style={{ color: colors.muted }}>
+        {/* Input Bar — compact horizontal layout */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderRadius: "14px",
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--border)",
+            flexShrink: 0,
+          }}
+        >
+          <label
+            style={{
+              display: "block",
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              color: "var(--subtle)",
+              marginBottom: "8px",
+            }}
+          >
             Strategy Description
           </label>
           <textarea
             value={strategyPrompt}
             onChange={(e) => setStrategyPrompt(e.target.value)}
-            placeholder="Describe your strategy..."
-            className="w-full h-24 border rounded-lg p-3 text-sm focus:border-emerald-500 focus:outline-none transition-all resize-none font-mono"
+            placeholder="e.g. Buy when RSI < 30 and SMA crossover occurs..."
+            rows={2}
+            className="w-full border rounded-lg p-2.5 text-sm focus:border-emerald-500 focus:outline-none resize-none"
             style={{
-              backgroundColor: colors.inputBg,
-              borderColor: colors.border,
-              color: colors.text
+              backgroundColor: "var(--canvas)",
+              borderColor: "var(--border)",
+              color: "var(--foreground)",
             }}
           />
         </div>
 
-        <div className="flex flex-col justify-end gap-3 min-w-[180px]">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold uppercase tracking-wide flex items-center gap-2" style={{ color: colors.muted }}>
-              Tickers
-              {fromScreenerTicker && (
-                <span className="text-xs font-normal normal-case px-2 py-0.5 rounded-full" style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  color: '#10B981',
-                  border: '1px solid rgba(16, 185, 129, 0.2)'
-                }}>
-                  From Screener
-                </span>
-              )}
-            </label>
-            <input
-              type="text"
-              value={tickers}
-              onChange={(e) => setTickers(e.target.value)}
-              placeholder="AAPL, MSFT"
-              className="w-full border rounded-lg p-3 text-sm focus:border-emerald-500 focus:outline-none"
-              style={{
-                backgroundColor: colors.inputBg,
-                borderColor: colors.border,
-                color: colors.text
-              }}
-            />
-          </div>
-
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !strategyPrompt.trim()}
-            className="w-full justify-center py-3 text-lg rounded-lg font-medium flex items-center gap-2 transition-colors text-white"
+        {/* Main Workspace */}
+        <div
+          className="flex-1 grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "7fr 6fr",
+            gap: "12px",
+            minHeight: 0,
+            overflowY: isMobile ? "auto" : "hidden",
+          }}
+        >
+          {/* Left: Editor + Chat */}
+          <div
             style={{
-              backgroundColor: isGenerating ? '#3F3F46' : '#10B981',
-              opacity: isGenerating || !strategyPrompt.trim() ? 0.5 : 1,
-              cursor: isGenerating || !strategyPrompt.trim() ? 'not-allowed' : 'pointer'
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              minHeight: 0,
+              overflow: "hidden",
             }}
           >
-            {isGenerating ? <Activity className="animate-spin" /> : <Sparkles />}
-            Generate
-          </button>
-        </div>
-      </div>
-
-      {/* Workspace */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-4 min-h-0">
-        {/* Left Column: Editor + Optimization Config */}
-        <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
-          {/* Code Editor */}
-          <div
-            className="rounded-xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-[400px]"
-            style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
-          >
+            {/* Tickers + Generate Bar */}
             <div
-              className="h-10 flex items-center px-4 justify-between"
-              style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : '#f5f5f7', borderBottom: `1px solid ${colors.border}` }}
+              style={{
+                display: "flex",
+                gap: "12px",
+                alignItems: "end",
+                padding: "12px 16px",
+                borderRadius: "12px",
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+                flexShrink: 0,
+              }}
             >
-              <span className="text-xs font-semibold uppercase flex items-center gap-2" style={{ color: colors.muted }}>
-                <Terminal size={12} />
-                {currentFilename ? (
-                  <span className="text-emerald-500">{currentFilename}</span>
-                ) : (
-                  <span>Untitled</span>
-                )}
-              </span>
-              {currentFilename && (
-                <button
-                  onClick={() => {
-                    setCode('');
-                    setCurrentFilename(null);
-                    setStrategyPrompt('');
-                    setOutput('');
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: "var(--subtle)",
+                    marginBottom: "8px",
                   }}
-                  className="text-xs hover:text-emerald-500 transition-colors"
-                  style={{ color: colors.muted }}
                 >
-                  New
-                </button>
-              )}
-            </div>
-            <div className="flex-1 relative">
-              <Editor
-                height="100%"
-                defaultLanguage="python"
-                theme={isDarkMode ? 'vs-dark' : 'vs'}
-                value={code}
-                onChange={(val) => setCode(val || '')}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  scrollBeyondLastLine: false,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Optimization Config */}
-          {runMode === 'optimize' && (
-            <div
-              className="rounded-xl overflow-hidden shadow-sm"
-              style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
-            >
-              <OptimizationConfig
-                config={optConfig}
-                setConfig={setOptConfig}
-                params={optParams}
-                setParams={setOptParams}
-              />
-            </div>
-          )}
-
-          {/* Chat Assistant */}
-          <div
-            className="rounded-xl overflow-hidden shadow-sm flex flex-col max-h-[400px]"
-            style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
-          >
-            <div
-              className="h-10 flex items-center px-4 justify-between cursor-pointer"
-              style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : '#f5f5f7', borderBottom: `1px solid ${colors.border}` }}
-              onClick={() => setIsChatOpen(!isChatOpen)}
-            >
-              <span className="text-xs font-semibold uppercase flex items-center gap-2" style={{ color: colors.muted }}>
-                <MessageCircle size={12} />
-                AI Assistant
-              </span>
-              {isChatOpen ? (
-                <ChevronDown size={14} style={{ color: colors.muted }} />
-              ) : (
-                <ChevronUp size={14} style={{ color: colors.muted }} />
-              )}
-            </div>
-
-            {isChatOpen && (
-              <div className="flex flex-col flex-1 min-h-[300px]">
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {chatMessages.length === 0 ? (
-                    <div className="text-xs text-center py-8 px-4" style={{ color: colors.muted }}>
-                      <div className="mb-2">👋 Ask me anything about your strategy!</div>
-                      <div style={{ opacity: 0.7 }}>
-                        {code ? 'I can explain your code, suggest improvements, or help debug issues.' : 'Generate or load a strategy above, then come here to ask questions about it.'}
-                      </div>
-                    </div>
-                  ) : (
-                    chatMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  Tickers
+                </label>
+                {importedTickers.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                    {importedTickers.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          setTickers(t);
+                          if (code) {
+                            let updated = replaceTickerInCode(code, t);
+                            updated = replaceDatesInCode(updated, optConfig.wfo.start_date, optConfig.wfo.end_date);
+                            setCode(updated);
+                          }
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          backgroundColor: tickers === t ? 'var(--accent)' : 'var(--canvas)',
+                          color: tickers === t ? '#000000' : 'var(--foreground)',
+                          transition: 'all 0.15s ease',
+                        }}
                       >
-                        <div
-                          className="max-w-[85%] rounded-lg p-2 text-xs"
-                          style={{
-                            backgroundColor: msg.role === 'user' ? colors.chatUserBg : colors.chatAssistantBg,
-                            color: msg.role === 'user' ? '#ffffff' : colors.chatAssistantText
-                          }}
-                        >
-                          {msg.content}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  {isChatLoading && (
-                    <div className="flex justify-start">
-                      <div
-                        className="rounded-lg p-2 text-xs animate-pulse"
-                        style={{ backgroundColor: colors.chatAssistantBg, color: colors.muted }}
-                      >
-                        Thinking...
-                      </div>
-                    </div>
-                  )}
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={tickers}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTickers(val);
+                    if (code && !val.includes(",") && val.trim().length > 0) {
+                      setCode(replaceTickerInCode(code, val.trim()));
+                    }
+                  }}
+                  placeholder="AAPL, MSFT"
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    border: "1px solid var(--border)",
+                    backgroundColor: "var(--canvas)",
+                    color: "var(--foreground)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              {/* Date Range */}
+              <div style={{ display: "flex", gap: "8px", minWidth: 0 }}>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: "var(--subtle)",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Start
+                  </label>
+                  <input
+                    type="date"
+                    value={optConfig.wfo.start_date}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOptConfig((prev) => ({
+                        ...prev,
+                        wfo: { ...prev.wfo, start_date: val },
+                      }));
+                      if (code) setCode(replaceDatesInCode(code, val, optConfig.wfo.end_date));
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      border: "1px solid var(--border)",
+                      backgroundColor: "var(--canvas)",
+                      color: "var(--foreground)",
+                      outline: "none",
+                    }}
+                  />
                 </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: "var(--subtle)",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    End
+                  </label>
+                  <input
+                    type="date"
+                    value={optConfig.wfo.end_date}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOptConfig((prev) => ({
+                        ...prev,
+                        wfo: { ...prev.wfo, end_date: val },
+                      }));
+                      if (code) setCode(replaceDatesInCode(code, optConfig.wfo.start_date, val));
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      border: "1px solid var(--border)",
+                      backgroundColor: "var(--canvas)",
+                      color: "var(--foreground)",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              </div>
 
-                {/* Input */}
-                <div className="p-3" style={{ borderTop: `1px solid ${colors.border}` }}>
-                  <div className="flex gap-2">
-                    <textarea
-                      ref={chatInputRef}
-                      rows={6}
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendChat()}
-                      placeholder={code ? 'Ask about your strategy...' : 'Type to ask questions...'}
-                      disabled={isChatLoading}
-                      className="flex-1 border rounded-md px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none resize-none"
-                      style={{
-                        backgroundColor: colors.inputBg,
-                        borderColor: colors.border,
-                        color: colors.text,
-                        opacity: isChatLoading ? 0.5 : 1
-                      }}
-                    />
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || !strategyPrompt.trim()}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  border: "none",
+                  cursor:
+                    !strategyPrompt.trim() || isGenerating
+                      ? "not-allowed"
+                      : "pointer",
+                  backgroundColor: isGenerating
+                    ? "var(--surface-overlay)"
+                    : "var(--accent)",
+                  color: isGenerating ? "var(--muted)" : "#000000",
+                  opacity: !strategyPrompt.trim() ? 0.4 : 1,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {isGenerating ? (
+                  <Activity size={18} className="animate-spin" />
+                ) : (
+                  <Sparkles size={18} />
+                )}
+                Generate Strategy
+              </button>
+            </div>
+            {/* Code Editor */}
+            <div
+              className="rounded-xl overflow-hidden shadow-sm flex flex-col"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {/* Editor header with inline run mode toggle */}
+              <div
+                style={{
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0 12px",
+                  backgroundColor: "var(--surface-raised)",
+                  borderBottom: "1px solid var(--border)",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      color: "var(--subtle)",
+                    }}
+                  >
+                    <Terminal size={14} />
+                    {currentFilename ? (
+                      <span style={{ color: "var(--accent)" }}>
+                        {currentFilename}
+                      </span>
+                    ) : (
+                      "Untitled"
+                    )}
+                  </span>
+                  {/* Run mode inline toggle */}
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      borderRadius: "6px",
+                      padding: "2px",
+                      backgroundColor: "var(--canvas)",
+                      marginLeft: "8px",
+                    }}
+                  >
                     <button
-                      onClick={handleSendChat}
-                      disabled={!chatInput.trim() || isChatLoading}
-                      className="p-2 rounded-md transition-colors text-white"
+                      onClick={() => setRunMode("backtest")}
                       style={{
-                        backgroundColor: isDarkMode ? '#10B981' : '#059669',
-                        opacity: !chatInput.trim() || isChatLoading ? 0.5 : 1,
-                        cursor: !chatInput.trim() || isChatLoading ? 'not-allowed' : 'pointer'
+                        padding: "6px 14px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        borderRadius: "4px",
+                        border: "none",
+                        cursor: "pointer",
+                        backgroundColor:
+                          runMode === "backtest"
+                            ? "var(--accent)"
+                            : "transparent",
+                        color:
+                          runMode === "backtest" ? "#000000" : "var(--muted)",
+                        transition: "all 0.15s ease",
                       }}
+                      aria-pressed={runMode === "backtest"}
                     >
-                      <Send size={14} />
+                      Backtest
+                    </button>
+                    <button
+                      onClick={() => setRunMode("optimize")}
+                      style={{
+                        padding: "6px 14px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        borderRadius: "4px",
+                        border: "none",
+                        cursor: "pointer",
+                        backgroundColor:
+                          runMode === "optimize"
+                            ? "var(--accent)"
+                            : "transparent",
+                        color:
+                          runMode === "optimize" ? "#000000" : "var(--muted)",
+                        transition: "all 0.15s ease",
+                      }}
+                      aria-pressed={runMode === "optimize"}
+                    >
+                      Optimize
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Panel */}
-        <div className="flex flex-col gap-4 min-h-0">
-          {/* Mode Toggle */}
-          <div
-            className="flex rounded-lg p-1"
-            style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : '#f5f5f7', border: `1px solid ${colors.border}` }}
-          >
-            <button
-              onClick={() => setRunMode('backtest')}
-              className={`flex-1 text-xs py-2 rounded font-medium transition-all`}
-              style={{
-                backgroundColor: runMode === 'backtest' ? (isDarkMode ? '#27272A' : '#ffffff') : 'transparent',
-                color: runMode === 'backtest' ? colors.text : colors.muted,
-                boxShadow: runMode === 'backtest' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              Backtest
-            </button>
-            <button
-              onClick={() => setRunMode('optimize')}
-              className={`flex-1 text-xs py-2 rounded font-medium transition-all`}
-              style={{
-                backgroundColor: runMode === 'optimize' ? '#10B981' : 'transparent',
-                color: runMode === 'optimize' ? '#ffffff' : colors.muted,
-                boxShadow: runMode === 'optimize' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              Optimize
-            </button>
-          </div>
-
-          {/* Run Button */}
-          <button
-            onClick={handleRun}
-            disabled={isRunning || !code}
-            className="w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors text-white"
-            style={{
-              backgroundColor: isDarkMode ? '#27272A' : '#1d1d1f',
-              opacity: isRunning || !code ? 0.5 : 1,
-              cursor: isRunning || !code ? 'not-allowed' : 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              if (!isRunning && code) {
-                e.currentTarget.style.backgroundColor = isDarkMode ? '#3F3F46' : '#3f3f46';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#27272A' : '#1d1d1f';
-            }}
-          >
-            {isRunning ? (
-              <Activity className="animate-spin" size={16} />
-            ) : runMode === 'optimize' ? (
-              <Microscope size={16} />
-            ) : (
-              <Play size={16} />
-            )}
-            {runMode === 'optimize' ? 'Run Optimization' : 'Run Backtest'}
-          </button>
-
-          {/* Save Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleSave}
-              disabled={!code}
-              className="py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors"
-              style={{
-                backgroundColor: isDarkMode ? '#27272A' : '#f5f5f7',
-                color: isDarkMode ? '#D4D4D8' : '#1d1d1f',
-                opacity: !code ? 0.5 : 1,
-                cursor: !code ? 'not-allowed' : 'pointer',
-                border: `1px solid ${colors.border}`
-              }}
-              onMouseEnter={(e) => {
-                if (code) {
-                  e.currentTarget.style.backgroundColor = isDarkMode ? '#3F3F46' : '#e5e5e7';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = isDarkMode ? '#27272A' : '#f5f5f7';
-              }}
-            >
-              <Save size={14} /> {currentFilename ? 'Save' : 'Save As'}
-            </button>
-            <button
-              onClick={handleSaveAs}
-              disabled={!code}
-              className="py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition-colors"
-              style={{
-                backgroundColor: isDarkMode ? '#27272A' : '#f5f5f7',
-                color: isDarkMode ? '#D4D4D8' : '#1d1d1f',
-                opacity: !code ? 0.5 : 1,
-                cursor: !code ? 'not-allowed' : 'pointer',
-                border: `1px solid ${colors.border}`
-              }}
-              onMouseEnter={(e) => {
-                if (code) {
-                  e.currentTarget.style.backgroundColor = isDarkMode ? '#3F3F46' : '#e5e5e7';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = isDarkMode ? '#27272A' : '#f5f5f7';
-              }}
-            >
-              <FilePlus size={14} /> Save As
-            </button>
-          </div>
-
-          {/* Saved Strategies */}
-          <div
-            className="rounded-xl overflow-hidden flex-1 flex flex-col min-h-[200px]"
-            style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
-          >
-            <div
-              className="p-3 font-semibold text-xs uppercase"
-              style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : '#f5f5f7', color: colors.muted, borderBottom: `1px solid ${colors.border}` }}
-            >
-              Library ({strategies.length})
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {strategies.map((s) => (
-                <div
-                  key={s}
-                  className="flex items-center justify-between p-2 rounded group cursor-pointer"
-                  style={{
-                    color: isDarkMode ? '#D4D4D8' : '#1d1d1f'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(63,63,70,0.5)' : '#e5e5e7';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span onClick={() => handleLoad(s)} className="truncate flex-1">
-                    {s}
-                  </span>
+                {currentFilename && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(s);
+                    onClick={() => {
+                      setCode("");
+                      setCurrentFilename(null);
+                      setStrategyPrompt("");
+                      setOutput("");
                     }}
-                    className="opacity-0 group-hover:opacity-100 transition-all p-1 rounded"
-                    style={{ color: '#f43f5e' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(244,63,94,0.1)';
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--muted)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
                     }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "var(--foreground)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "var(--muted)")
+                    }
                   >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Console Output */}
-          <div
-            className="rounded-xl overflow-hidden flex-1 flex flex-col min-h-[200px] font-mono text-xs shadow-inner"
-            style={{ backgroundColor: colors.consoleBg, border: `1px solid ${colors.border}` }}
-          >
-            <div
-              className="p-2 flex justify-between items-center"
-              style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : '#e5e5e7', borderBottom: `1px solid ${colors.border}` }}
-            >
-              <span style={{ color: colors.muted }}>Console Output</span>
-              <div className="flex items-center gap-2">
-                {isRunning && <span className="text-emerald-500 animate-pulse">Running...</span>}
-                {output && (
-                  <button
-                    onClick={() => setOutput('')}
-                    className="text-xs transition-colors"
-                    style={{ color: colors.muted }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = colors.text}
-                    onMouseLeave={(e) => e.currentTarget.style.color = colors.muted}
-                  >
-                    Clear
+                    New
                   </button>
                 )}
               </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <Editor
+                  height="100%"
+                  defaultLanguage="python"
+                  theme={isDarkMode ? "vs-dark" : "vs"}
+                  value={code}
+                  onChange={(val) => setCode(val || "")}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 16,
+                    scrollBeyondLastLine: false,
+                  }}
+                />
+              </div>
             </div>
-            <div className="p-3 overflow-auto whitespace-pre-wrap flex-1" style={{ color: colors.consoleText }}>
-              {output || <span style={{ opacity: 0.3 }}>Waiting for execution...</span>}
+
+            {/* Chat Assistant */}
+            <div
+              className="rounded-xl overflow-hidden shadow-sm flex flex-col"
+              style={{
+                flexShrink: 0,
+                height: isChatOpen ? "420px" : "44px",
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+                transition: "height 0.25s ease",
+              }}
+            >
+              <button
+                style={{
+                  height: "44px",
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0 16px",
+                  backgroundColor: "var(--surface-raised)",
+                  border: "none",
+                  borderBottom: isChatOpen ? "1px solid var(--border)" : "none",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  color: "var(--foreground)",
+                }}
+                onClick={() => setIsChatOpen(!isChatOpen)}
+                aria-expanded={isChatOpen}
+                aria-label="Toggle AI Assistant panel"
+              >
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    color: "var(--subtle)",
+                  }}
+                >
+                  <MessageCircle size={16} />
+                  AI Assistant
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {isChatOpen && chatMessages.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setChatMessages([]);
+                        setChatInput("");
+                      }}
+                      title="Clear chat"
+                      style={{
+                        padding: "6px",
+                        borderRadius: "6px",
+                        border: "none",
+                        background: "none",
+                        cursor: "pointer",
+                        color: "var(--muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor =
+                          isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+                        e.currentTarget.style.color = "var(--foreground)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "var(--muted)";
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                  {isChatOpen ? (
+                    <ChevronDown size={16} style={{ color: "var(--muted)" }} />
+                  ) : (
+                    <ChevronUp size={16} style={{ color: "var(--muted)" }} />
+                  )}
+                </div>
+              </button>
+
+              {isChatOpen && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                    minHeight: 0,
+                  }}
+                >
+                  {/* Messages scroll area */}
+                  <div
+                    style={{ flex: 1, overflowY: "auto", padding: "16px" }}
+                  >
+                    {chatMessages.length === 0 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          gap: "12px",
+                          opacity: 0.7,
+                        }}
+                      >
+                        <Bot size={32} style={{ color: "var(--muted)" }} />
+                        <p
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            color: "var(--muted)",
+                          }}
+                        >
+                          Ask me anything about your strategy
+                        </p>
+                        <p style={{ fontSize: "13px", color: "var(--subtle)", maxWidth: "300px", textAlign: "center" }}>
+                          {code
+                            ? "I can explain indicators, suggest improvements, or edit your code. Try: 'Change fast window to 15'"
+                            : "Generate a strategy first, then ask questions."}
+                        </p>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg, idx) => {
+                        const isUser = msg.role === "user";
+                        const assistantCode = isUser
+                          ? null
+                          : extractCodeFromMessage(msg.content);
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: "flex",
+                              justifyContent: isUser ? "flex-end" : "flex-start",
+                              alignItems: "flex-start",
+                              gap: "10px",
+                              marginBottom: "16px",
+                            }}
+                          >
+                            {/* Avatar */}
+                            {!isUser && (
+                              <div
+                                style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  borderRadius: "8px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                  marginTop: "2px",
+                                  background: isDarkMode
+                                    ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+                                    : "linear-gradient(135deg, #34D399 0%, #10B981 100%)",
+                                  boxShadow: "0 2px 8px rgba(16,185,129,0.3)",
+                                }}
+                              >
+                                <Bot size={16} color="#ffffff" />
+                              </div>
+                            )}
+
+                            <div
+                              style={{
+                                maxWidth: "78%",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: isUser ? "flex-end" : "flex-start",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  color: "var(--subtle)",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.08em",
+                                  marginBottom: "4px",
+                                  marginLeft: isUser ? "0" : "4px",
+                                  marginRight: isUser ? "4px" : "0",
+                                }}
+                              >
+                                {isUser ? "You" : "AI Assistant"}
+                              </span>
+                              <div
+                                style={{
+                                  borderRadius: "14px",
+                                  padding: "12px 16px",
+                                  fontSize: "14px",
+                                  lineHeight: 1.65,
+                                  backgroundColor: isUser
+                                    ? "var(--accent)"
+                                    : isDarkMode
+                                      ? "rgba(255,255,255,0.04)"
+                                      : "#f8fafc",
+                                  color: isUser ? "#000000" : "var(--foreground)",
+                                  border: isUser
+                                    ? "none"
+                                    : `1px solid ${isDarkMode ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
+                                  boxShadow: isUser
+                                    ? "0 2px 10px rgba(16,185,129,0.15)"
+                                    : isDarkMode
+                                      ? "0 2px 8px rgba(0,0,0,0.2)"
+                                      : "0 2px 8px rgba(0,0,0,0.04)",
+                                }}
+                              >
+                                {renderMessageContent(msg.content)}
+
+                                {assistantCode && (
+                                  <button
+                                    onClick={() => {
+                                      let updated = replaceDatesInCode(assistantCode, optConfig.wfo.start_date, optConfig.wfo.end_date);
+                                      setCode(updated);
+                                      setOutput((prev) =>
+                                        prev +
+                                        `\n[AI] Applied code changes from chat.\n`,
+                                      );
+                                    }}
+                                    style={{
+                                      marginTop: "12px",
+                                      padding: "8px 16px",
+                                      borderRadius: "8px",
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      border: "1px solid var(--border)",
+                                      cursor: "pointer",
+                                      backgroundColor: "var(--accent)",
+                                      color: "#000000",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "6px",
+                                      transition: "all 0.15s ease",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor =
+                                        "#34D399";
+                                      e.currentTarget.style.transform = "scale(1.02)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor =
+                                        "var(--accent)";
+                                      e.currentTarget.style.transform = "scale(1)";
+                                    }}
+                                  >
+                                    <Sparkles size={14} /> Apply Changes
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {isUser && (
+                              <div
+                                style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  borderRadius: "8px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                  marginTop: "2px",
+                                  backgroundColor: isDarkMode
+                                    ? "rgba(255,255,255,0.1)"
+                                    : "#e2e8f0",
+                                }}
+                              >
+                                <User size={16} color={isDarkMode ? "#ffffff" : "#475569"} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+
+                    {isChatLoading && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "flex-start",
+                          alignItems: "flex-start",
+                          gap: "10px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "8px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            background: isDarkMode
+                              ? "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+                              : "linear-gradient(135deg, #34D399 0%, #10B981 100%)",
+                            boxShadow: "0 2px 8px rgba(16,185,129,0.3)",
+                          }}
+                        >
+                          <Bot size={16} color="#ffffff" />
+                        </div>
+                        <div
+                          style={{
+                            borderRadius: "14px",
+                            padding: "14px 18px",
+                            fontSize: "14px",
+                            backgroundColor: isDarkMode
+                              ? "rgba(255,255,255,0.04)"
+                              : "#f8fafc",
+                            border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.06)" : "#e2e8f0"}`,
+                            color: "var(--muted)",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                            }}
+                          >
+                            <span
+                              className="animate-pulse"
+                              style={{
+                                width: "8px",
+                                height: "8px",
+                                borderRadius: "50%",
+                                backgroundColor: "var(--accent)",
+                              }}
+                            />
+                            <span
+                              className="animate-pulse"
+                              style={{
+                                width: "8px",
+                                height: "8px",
+                                borderRadius: "50%",
+                                backgroundColor: "var(--accent)",
+                                animationDelay: "0.2s",
+                              }}
+                            />
+                            <span
+                              className="animate-pulse"
+                              style={{
+                                width: "8px",
+                                height: "8px",
+                                borderRadius: "50%",
+                                backgroundColor: "var(--accent)",
+                                animationDelay: "0.4s",
+                              }}
+                            />
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input area */}
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderTop: "1px solid var(--border)",
+                      flexShrink: 0,
+                      backgroundColor: isDarkMode
+                        ? "rgba(255,255,255,0.015)"
+                        : "#fafafa",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
+                      <textarea
+                        ref={chatInputRef}
+                        rows={3}
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && !e.shiftKey && handleSendChat()
+                        }
+                        placeholder={
+                          code
+                            ? "Ask about your strategy, e.g. 'Change fast window to 15'..."
+                            : "Type to ask questions..."
+                        }
+                        disabled={isChatLoading}
+                        className="flex-1 border rounded-lg px-4 py-3 focus:border-emerald-500 focus:outline-none resize-none"
+                        style={{
+                          backgroundColor: "var(--canvas)",
+                          borderColor: "var(--border)",
+                          color: "var(--foreground)",
+                          opacity: isChatLoading ? 0.5 : 1,
+                          fontSize: "14px",
+                          lineHeight: 1.5,
+                          minHeight: "60px",
+                        }}
+                      />
+                      <button
+                        onClick={handleSendChat}
+                        disabled={!chatInput.trim() || isChatLoading}
+                        style={{
+                          padding: "12px",
+                          borderRadius: "10px",
+                          border: "none",
+                          cursor:
+                            !chatInput.trim() || isChatLoading
+                              ? "not-allowed"
+                              : "pointer",
+                          backgroundColor: "var(--accent)",
+                          color: "#000000",
+                          opacity: !chatInput.trim() || isChatLoading ? 0.4 : 1,
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: "0 2px 8px rgba(16,185,129,0.2)",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (chatInput.trim() && !isChatLoading) {
+                            e.currentTarget.style.transform = "scale(1.05)";
+                            e.currentTarget.style.boxShadow =
+                              "0 4px 12px rgba(16,185,129,0.3)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                          e.currentTarget.style.boxShadow =
+                            "0 2px 8px rgba(16,185,129,0.2)";
+                        }}
+                      >
+                        <Send size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Panel */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            {/* Run Button */}
+            <button
+              onClick={handleRun}
+              disabled={isRunning || !code}
+              style={{
+                padding: "12px 20px",
+                borderRadius: "10px",
+                fontWeight: 600,
+                fontSize: "14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                border: "none",
+                cursor: isRunning || !code ? "not-allowed" : "pointer",
+                backgroundColor: isRunning
+                  ? "var(--surface-overlay)"
+                  : "var(--accent)",
+                color: isRunning ? "var(--muted)" : "#000000",
+                opacity: !code ? 0.4 : 1,
+                flexShrink: 0,
+              }}
+            >
+              {isRunning ? (
+                <Activity size={14} className="animate-spin" />
+              ) : runMode === "optimize" ? (
+                <Microscope size={14} />
+              ) : (
+                <Play size={14} />
+              )}
+              {isRunning
+                ? "Running..."
+                : runMode === "optimize"
+                  ? "Run Optimization"
+                  : "Run Backtest"}
+            </button>
+
+            {/* Save with dropdown */}
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 36px",
+                  gap: "4px",
+                }}
+              >
+                <button
+                  onClick={handleSave}
+                  disabled={!code}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    border: "1px solid var(--border)",
+                    cursor: !code ? "not-allowed" : "pointer",
+                    backgroundColor: "var(--surface)",
+                    color: "var(--foreground)",
+                    opacity: !code ? 0.4 : 1,
+                  }}
+                >
+                  <Save size={13} /> {currentFilename ? "Save" : "Save As"}
+                </button>
+                <button
+                  onClick={() => setShowSaveDropdown(!showSaveDropdown)}
+                  disabled={!code}
+                  aria-label="Save options"
+                  aria-haspopup="menu"
+                  aria-expanded={showSaveDropdown}
+                  style={{
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border)",
+                    cursor: !code ? "not-allowed" : "pointer",
+                    backgroundColor: "var(--surface)",
+                    color: "var(--foreground)",
+                    opacity: !code ? 0.4 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ChevronDown size={12} />
+                </button>
+              </div>
+              {showSaveDropdown && code && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: "4px",
+                    width: "200px",
+                    borderRadius: "10px",
+                    backgroundColor: "var(--surface-overlay)",
+                    border: "1px solid var(--border)",
+                    boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+                    zIndex: 20,
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      handleSave();
+                      setShowSaveDropdown(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      fontSize: "14px",
+                      textAlign: "left",
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = "var(--surface)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
+                  >
+                    <Save size={13} /> Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleSaveAs();
+                      setShowSaveDropdown(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      fontSize: "14px",
+                      textAlign: "left",
+                      background: "none",
+                      border: "none",
+                      color: "var(--foreground)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = "var(--surface)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
+                  >
+                    <FilePlus size={13} /> Save As...
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Optimization Config (only visible when optimize mode) */}
+            {runMode === "optimize" && (
+              <div
+                className="rounded-xl overflow-hidden shadow-sm"
+                style={{
+                  flexShrink: 0,
+                  backgroundColor: "var(--surface)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <OptimizationConfig
+                  config={optConfig}
+                  setConfig={setOptConfig}
+                  params={optParams}
+                  setParams={setOptParams}
+                />
+              </div>
+            )}
+
+            {/* Strategy Library */}
+            <div
+              className="rounded-xl overflow-hidden flex flex-col"
+              style={{
+                flex: "1 1 0",
+                minHeight: 0,
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "10px 14px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  color: "var(--subtle)",
+                  backgroundColor: "var(--surface-raised)",
+                  borderBottom: "1px solid var(--border)",
+                  flexShrink: 0,
+                }}
+              >
+                Library ({strategies.length})
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "6px" }}>
+                {strategies.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "16px 12px",
+                      textAlign: "center",
+                      fontSize: "14px",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    No saved strategies. Generate a strategy above, then save it
+                    here.
+                  </div>
+                ) : (
+                  strategies.map((s) => (
+                    <div
+                      key={s}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleLoad(s)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleLoad(s);
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "9px 12px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        color: "var(--foreground)",
+                        fontSize: "14px",
+                        marginBottom: "2px",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor =
+                          "var(--surface-overlay)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = "transparent")
+                      }
+                    >
+                      <span
+                        style={{
+                          flex: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {s}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(s);
+                        }}
+                        aria-label={`Delete strategy ${s}`}
+                        style={{
+                          padding: "6px",
+                          borderRadius: "6px",
+                          background: "none",
+                          border: "none",
+                          color: "var(--danger)",
+                          cursor: "pointer",
+                          opacity: 0.35,
+                          minWidth: "32px",
+                          minHeight: "32px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                          e.currentTarget.style.backgroundColor =
+                            "var(--danger-hover)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = "0.35";
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Console Output */}
+            <div
+              className="rounded-xl overflow-hidden flex flex-col font-mono text-xs"
+              style={{
+                flex: "1 1 0",
+                minHeight: 0,
+                backgroundColor: "var(--canvas)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "8px 12px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  backgroundColor: "var(--surface-raised)",
+                  borderBottom: "1px solid var(--border)",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: "var(--subtle)",
+                  }}
+                >
+                  Console
+                </span>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  {isRunning && (
+                    <span
+                      style={{ color: "var(--accent)", fontSize: "12px" }}
+                      className="animate-pulse"
+                    >
+                      Running...
+                    </span>
+                  )}
+                  {output && (
+                    <button
+                      onClick={() => {
+                        setOutput("");
+                        setStructuredError(null);
+                      }}
+                      aria-label="Clear console output"
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--muted)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "var(--foreground)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "var(--muted)")
+                      }
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div
+                style={{
+                  flex: 1,
+                  overflow: "auto",
+                  padding: "10px 12px",
+                  color: "var(--muted)",
+                  whiteSpace: "pre-wrap",
+                  fontSize: "14px",
+                  lineHeight: 1.5,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                }}
+              >
+                {structuredError && <ErrorCard error={structuredError} />}
+                {output || (
+                  <span style={{ opacity: 0.5, color: "var(--muted)" }}>
+                    Waiting for execution...
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Error Toast */}
+      {errorToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "12px 20px",
+            borderRadius: "14px",
+            backgroundColor: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.2)",
+          }}
+        >
+          <AlertCircle style={{ width: "18px", height: "18px", color: "#EF4444" }} />
+          <span style={{ fontSize: "15px", fontWeight: 600, color: "#EF4444" }}>{errorToast}</span>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {confirmDialog?.open && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            style={{
+              padding: "24px",
+              borderRadius: "20px",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p
+              style={{
+                fontSize: "17px",
+                fontWeight: 600,
+                color: "var(--foreground)",
+                marginBottom: "24px",
+              }}
+            >
+              {confirmDialog.message}
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmDialog(null)}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                  color: "var(--foreground)",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  border: "none",
+                  backgroundColor: "var(--danger)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Save Prompt */}
+      {savePrompt.open && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={() => setSavePrompt({ open: false, name: "" })}
+        >
+          <div
+            style={{
+              padding: "24px",
+              borderRadius: "20px",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border)",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <label
+              style={{
+                display: "block",
+                fontSize: "12px",
+                fontWeight: 600,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: "var(--subtle)",
+                marginBottom: "8px",
+              }}
+            >
+              Strategy Name
+            </label>
+            <input
+              type="text"
+              value={savePrompt.name}
+              onChange={(e) => setSavePrompt({ ...savePrompt, name: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitSaveAs();
+                if (e.key === "Escape") setSavePrompt({ open: false, name: "" });
+              }}
+              autoFocus
+              placeholder="e.g. sma_crossover"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: "10px",
+                fontSize: "14px",
+                border: "1px solid var(--border)",
+                backgroundColor: "var(--canvas)",
+                color: "var(--foreground)",
+                outline: "none",
+                marginBottom: "20px",
+              }}
+            />
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setSavePrompt({ open: false, name: "" })}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                  color: "var(--foreground)",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitSaveAs}
+                disabled={!savePrompt.name.trim()}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  border: "none",
+                  backgroundColor: "var(--accent)",
+                  color: "#000000",
+                  cursor: !savePrompt.name.trim() ? "not-allowed" : "pointer",
+                  opacity: !savePrompt.name.trim() ? 0.4 : 1,
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

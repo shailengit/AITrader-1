@@ -1,0 +1,205 @@
+import vectorbt as vbt
+import pandas as pd
+import numpy as np
+
+# =============================================================================
+# Strategy Parameters
+# =============================================================================
+sma_window = 15
+ema_window = 9
+trailing_stop_pct = 0.05   # 5% trailing stop — applied manually in exit logic
+initial_capital = 10000.0
+fees = 0.001               # 0.1% commission per trade
+
+# =============================================================================
+# Data Configuration
+# =============================================================================
+ticker = 'APA'
+start = '2020-01-01'
+end = '2024-01-01'
+
+# Load data
+try:
+    data = DataService.get_ohlcv_data(ticker, start, end)
+except NameError:
+    import yfinance as yf
+    data = yf.download(ticker, start=start, end=end, auto_adjust=True)
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+# Ensure clean datetime index (no gaps from weekends/holidays cause shift issues)
+data = data.sort_index()
+data = data[~data.index.duplicated(keep='first')]
+
+# =============================================================================
+# Extract prices
+# =============================================================================
+close  = data['Close']
+open_p = data['Open']
+high   = data['High']
+low    = data['Low']
+
+# =============================================================================
+# Calculate indicators
+# =============================================================================
+sma = vbt.MA.run(close, window=sma_window, short_name='SMA')
+ema = vbt.MA.run(close, window=ema_window, ewm=True, short_name='EMA')
+
+sma_ma = sma.ma
+ema_ma = ema.ma
+
+# =============================================================================
+# SIGNAL LOGIC
+# Use .notna() masks instead of manual iloc slicing — safer and index-aligned
+# =============================================================================
+valid_mask = sma_ma.notna() & ema_ma.notna()
+
+# Current position relative to MAs
+above_sma = close > sma_ma
+above_ema = close > ema_ma
+below_sma = close < sma_ma
+below_ema = close < ema_ma
+
+# Previous position — use .shift(1) on the boolean series
+# fillna(False) so the very first bar never fires a crossover
+prev_above_sma = above_sma.shift(1).fillna(False)
+prev_above_ema = above_ema.shift(1).fillna(False)
+
+# ENTRY: Price crosses above BOTH MAs
+# Condition: was NOT above both MAs on previous bar, IS above both now
+entries_raw = (~(prev_above_sma & prev_above_ema)) & (above_sma & above_ema)
+
+# EXIT: Price falls below EITHER MA (aggressive trend-break exit)
+# Swap to (below_sma & below_ema) for a more conservative exit
+exits_raw = below_sma | below_ema
+
+# ── Trailing Stop (manual implementation) ────────────────────────────────────
+# Track rolling max since entry and exit when price drops > trailing_stop_pct
+# This builds a trailing-stop exit signal aligned with the close series.
+trailing_stop_exits = pd.Series(False, index=close.index)
+
+in_trade = False
+peak_price = np.nan
+
+for i in range(len(close)):
+    if not in_trade:
+        if entries_raw.iloc[i] and valid_mask.iloc[i]:
+            in_trade = True
+            peak_price = close.iloc[i]
+    else:
+        # Update peak
+        if close.iloc[i] > peak_price:
+            peak_price = close.iloc[i]
+        # Check trailing stop breach
+        drawdown = (peak_price - close.iloc[i]) / peak_price
+        if drawdown >= trailing_stop_pct:
+            trailing_stop_exits.iloc[i] = True
+            in_trade = False
+            peak_price = np.nan
+        # Regular exit also resets trade state
+        elif exits_raw.iloc[i]:
+            in_trade = False
+            peak_price = np.nan
+
+# =============================================================================
+# Combine all exit signals
+# =============================================================================
+exits_combined = exits_raw | trailing_stop_exits
+
+# Apply valid_mask — never signal during warm-up period
+entries = entries_raw & valid_mask
+exits   = exits_combined & valid_mask
+
+# CRITICAL: Ensure no bar is both an entry AND an exit
+# Exits are subordinate — entry takes priority on conflict
+exits = exits & ~entries
+
+# =============================================================================
+# Build Portfolio
+# NOTE: sl_stop / sl_trail are NOT valid from_signals parameters in open-source
+# vbt. Trailing stop is handled manually above via trailing_stop_exits.
+# =============================================================================
+pf = vbt.Portfolio.from_signals(
+    close=close,
+    open=open_p,
+    high=high,
+    low=low,
+    entries=entries,
+    exits=exits,
+    direction='longonly',
+    freq='1d',
+    init_cash=initial_capital,
+    fees=fees,
+    accumulate=False,   # Don't pyramid into existing positions
+    # log=True          # Uncomment only for debugging — causes memory overhead
+)
+
+# =============================================================================
+# Performance Analysis
+# NOTE: annualized_return and calmar_ratio are PROPERTIES, not methods.
+#       Do not call them with ().
+# =============================================================================
+print("=" * 50)
+print(f"SMA-{sma_window} / EMA-{ema_window} Trend Strategy  |  {ticker}")
+print("=" * 50)
+
+# -- Core returns (properties, no parentheses) --------------------------------
+print(f"Total Return:        {pf.total_return():>10.2%}")
+
+# annualized_return and calmar_ratio are properties in vbt open-source
+try:
+    print(f"Annualized Return:   {pf.annualized_return:>10.2%}")
+except AttributeError:
+    # Fallback for some vbt versions that expose it differently
+    stats = pf.stats()
+    ann_ret = stats.get('Annualized Return [%]', float('nan')) / 100
+    print(f"Annualized Return:   {ann_ret:>10.2%}")
+
+print(f"Sharpe Ratio:        {pf.sharpe_ratio():>10.2f}")
+print(f"Max Drawdown:        {pf.max_drawdown():>10.2%}")
+
+try:
+    print(f"Calmar Ratio:        {pf.calmar_ratio:>10.2f}")
+except AttributeError:
+    print(f"Calmar Ratio:         {'N/A':>9}")
+
+print("-" * 50)
+
+# -- Trade-level stats --------------------------------------------------------
+print(f"Total Trades:        {pf.trades.count():>10}")
+print(f"Win Rate:            {pf.trades.win_rate():>10.2%}")
+
+# trades.returns is a property returning a Series; call .mean() on the Series
+try:
+    avg_ret = pf.trades.returns.mean()
+except AttributeError:
+    # Some vbt versions use .rets instead of .returns
+    avg_ret = pf.trades.rets.mean()
+print(f"Avg Trade Return:    {avg_ret:>10.2%}")
+
+print(f"Profit Factor:       {pf.trades.profit_factor():>10.2f}")
+print(f"Trailing Stop Exits: {trailing_stop_exits.sum():>10}")
+
+# =============================================================================
+# Sanity Checks
+# =============================================================================
+print("\n── Sanity Checks " + "─" * 33)
+
+overlap = (entries & exits).sum()
+if overlap > 0:
+    print(f"⚠️  Overlapping entry/exit signals: {overlap} bars")
+else:
+    print("✅  No overlapping entry/exit signals")
+
+if entries.sum() == 0:
+    print("⚠️  Warning: No entry signals generated")
+else:
+    print(f"✅  Entry signals generated: {entries.sum()}")
+
+if exits.sum() == 0:
+    print("⚠️  Warning: No exit signals generated")
+else:
+    print(f"✅  Exit signals generated: {exits.sum()}")
+
+print(f"ℹ️   Warm-up bars excluded: {(~valid_mask).sum()}")
+print(f"ℹ️   Data range: {close.index[0].date()} → {close.index[-1].date()}")

@@ -110,17 +110,53 @@ def analyze_single_ticker_dormant_giant(ticker: str, filters: Dict[str, Any] = N
     )
 
     if is_breakout:
-        return {"ticker": ticker.upper(), "signal": "Active Breakout", "log": f"MATCH: {ticker.upper()} - Active Breakout detected"}
+        result = {"ticker": ticker.upper(), "signal": "Active Breakout", "log": f"MATCH: {ticker.upper()} - Active Breakout detected"}
     elif is_squeezing and hidden_accumulation:
-        return {"ticker": ticker.upper(), "signal": "Coiling (Accumulation)", "log": f"MATCH: {ticker.upper()} - Coiling/Accumulation detected"}
+        result = {"ticker": ticker.upper(), "signal": "Coiling (Accumulation)", "log": f"MATCH: {ticker.upper()} - Coiling/Accumulation detected"}
+    else:
+        return None
 
-    return None
+    # Enrich with price stats from the existing DataFrame
+    result['close'] = round(float(df['Close'].iloc[-1]), 2)
+    result['sma_20'] = round(float(df['Close'].rolling(window=20).mean().iloc[-1]), 2)
+    result['ema_9'] = round(float(df['Close'].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
+    result['high_52w'] = round(float(df['High'].max()), 2)
+    result['low_52w'] = round(float(df['Low'].min()), 2)
+
+    # Volume stats
+    try:
+        latest_vol = float(df['Volume'].iloc[-1])
+        avg_vol_50 = float(df['Volume'].tail(50).mean())
+        result['volume'] = int(latest_vol) if latest_vol > 0 else None
+        result['volume_ma_50'] = round(avg_vol_50, 0) if avg_vol_50 > 0 else None
+        result['volume_ratio'] = round(latest_vol / avg_vol_50, 4) if avg_vol_50 > 0 else None
+    except Exception:
+        result['volume'] = None
+        result['volume_ma_50'] = None
+        result['volume_ratio'] = None
+
+    # All-time high/low (fast indexed query)
+    try:
+        ath_query = f'SELECT MAX("High") as ath, MIN("Low") as atl FROM "{ticker.lower()}"'
+        ath_df = pd.read_sql(ath_query, worker_engine)
+        result['all_time_high'] = round(float(ath_df['ath'].iloc[0]), 2) if pd.notnull(ath_df['ath'].iloc[0]) else None
+        result['all_time_low'] = round(float(ath_df['atl'].iloc[0]), 2) if pd.notnull(ath_df['atl'].iloc[0]) else None
+    except Exception:
+        result['all_time_high'] = None
+        result['all_time_low'] = None
+
+    return result
 
 
 def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Dict[str, Any] = None) -> List[Dict]:
     """Technical scan for Dormant Giant screening."""
     tickers = get_active_tickers()
+    total = len(tickers)
     results = []
+    
+    if log_callback:
+        log_callback(f"Technical Agent: Analyzing {total} tickers for Squeeze/Breakout patterns...")
+    logger.info(f"Starting Dormant Giant technical scan for {total} tickers")
 
     with ProcessPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(analyze_single_ticker_dormant_giant, t, filters): t for t in tickers}
@@ -152,26 +188,28 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
     return results
 
 
-def tool_verify_eps_acceleration(tickers: List[Dict]) -> List[Dict]:
+def tool_verify_eps_acceleration(tickers: List[Dict], log_callback=None) -> List[Dict]:
     """Verify EPS acceleration OR revenue growth for screened tickers."""
     verified_tickers = []
+    if log_callback:
+        log_callback(f"Fundamental Agent: Verifying catalysts for {len(tickers)} candidates...")
 
     for item in tickers:
         ticker = item['ticker']
         catalyst = None
         try:
             query = text("""
-                SELECT eps, total_revenue FROM stock_financials_quarterly
+                SELECT diluted_eps as eps, total_revenue FROM stock_financials_quarterly
                 WHERE ticker = :ticker ORDER BY report_date DESC LIMIT 3;
             """)
             with ENGINE.connect() as conn:
                 fin_df = pd.read_sql(query, conn, params={"ticker": ticker})
 
-            # EPS check: positive growth (looser than 1.5x acceleration)
+            # EPS check: positive growth
             if len(fin_df) >= 2:
                 current_eps = fin_df['eps'].iloc[0]
                 prev_eps = fin_df['eps'].iloc[1]
-                if prev_eps != 0:
+                if pd.notnull(current_eps) and pd.notnull(prev_eps) and prev_eps != 0:
                     current_growth = (current_eps - prev_eps) / abs(prev_eps)
                     if current_growth > 0:
                         catalyst = "Confirmed EPS Acceleration"
@@ -180,18 +218,21 @@ def tool_verify_eps_acceleration(tickers: List[Dict]) -> List[Dict]:
             if not catalyst and len(fin_df) >= 2:
                 curr_rev = fin_df['total_revenue'].iloc[0]
                 prev_rev = fin_df['total_revenue'].iloc[1]
-                if prev_rev and prev_rev > 0:
+                if pd.notnull(curr_rev) and pd.notnull(prev_rev) and prev_rev > 0:
                     rev_growth = (curr_rev - prev_rev) / prev_rev
                     if rev_growth > 0:
                         catalyst = "Confirmed Revenue Growth"
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"Fundamental verification error for {ticker}: {e}")
             pass
 
         if catalyst:
             item['fundamental_catalyst'] = catalyst
             verified_tickers.append(item)
 
+    if log_callback:
+        log_callback(f"Fundamental Agent: Verification complete. {len(verified_tickers)} stocks verified.")
     return verified_tickers
 
 
@@ -232,6 +273,39 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                     res[col] = round(latest[col], 4)
                 except (TypeError, ValueError):
                     res[col] = latest[col]
+
+        # Enrich with price stats
+        res['sma_20'] = round(float(df['Close'].rolling(window=20).mean().iloc[-1]), 2)
+        res['ema_9'] = round(float(df['Close'].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
+        res['high_52w'] = round(float(df['High'].tail(252).max()), 2)
+        res['low_52w'] = round(float(df['Low'].tail(252).min()), 2)
+
+        # Volume ratio vs 50-day average + raw volume stats
+        try:
+            avg_vol_50 = float(df['Volume'].tail(50).mean())
+            res['volume'] = int(latest['Volume']) if pd.notnull(latest['Volume']) else None
+            res['volume_ma_50'] = round(avg_vol_50, 0) if avg_vol_50 > 0 else None
+            res['volume_ratio'] = round(float(latest['Volume']) / avg_vol_50, 4) if avg_vol_50 > 0 else None
+        except Exception:
+            res['volume'] = None
+            res['volume_ma_50'] = None
+            res['volume_ratio'] = None
+
+        # All-time high/low (fast indexed query)
+        try:
+            ath_query = f'SELECT MAX("High") as ath, MIN("Low") as atl FROM {safe_ticker}'
+            ath_df = pd.read_sql(ath_query, worker_engine)
+            ath_val = float(ath_df['ath'].iloc[0]) if pd.notnull(ath_df['ath'].iloc[0]) else None
+            atl_val = float(ath_df['atl'].iloc[0]) if pd.notnull(ath_df['atl'].iloc[0]) else None
+            res['all_time_high'] = round(ath_val, 2) if ath_val else None
+            res['all_time_low'] = round(atl_val, 2) if atl_val else None
+            if ath_val and ath_val > 0:
+                res['ath_proximity'] = round(float(latest['Close']) / ath_val, 4)
+        except Exception:
+            res['all_time_high'] = None
+            res['all_time_low'] = None
+            res['ath_proximity'] = None
+
         return res
     except Exception as e:
         logger.debug(f"Error processing {ticker}: {e}")
@@ -247,7 +321,8 @@ def _worker_ta_wrapper(args_tuple):
 
 def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                        cutoff_date: Optional[str] = None,
-                       progress_callback=None, log_callback=None) -> str:
+                       progress_callback=None, log_callback=None,
+                       filters: Optional[Dict[str, Any]] = None) -> str:
     """Screen S&P 1500 using parallel processing with ta library (matching standalone)."""
     # Source tickers from information_schema.tables (matching standalone)
     with ENGINE.connect() as conn:
@@ -282,8 +357,14 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                     progress_callback(progress)
 
     df = pd.DataFrame([r for r in results if r is not None])
-    if not df.empty and sort_by in df.columns:
-        df = df.sort_values(by=sort_by).head(50)
+    if not df.empty:
+        # Apply user-defined QuantFilters if provided
+        if filters:
+            df = apply_quant_filters(df, filters)
+            if log_callback:
+                log_callback(f"Applied filters: {len(df)} stocks remain after filtering.")
+        elif sort_by in df.columns:
+            df = df.sort_values(by=sort_by).head(50)
 
     return df.to_csv(index=False) if not df.empty else "No results found."
 
@@ -394,6 +475,147 @@ def tool_get_historical_performance(tickers: List[str], cutoff_date: str) -> str
             continue
 
     return pd.DataFrame(results).to_csv(index=False) if results else "No performance data available."
+
+
+# =============================================================================
+# QUANT FILTER PARSING & APPLICATION
+# =============================================================================
+
+QUANT_FILTER_SCHEMA = {
+    "ath_proximity_min": "float|null  // 0-1, e.g. 0.95 = within 5% of ATH",
+    "ath_proximity_max": "float|null",
+    "rsi_min": "float|null  // 0-100",
+    "rsi_max": "float|null  // 0-100",
+    "volume_ratio_min": "float|null  // vs 50-day avg",
+    "sma_20_relation": "'above'|'below'|'any'",
+    "sma_50_relation": "'above'|'below'|'any'",
+    "sector_whitelist": "[string]  // e.g. ['Technology','Healthcare']",
+    "market_cap_min": "float|null  // in billions",
+    "market_cap_max": "float|null  // in billions",
+    "eps_growth_min": "float|null  // decimal, e.g. 0.10 = 10%",
+    "revenue_growth_min": "float|null  // decimal, e.g. 0.10 = 10%",
+    "sort_by": "'ticker'|'ath_proximity'|'rsi'|'volume_ratio'|'close'",
+    "sort_order": "'asc'|'desc'",
+    "max_results": "int  // default 20"
+}
+
+FILTER_PARSER_PROMPT = """You are a stock screener filter parser.
+Convert the user's request into a JSON object matching this schema exactly.
+Only include non-null fields. Return ONLY valid JSON, no markdown, no explanation.
+
+Schema fields:
+{schema}
+
+Default rules:
+- If user asks for stocks "close to all time high", set ath_proximity_min to 0.90-0.98 depending on wording (very close = 0.98, close = 0.95, near = 0.90).
+- If user specifies a count (e.g. "top 20", "find 50"), set max_results to that number.
+- sort_by defaults to "ath_proximity" if ATH mentioned, otherwise "ticker".
+- sort_order defaults to "desc" for proximity-based sorts, "asc" for ticker.
+- sma_20_relation and sma_50_relation default to "any".
+- sector_whitelist should be exact sector names as they appear in stock_metadata (e.g. "Technology", "Healthcare", "Financials").
+""".format(schema="\n".join(f'  "{k}": {v}' for k, v in QUANT_FILTER_SCHEMA.items()))
+
+
+def parse_quant_filters(prompt: str) -> Dict[str, Any]:
+    """Parse a natural language prompt into structured QuantFilters using an LLM."""
+    from agno.agent import Agent
+    from agno.models.ollama import Ollama
+    import json
+
+    try:
+        parser = Agent(
+            model=Ollama(id=OLLAMA_MODEL_ID, options={"num_ctx": 8192}),
+            instructions=FILTER_PARSER_PROMPT,
+            markdown=False,
+        )
+        response = parser.run(prompt)
+        content = response.content if hasattr(response, 'content') else str(response)
+
+        # Extract JSON from the response
+        start = content.find('{')
+        end = content.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            filters = json.loads(content[start:end + 1])
+        else:
+            filters = {}
+    except Exception as e:
+        logger.warning(f"Filter parsing failed: {e}. Returning empty filters.")
+        filters = {}
+
+    # Normalize and set sensible defaults
+    normalized: Dict[str, Any] = {
+        "ath_proximity_min": filters.get("ath_proximity_min"),
+        "ath_proximity_max": filters.get("ath_proximity_max"),
+        "rsi_min": filters.get("rsi_min"),
+        "rsi_max": filters.get("rsi_max"),
+        "volume_ratio_min": filters.get("volume_ratio_min"),
+        "sma_20_relation": filters.get("sma_20_relation", "any"),
+        "sma_50_relation": filters.get("sma_50_relation", "any"),
+        "sector_whitelist": filters.get("sector_whitelist", []),
+        "market_cap_min": filters.get("market_cap_min"),
+        "market_cap_max": filters.get("market_cap_max"),
+        "eps_growth_min": filters.get("eps_growth_min"),
+        "revenue_growth_min": filters.get("revenue_growth_min"),
+        "sort_by": filters.get("sort_by", "ticker"),
+        "sort_order": filters.get("sort_order", "asc"),
+        "max_results": filters.get("max_results", 20),
+    }
+    return normalized
+
+
+def apply_quant_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFrame:
+    """Apply QuantFilters to a DataFrame of technical screening results."""
+    if df.empty:
+        return df
+
+    # ATH proximity
+    ath_min = filters.get("ath_proximity_min")
+    if ath_min is not None and "ath_proximity" in df.columns:
+        df = df[df["ath_proximity"] >= ath_min]
+    ath_max = filters.get("ath_proximity_max")
+    if ath_max is not None and "ath_proximity" in df.columns:
+        df = df[df["ath_proximity"] <= ath_max]
+
+    # RSI
+    rsi_min = filters.get("rsi_min")
+    if rsi_min is not None and "momentum_rsi" in df.columns:
+        df = df[df["momentum_rsi"] >= rsi_min]
+    rsi_max = filters.get("rsi_max")
+    if rsi_max is not None and "momentum_rsi" in df.columns:
+        df = df[df["momentum_rsi"] <= rsi_max]
+
+    # Volume ratio
+    vol_min = filters.get("volume_ratio_min")
+    if vol_min is not None and "volume_ratio" in df.columns:
+        df = df[df["volume_ratio"] >= vol_min]
+
+    # SMA relations
+    sma20_rel = filters.get("sma_20_relation", "any")
+    if sma20_rel == "above" and "trend_sma_fast" in df.columns:
+        df = df[df["Close"] > df["trend_sma_fast"]]
+    elif sma20_rel == "below" and "trend_sma_fast" in df.columns:
+        df = df[df["Close"] < df["trend_sma_fast"]]
+
+    sma50_rel = filters.get("sma_50_relation", "any")
+    if sma50_rel == "above" and "trend_sma_slow" in df.columns:
+        df = df[df["Close"] > df["trend_sma_slow"]]
+    elif sma50_rel == "below" and "trend_sma_slow" in df.columns:
+        df = df[df["Close"] < df["trend_sma_slow"]]
+
+    # Sort and limit
+    sort_by = filters.get("sort_by", "ticker")
+    sort_order = filters.get("sort_order", "asc")
+    ascending = sort_order != "desc"
+
+    if sort_by in df.columns:
+        df = df.sort_values(by=sort_by, ascending=ascending)
+    elif sort_by == "ticker" and "ticker" in df.columns:
+        df = df.sort_values(by="ticker", ascending=ascending)
+
+    max_results = filters.get("max_results", 50)
+    df = df.head(max_results)
+
+    return df
 
 
 # =============================================================================
@@ -513,6 +735,101 @@ def create_quant_strategy_team():
 
 
 # =============================================================================
+# RESULT ENRICHMENT
+# =============================================================================
+
+def enrich_results(results: List[Dict]) -> List[Dict]:
+    """
+    Enrich screener results with metadata, fundamentals, and price stats.
+    Adds: company_name, sector, market_cap, beta, eps_growth_qoq,
+          revenue_growth_qoq, peg_ratio.
+    """
+    if not results:
+        return results
+
+    tickers = [r['ticker'].upper() for r in results if r.get('ticker')]
+    if not tickers:
+        return results
+
+    # 1. Metadata (single batched query)
+    try:
+        meta_query = text(
+            "SELECT ticker, name, sector, market_cap, beta FROM stock_metadata WHERE ticker = ANY(:t)"
+        )
+        meta_df = pd.read_sql(meta_query, ENGINE, params={"t": tickers})
+        meta_map = {row['ticker'].upper(): row for _, row in meta_df.iterrows()}
+    except Exception as e:
+        logger.warning(f"Metadata enrichment failed: {e}")
+        meta_map = {}
+
+    # 2. Financials — last 2 quarters per ticker (single batched query)
+    try:
+        fin_query = text("""
+            SELECT ticker, report_date, diluted_eps, total_revenue, net_income
+            FROM stock_financials_quarterly
+            WHERE ticker = ANY(:t)
+            ORDER BY ticker, report_date DESC
+        """)
+        fin_df = pd.read_sql(fin_query, ENGINE, params={"t": tickers})
+    except Exception as e:
+        logger.warning(f"Financial enrichment failed: {e}")
+        fin_df = pd.DataFrame()
+
+    for r in results:
+        t = r.get('ticker', '').upper()
+        if not t:
+            continue
+
+        # Metadata
+        m = meta_map.get(t)
+        if m is not None:
+            r['company_name'] = m.get('name') or t
+            r['sector'] = m.get('sector') or 'N/A'
+            r['market_cap'] = float(m['market_cap']) if pd.notnull(m.get('market_cap')) else None
+            r['beta'] = float(m['beta']) if pd.notnull(m.get('beta')) else None
+        else:
+            r['company_name'] = t
+            r['sector'] = 'N/A'
+
+        # Financials
+        t_df = fin_df[fin_df['ticker'] == t]
+        if len(t_df) >= 2:
+            curr = t_df.iloc[0]
+            prev = t_df.iloc[1]
+            close_price = r.get('close')
+
+            # EPS growth QoQ
+            curr_eps = curr['diluted_eps']
+            prev_eps = prev['diluted_eps']
+            if pd.notnull(curr_eps) and pd.notnull(prev_eps) and prev_eps != 0:
+                eps_growth = (curr_eps - prev_eps) / abs(prev_eps)
+                r['eps_growth_qoq'] = round(eps_growth * 100, 2)
+
+                # PEG ratio approximation
+                if close_price and eps_growth > 0:
+                    pe = close_price / max(float(curr_eps), 0.001)
+                    annualized_growth = eps_growth * 4
+                    peg = pe / max(annualized_growth, 0.001)
+                    r['peg_ratio'] = round(peg, 2)
+                else:
+                    r['peg_ratio'] = None
+            else:
+                r['eps_growth_qoq'] = None
+                r['peg_ratio'] = None
+
+            # Revenue growth QoQ
+            curr_rev = curr['total_revenue']
+            prev_rev = prev['total_revenue']
+            if pd.notnull(curr_rev) and pd.notnull(prev_rev) and prev_rev > 0:
+                rev_growth = (curr_rev - prev_rev) / prev_rev
+                r['revenue_growth_qoq'] = round(rev_growth * 100, 2)
+            else:
+                r['revenue_growth_qoq'] = None
+
+    return results
+
+
+# =============================================================================
 # SERVICE FUNCTIONS
 # =============================================================================
 
@@ -536,8 +853,11 @@ def run_dormant_giant_screener(prompt: str = None, progress_callback=None, log_c
         }
 
     # Fundamental verification
-    verified_results = tool_verify_eps_acceleration(technical_results)
+    verified_results = tool_verify_eps_acceleration(technical_results, log_callback=log_callback)
     logger.info(f"Fundamental verification found {len(verified_results)} stocks with catalysts")
+
+    # Enrich with metadata, fundamentals, and price stats
+    verified_results = enrich_results(verified_results)
 
     return {
         "technical_candidates": len(technical_results),
@@ -765,12 +1085,14 @@ def run_dormant_giant_screener_with_ai(prompt: str = None, progress_callback=Non
         return run_dormant_giant_screener(prompt, progress_callback=progress_callback, log_callback=log_callback, filters=filters)
 
 
-def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_callback=None, log_callback=None) -> Dict[str, Any]:
+def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_callback=None,
+                                log_callback=None, filters: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
     Uses ta library column names and maps to frontend-friendly keys.
+    Applies user-defined QuantFilters if provided.
     """
-    logger.info(f"Running Quant Strategy screener (cutoff_date={cutoff_date})...")
+    logger.info(f"Running Quant Strategy screener (cutoff_date={cutoff_date}, filters={filters})...")
 
     if progress_callback:
         progress_callback(5)
@@ -785,12 +1107,13 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_c
         'Volume': 'volume',
     }
 
-    # Technical scan with progress
+    # Technical scan with progress and optional filters
     tech_csv = technical_screener(
         ta_indicators,
         cutoff_date=cutoff_date,
         progress_callback=progress_callback,
-        log_callback=log_callback
+        log_callback=log_callback,
+        filters=filters
     )
     tech_df = pd.read_csv(pd.io.common.StringIO(tech_csv)) if tech_csv != "No results found." else pd.DataFrame()
 
@@ -813,9 +1136,14 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_c
         for ta_col, friendly_col in ta_to_friendly.items():
             if ta_col in tech_df.columns and pd.notna(row.get(ta_col)):
                 record[friendly_col] = round(row[ta_col], 4) if isinstance(row[ta_col], (int, float)) else row[ta_col]
+        # Include additional price stats computed in _worker_ta_analysis
+        for extra in ['ema_9', 'high_52w', 'low_52w', 'all_time_high', 'all_time_low', 'ath_proximity', 'volume', 'volume_ma_50', 'volume_ratio']:
+            if extra in tech_df.columns and pd.notna(row.get(extra)):
+                record[extra] = round(row[extra], 4) if isinstance(row[extra], (int, float)) else row[extra]
         results_records.append(record)
 
-    tickers = [r['ticker'] for r in results_records if r.get('ticker')][:20]
+    max_results = filters.get("max_results", 20) if filters else 20
+    tickers = [r['ticker'] for r in results_records if r.get('ticker')][:max_results]
 
     # Fundamental check
     if log_callback:
@@ -843,9 +1171,12 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_c
     if progress_callback:
         progress_callback(95)
 
+    # Enrich with metadata, fundamentals, and price stats
+    results_records = enrich_results(results_records)
+
     return {
         "technical_candidates": len(results_records),
-        "results": results_records[:50],
+        "results": results_records[:max_results],
         "fundamental_data": fund_csv,
         "metadata": meta_csv,
         "performance": perf_csv,
@@ -853,9 +1184,12 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_c
     }
 
 
-def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: str = None, logs_buffer: List[Dict] = None, progress_callback=None, agent_log_callback=None) -> Dict[str, Any]:
+def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: str = None, logs_buffer: List[Dict] = None,
+                                        progress_callback=None, agent_log_callback=None,
+                                        filters: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
+    Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
     """
     if logs_buffer is None:
         logs_buffer = []
@@ -868,9 +1202,13 @@ def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: str = None, lo
 
         team = create_quant_strategy_team()
 
-        full_prompt = prompt
+        import json
+        full_prompt = f"""User directive: {prompt}
+
+Screening criteria applied:
+{json.dumps(filters, indent=2) if filters else "No custom filters applied."}"""
         if cutoff_date:
-            full_prompt = f"{prompt} cutoff_date={cutoff_date}"
+            full_prompt += f"\n\nBacktest cutoff date: {cutoff_date}"
             log_capture.log_system(f"Backtesting mode enabled: cutoff_date={cutoff_date}")
 
         log_capture.log_agent_start("Quant Strategy Team", "Coordinating multi-phase screening analysis")
@@ -879,9 +1217,14 @@ def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: str = None, lo
 
         logger.info("Running Quant Strategy AI screener...")
 
-        # Get structured results first (for immediate feedback)
+        # Get structured results first (for immediate feedback), passing filters
         log_capture.log_system("Running technical screen across S&P 1500...")
-        structured = run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback, log_callback=None)
+        structured = run_quant_strategy_screener(
+            prompt, cutoff_date,
+            progress_callback=progress_callback,
+            log_callback=None,
+            filters=filters
+        )
 
         log_capture.log_system(f"Technical screen complete: {structured['technical_candidates']} candidates found")
 

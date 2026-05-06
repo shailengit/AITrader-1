@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 10
-slow_ema_window = 50
+fast_ema_window = 20
+slow_ema_window = 100
 
 # Download data
-ticker = 'AAPL'
-start = '2020-01-01'
-end = '2024-01-01'
+ticker = 'AOSL'
+start = '2026-01-01'
+end = '2026-05-01'
 data = DataService.get_ohlcv_data(ticker, start, end)
 
 # Get price data

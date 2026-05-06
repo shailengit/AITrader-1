@@ -2,8 +2,8 @@ import vectorbt as vbt
 from app.services.data_service import DataService
 import numpy as np
 
-ticker = 'AAPL'
-start = '2023-01-01'
+ticker = 'CLB'
+start = '2000-01-01'
 end = '2025-12-31'
 data = DataService.get_ohlcv_data(ticker, start, end)
 print(data.head())
@@ -13,7 +13,7 @@ close = data['Close']
 
 # Parameters to optimize
 fast_window = 20
-slow_window = 100
+slow_window = 200
 
 # Create MA for each parameter combination
 fast_ma = vbt.MA.run(close, window=fast_window)

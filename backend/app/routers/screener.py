@@ -22,7 +22,8 @@ from app.services.agno_screener import (
     run_dormant_giant_screener,
     run_dormant_giant_screener_with_ai,
     run_quant_strategy_screener,
-    run_quant_strategy_screener_with_ai
+    run_quant_strategy_screener_with_ai,
+    parse_quant_filters
 )
 from app.services.pdf_generator import generate_screener_report
 
@@ -78,6 +79,17 @@ class ScanStatus(BaseModel):
     error: Optional[str] = None
 
 
+class ParseFiltersRequest(BaseModel):
+    """Request to parse a natural language prompt into structured filters."""
+    prompt: str
+
+
+class ParseFiltersResponse(BaseModel):
+    """Response containing parsed QuantFilters."""
+    filters: Dict[str, Any]
+    raw_prompt: str
+
+
 # =============================================================================
 # Helpers
 # =============================================================================
@@ -125,6 +137,26 @@ async def get_screener_modes():
             }
         ]
     }
+
+
+@router.post("/parse-filters", response_model=Dict[str, Any])
+async def parse_filters(request: ParseFiltersRequest):
+    """
+    Parse a natural language prompt into structured QuantFilters.
+
+    Uses a lightweight LLM call to extract filter criteria from the user's directive.
+    Returns the parsed filters for frontend review and editing.
+    """
+    try:
+        filters = await run_in_threadpool(lambda: parse_quant_filters(request.prompt))
+        return {
+            "filters": filters,
+            "raw_prompt": request.prompt,
+            "message": "Filters parsed successfully. Review and edit before scanning."
+        }
+    except Exception as e:
+        logger.error(f"Filter parsing failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Filter parsing failed: {str(e)}")
 
 
 @router.post("/scan", response_model=Dict[str, Any])
@@ -455,7 +487,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         cutoff_date=request.cutoff_date,
                         logs_buffer=logs_buffer,
                         progress_callback=update_progress,
-                        agent_log_callback=update_agent_log
+                        agent_log_callback=update_agent_log,
+                        filters=request.filters
                     )
                 )
             else:
@@ -464,7 +497,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         prompt=request.prompt or "Find me candidates for a high-growth breakout. Technically, they should be in a Volatility Squeeze (volatility_bbw). Fundamentally, they must have positive QoQ revenue growth.",
                         cutoff_date=request.cutoff_date,
                         progress_callback=update_progress,
-                        log_callback=update_logs
+                        log_callback=update_logs,
+                        filters=request.filters
                     )
                 )
         else:

@@ -9,8 +9,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Landing />} />
+        <Route path="/" element={<Landing />} />
+        <Route element={<Layout />}>
           <Route path="sectors" element={<SectorRotation />} />
           <Route path="screener" element={<StockScreener />} />
           <Route path="quantgen/*" element={<QuantGen />} />

@@ -61,6 +61,9 @@
   --accent-light: #34D399;
   --accent-dark: #059669;
   --accent-glow: rgba(16, 185, 129, 0.25);
+
+  --danger: #f43f5e;
+  --danger-hover: rgba(244, 63, 94, 0.1);
 }
 
 .apple-light-theme {
@@ -392,4 +395,9 @@ button, a, input, textarea, select {
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.15; }
   50% { opacity: 0.25; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

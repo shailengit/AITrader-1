@@ -1,0 +1,16 @@
+[
+  {
+    "id": "689caa16",
+    "error_signature": "ATTRIBUTE_ERROR",
+    "error_pattern": "ExecutionError: Execution failed: module 'vectorbt' has no attribute 'EMA'\nTraceback (most recent call last):\n  File \"/Users/shailendrakaushik/Documents/Python/AlgoTrading/TradeCraft-1/AITrader-1/back",
+    "error_message": "ExecutionError: Execution failed: module 'vectorbt' has no attribute 'EMA'\nTraceback (most recent call last):\n  File \"/Users/shailendrakaushik/Documents/Python/AlgoTrading/TradeCraft-1/AITrader-1/backend/app/services/executor.py\", line 331, in execute_with_timeout\n    exec(code, exec_globals)\n    ~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 21, in <module>\nAttributeError: module 'vectorbt' has no attribute 'EMA'. Did you mean: 'MA'?\n",
+    "fix_description": "Review the error message and fix the code. Error: ExecutionError: Execution failed: module 'vectorbt' has no attribute 'EMA'\nTraceback (most recent ca",
+    "example_before": "import vectorbt as vbt\nimport pandas as pd\nimport numpy as np\n\n# Parameters\nema_window = 9\nsma_window = 20\nvol_ma_window = 20\nticker = 'AOSL'\nstart = '2020-01-01'\nend = '2024-01-01'\n\n# Load data from ",
+    "example_after": "import vectorbt as vbt\nimport pandas as pd\nimport numpy as np\n\n# Parameters\nema_window = 9\nsma_window = 20\nvol_ma_window = 20\nticker = 'AOSL'\nstart = '2020-01-01'\nend = '2024-01-01'\n\n# Load data from ",
+    "timestamp": "2026-05-04T17:38:45.838995Z",
+    "frequency": 1,
+    "variations": [
+      "ExecutionError: Execution failed: module 'vectorbt' has no attribute 'EMA'\nTraceback (most recent call last):\n  File \"/Users/shailendrakaushik/Documents/Python/AlgoTrading/TradeCraft-1/AITrader-1/backend/app/services/executor.py\", line 331, in execute_with_timeout\n    exec(code, exec_globals)\n    ~~~~^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 21, in <module>\nAttributeError: module 'vectorbt' has no attribute 'EMA'. Did you mean: 'MA'?\n"
+    ]
+  }
+]

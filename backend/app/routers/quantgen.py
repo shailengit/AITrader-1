@@ -31,10 +31,106 @@ from app.services.validators import (
     StrategyValidator
 )
 from app.services.vbt_helpers import get_indicator_list
+from app.services.code_verifier import CodeVerifier
+from app.services.lessons_learned import LessonsLearnedStore
+from app.db.database import engine
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _extract_error_details_from_result(result: dict, code: str) -> dict:
+    """Extract structured error details from an executor result."""
+    import re
+
+    error_str = result.get("error", "Unknown error")
+    traceback_str = result.get("traceback", "")
+    stdout = result.get("output", "")
+
+    # Extract line number from traceback
+    line_match = re.search(r'File "<string>".*line (\d+)', traceback_str)
+    if not line_match:
+        line_match = re.search(r"line (\d+)", traceback_str)
+    line_num = int(line_match.group(1)) if line_match else None
+    line_content = None
+    if line_num:
+        lines = code.split("\n")
+        if 0 <= line_num - 1 < len(lines):
+            line_content = lines[line_num - 1]
+
+    # Classify error type
+    category = "execution"
+    error_lower = error_str.lower()
+    if "syntax" in error_lower or "invalid syntax" in error_lower:
+        category = "syntax"
+    elif "validation" in error_lower:
+        category = "validation"
+    elif "security" in error_lower or "forbidden" in error_lower:
+        category = "security"
+    elif "timeout" in error_lower:
+        category = "timeout"
+
+    # Try to classify with lessons store
+    try:
+        lessons_store = LessonsLearnedStore()
+        error_type = lessons_store.classify_error(error_str) or "UNKNOWN"
+        lesson = lessons_store.find_match(error_str)
+        suggestion = (
+            lesson["fix_description"]
+            if lesson
+            else _get_default_suggestion(error_type, error_str, line_content)
+        )
+        related_lesson = lesson["id"] if lesson else None
+    except Exception:
+        error_type = "UNKNOWN"
+        suggestion = _get_default_suggestion("UNKNOWN", error_str, line_content)
+        related_lesson = None
+
+    return {
+        "type": error_type,
+        "category": category,
+        "message": error_str,
+        "line": line_num,
+        "line_content": line_content,
+        "traceback": traceback_str,
+        "stdout": stdout,
+        "suggestion": suggestion,
+        "related_lesson": related_lesson,
+    }
+
+
+def _get_default_suggestion(error_type: str, error_message: str, line_content: Optional[str]) -> str:
+    """Generate a default suggestion based on error type."""
+    suggestions = {
+        "VBT_COMPARISON_OPERATOR": (
+            "Replace comparison operators (>, <, &, |) with VBT methods: "
+            "ma_above(), ma_below(), rsi_below(), vbt.And(), vbt.Or()"
+        ),
+        "MISSING_PF_OBJECT": (
+            "Ensure code ends with: pf = vbt.Portfolio.from_signals(...)"
+        ),
+        "SYNTAX_ERROR": (
+            "Check for missing parentheses, quotes, or indentation issues."
+        ),
+        "DATA_LOADING": (
+            "Use DataService.get_ohlcv_data(ticker, start, end) to load data."
+        ),
+        "PORTFOLIO_EMPTY": (
+            "Portfolio has no trades. Check that entries/exits have True values."
+        ),
+        "MISSING_PARAMETERS": (
+            "Add a '# Parameters' section at the top with tunable numeric variables."
+        ),
+        "IMPORT_ERROR": (
+            "Only standard libraries + pandas/numpy/vectorbt are allowed."
+        ),
+    }
+    return suggestions.get(
+        error_type,
+        f"Review the error and fix the code. Error: {error_message[:100]}",
+    )
 
 
 class GenerateRequest(BaseModel):
@@ -49,6 +145,7 @@ class RunRequest(BaseModel):
     """Request model for strategy execution."""
     code: str
     use_database: bool = True
+    tickers: Optional[List[str]] = None
 
 
 class OptimizeRequest(BaseModel):
@@ -56,6 +153,7 @@ class OptimizeRequest(BaseModel):
     code: str
     strategy_params: Dict[str, Any]
     config: Dict[str, Any]
+    tickers: Optional[List[str]] = None
 
 
 class TrueWFORequest(BaseModel):
@@ -63,6 +161,7 @@ class TrueWFORequest(BaseModel):
     code: str
     strategy_params: Dict[str, Any]
     config: Dict[str, Any]
+    tickers: Optional[List[str]] = None
 
 
 class ChatRequest(BaseModel):
@@ -154,60 +253,61 @@ async def generate_strategy(request: GenerateRequest):
                 }
             }
 
-        # Try to validate and fix the code
-        attempts = 0
-        max_retries = 2  # Reduced from 5 to prevent long wait times
-        last_error = None
+        # Verify and auto-fix the generated code using CodeVerifier
+        verifier = CodeVerifier()
+        verification = verifier.verify_and_fix(
+            code,
+            tickers=request.tickers,
+            max_attempts=3,
+            record_lessons=True
+        )
 
-        import time
-        total_start = time.time()
+        if verification.success:
+            msg = "Strategy generated and validated successfully"
+            if verification.fix_attempts > 0:
+                msg = f"Strategy generated and auto-fixed after {verification.fix_attempts} attempt(s)"
+            return {
+                "success": True,
+                "data": {
+                    "code": verification.code,
+                    "output": verification.output,
+                    "fix_attempts": verification.fix_attempts,
+                    "lessons_applied": verification.lessons_applied,
+                    "execution_time": verification.execution_time,
+                },
+                "message": msg
+            }
 
-        while attempts < max_retries:
-            logger.info(f"Attempt {attempts + 1}: Testing generated strategy")
-            test_start = time.time()
+        # Failed after all attempts - return structured error details
+        error_details = None
+        if verification.error_details:
+            error_details = {
+                "type": verification.error_details.type,
+                "category": verification.error_details.category,
+                "message": verification.error_details.message,
+                "line": verification.error_details.line,
+                "line_content": verification.error_details.line_content,
+                "traceback": verification.error_details.traceback,
+                "stdout": verification.error_details.stdout,
+                "suggestion": verification.error_details.suggestion,
+                "related_lesson": verification.error_details.related_lesson,
+            }
 
-            # Dry run with validation
-            exec_result = execute_strategy(code)
-
-            test_elapsed = time.time() - test_start
-            logger.info(f"Strategy execution test took {test_elapsed:.2f}s")
-
-            if exec_result["success"]:
-                logger.info(f"Strategy generated successfully after {attempts + 1} attempts")
-                return {
-                    "success": True,
-                    "data": {
-                        "code": code,
-                        "output": exec_result.get("output", ""),
-                        "validation": exec_result.get("validation", {}),
-                    },
-                    "attempts": attempts + 1,
-                    "message": "Strategy generated and validated successfully"
-                }
-
-            # Failure -> Fix
-            last_error = exec_result.get("error", "Unknown error")
-            logger.warning(f"Attempt {attempts + 1} failed. Error: {last_error}")
-
-            fix_start = time.time()
-            code = fix_strategy_code(code, last_error)
-            fix_elapsed = time.time() - fix_start
-            logger.info(f"Code fix request took {fix_elapsed:.2f}s")
-            attempts += 1
-
-        # If we fail after all retries
-        logger.error(f"Strategy generation failed after {max_retries} attempts")
+        logger.error(
+            f"Strategy generation failed after {verification.fix_attempts} attempts. "
+            f"Error: {verification.error_details.message if verification.error_details else 'Unknown'}"
+        )
         return {
             "success": False,
             "error": {
                 "type": "GenerationError",
-                "message": f"Failed after {max_retries} attempts",
-                "details": last_error,
-                "attempts": attempts
+                "message": f"Failed after {verification.fix_attempts} attempts",
+                "details": error_details,
             },
             "data": {
-                "code": code,
-                "output": exec_result.get("output", "") if 'exec_result' in locals() else ""
+                "code": verification.code,
+                "output": verification.output,
+                "fix_attempts": verification.fix_attempts,
             }
         }
 
@@ -242,8 +342,8 @@ async def run_strategy_endpoint(request: RunRequest):
                 "data": None
             }
 
-        # Execute strategy
-        result = execute_strategy(validated.code)
+        # Execute strategy with enhanced error extraction
+        result = execute_strategy(validated.code, request.tickers)
 
         if result["success"]:
             logger.info("Strategy executed successfully")
@@ -262,13 +362,18 @@ async def run_strategy_endpoint(request: RunRequest):
                 "message": "Strategy executed successfully"
             }
         else:
-            logger.error(f"Strategy execution failed: {result.get('error')}")
+            error_str = result.get("error", "Unknown error")
+            logger.error(f"Strategy execution failed: {error_str}")
+
+            # Extract structured error details
+            error_details = _extract_error_details_from_result(result, validated.code)
+
             return {
                 "success": False,
                 "error": {
                     "type": "ExecutionError",
                     "message": "Strategy execution failed",
-                    "details": result.get("error", "Unknown error")
+                    "details": error_details
                 },
                 "data": {
                     "output": result.get("output", "")
@@ -314,7 +419,8 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
         result = run_optimization(
             validated.code,
             validated.strategy_params,
-            validated.config
+            validated.config,
+            request.tickers
         )
 
         # Check if there was an error
@@ -368,7 +474,8 @@ async def run_true_wfo(request: TrueWFORequest):
     opt_request = OptimizeRequest(
         code=request.code,
         strategy_params=request.strategy_params,
-        config={**request.config, "mode": "true_wfo"}
+        config={**request.config, "mode": "true_wfo"},
+        tickers=request.tickers
     )
 
     # Route to optimize endpoint
@@ -605,3 +712,35 @@ async def list_indicators():
     except Exception as e:
         logger.error(f"Error listing indicators: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/latest-date")
+async def get_latest_date():
+    """Return the latest available trading date in the database."""
+    try:
+        # Query aapl table as a reliable S&P 1500 constituent
+        query = text('SELECT MAX("Date") as latest_date FROM aapl')
+        with engine.connect() as conn:
+            result = conn.execute(query).fetchone()
+
+        if result and result[0]:
+            latest = str(result[0])
+            # Ensure YYYY-MM-DD format
+            if len(latest) > 10:
+                latest = latest[:10]
+            return {
+                "success": True,
+                "data": {"latest_date": latest},
+                "message": f"Latest available date: {latest}"
+            }
+    except Exception as e:
+        logger.warning(f"Could not fetch latest date from DB: {e}")
+
+    # Fallback to today if DB is unavailable
+    from datetime import datetime
+    today = datetime.now().strftime("%Y-%m-%d")
+    return {
+        "success": True,
+        "data": {"latest_date": today},
+        "message": f"Database unavailable, fallback to today: {today}"
+    }

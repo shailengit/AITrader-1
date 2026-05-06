@@ -67,10 +67,10 @@ interface ProgressMetricProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const progressColors = {
-  emerald: 'bg-gradient-to-r from-emerald-600 to-emerald-400',
-  blue: 'bg-gradient-to-r from-blue-600 to-blue-400',
-  purple: 'bg-gradient-to-r from-purple-600 to-purple-400',
-  zinc: 'bg-zinc-600',
+  emerald: 'bg-emerald-500',
+  blue: 'bg-blue-500',
+  purple: 'bg-purple-500',
+  zinc: 'bg-zinc-500',
 }
 
 const progressTextColors = {

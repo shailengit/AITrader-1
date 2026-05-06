@@ -18,7 +18,7 @@ TradeCraft/
 │   │   ├── main.py          # FastAPI entry point with CORS, security headers
 │   │   ├── routers/         # API endpoints
 │   │   │   ├── sectors.py    # Sector rotation: /api/sectors, /api/stocks/:sector
-│   │   │   ├── screener.py  # AI screener: /api/screener/scan, /api/screener/status/:id
+│   │   │   ├── screener.py  # AI screener: /api/screener/scan, /api/screener/parse-filters, /api/screener/status/:id
 │   │   │   ├── quantgen.py  # Strategy builder: /api/generate, /api/run, /api/optimize
 │   │   │   └── health.py     # Health check: /api/health, /api/db-status
 │   │   ├── services/        # Business logic
@@ -100,6 +100,23 @@ Two screening modes with optional AI multi-agent analysis:
 
 Set `use_ai=true` for Agno multi-agent team analysis with natural language reports.
 
+### Quant Strategy Filter System
+
+The Quant Strategy screener supports a two-phase natural language workflow:
+
+1. **Parse Phase:** `POST /api/screener/parse-filters` sends the user's prompt to a lightweight LLM (`parse_quant_filters()`) which extracts structured `QuantFilters` JSON.
+2. **Review Phase:** The frontend displays editable controls for each parsed filter (ATH proximity, RSI range, volume ratio, SMA relations, sort order, max results).
+3. **Scan Phase:** The user clicks "Start Scan" with the confirmed filters. Both AI and non-AI paths apply the filters deterministically to the full S&P 1500 universe.
+
+**Key functions:**
+- `backend/app/services/agno_screener.py:parse_quant_filters()` — LLM-based prompt parser
+- `backend/app/services/agno_screener.py:apply_quant_filters()` — Deterministic DataFrame filter engine
+- `backend/app/routers/screener.py:parse_filters()` — FastAPI endpoint
+
+**Important:** The `prompt` parameter to `run_quant_strategy_screener` was previously accepted but never used. The filter system fixes this by either:
+- Using `parse_quant_filters()` to turn the prompt into structured filters (non-AI path)
+- Passing both the prompt and confirmed filters to the Agno agent team (AI path)
+
 ### Database Access Pattern
 
 ```python
@@ -136,12 +153,35 @@ const res = await fetch('/api/sectors')
 
 **Implementation:** `backend/app/services/continuous_wfo.py` — uses `PortfolioTracker` to maintain position state across windows.
 
+## Available Skills
+
+The following Claude Code skills are used in this project:
+- **cli-anything-tradecraft** - General-purpose CLI automation and task execution
+- **playwright-cli** - Browser automation, UI testing, and screenshot capture
+
 ## Original Repositories
 
 This unified platform combines code from:
 - **StockScreener_2** - Multi-agent AI stock screener with Agno/Ollama
 - **Sector-Rotation-Scanner** - React/TypeScript sector analysis dashboard
 - **QuantGen** - FastAPI/React quantitative strategy builder with VectorBT
+
+## Sector Rotation to QuantGen Export Flow
+
+When a user exports stocks from the Sector Rotation Scanner to the QuantGen Builder, the following parameters are passed via URL query string:
+- `tickers` — comma-separated list of filtered stock tickers
+- `from_date` — the "As Of" date selected in the Sector Rotation Scanner
+
+The Builder page (`frontend/src/pages/QuantGen/Builder.tsx`) parses these parameters:
+- `from_date` becomes the `start_date` for strategy generation and WFO optimization
+- `end_date` is fetched from the backend via `/api/latest-date` and represents the latest available trading date in the PostgreSQL database
+- Both dates are editable in the Optimization Config panel (`OptimizationConfig.tsx`)
+
+**Key files:**
+- `frontend/src/pages/SectorRotation.tsx:163-166` — builds export URL
+- `frontend/src/pages/QuantGen/Builder.tsx:78-83` — parses URL params and applies dates
+- `frontend/src/components/quantgen/OptimizationConfig.tsx` — date picker UI
+- `backend/app/routers/quantgen.py` — `/api/latest-date` endpoint queries `SELECT MAX("Date") FROM aapl`
 
 ## Design System Rules
 - Max content width: 1280px, centered with auto margins
@@ -230,25 +270,101 @@ window_configs = calculate_window_configs(
 
 **Problem:** Strategy backtest works fine, but optimization fails with "cannot join with no overlapping index names" error.
 
-**Root Cause:** When using single parameter values, VBT creates simple Series that can be compared with operators (`>`, `<`, `&`). When optimizing with multiple parameter combinations, VBT creates DataFrames with MultiIndex columns that cannot be directly compared with operators.
+**Root Cause:** When using single parameter values, VBT creates simple Series that can be compared with operators (`>`, `<`, `&`, `|`). When optimizing with multiple parameter combinations, VBT creates DataFrames with MultiIndex columns that cannot be directly compared with operators.
 
-**Solution:** Use VBT's built-in comparison methods instead of operators:
+**Solution:** Use `.vbt` accessor methods and `vbt.combine_logic` instead of operators:
 
 ```python
 # WRONG - Works for backtest, fails for optimization:
 entries = (fast_ma.ma > slow_ma.ma) & (rsi.rsi < 30)
 
 # CORRECT - Works for both backtest and optimization:
-entries = vbt.And(fast_ma.ma_above(slow_ma.ma), rsi.rsi_below(30))
+entries = vbt.combine_logic(
+    fast_ma.ma.vbt.gt(slow_ma.ma),
+    rsi.rsi.vbt.lt(30),
+    combine_func=np.logical_and
+)
 
-# Available VBT comparison methods:
-# - ma_above(), ma_below(), ma_crossed_above(), ma_crossed_below()
-# - rsi_above(), rsi_below(), rsi_crossed_above(), rsi_crossed_below()
-# - vbt.And(), vbt.Or(), vbt.Not() for combining conditions
+# Standard Operation | VectorBT Method
+# ------------------ | -----------------------------
+# a > b              | a.vbt.gt(b)
+# a < b              | a.vbt.lt(b)
+# a == b             | a.vbt.eq(b)
+# a & b              | vbt.combine_logic(a, b, combine_func=np.logical_and)
+# a | b              | vbt.combine_logic(a, b, combine_func=np.logical_or)
 ```
 
-**Lesson:** 
-- Strategy code must use VBT comparison methods to work with optimization
-- Single-parameter backtests work with operators because VBT uses simple Series
-- Multi-parameter optimization requires DataFrame-aware comparison methods
+**Portfolio.from_signals flags for optimization:**
+```python
+pf = vbt.Portfolio.from_signals(
+    close,
+    entries=entries,
+    exits=exits,
+    broadcast_kwargs={'keep_pd': True},  # Crucial for optimization/WFO
+    jitted=True
+)
+```
+
+**Lesson:**
+- Strategy code must use `.vbt.gt()`, `.vbt.lt()`, and `vbt.combine_logic` to work with optimization
+- Never use `&`, `|`, `<`, or `>` with VBT indicators during signal generation
+- Always add `broadcast_kwargs={'keep_pd': True}` and `jitted=True` to `Portfolio.from_signals`
 - The backend now catches this error and provides a helpful message explaining how to fix the code
+
+### Agno Agent API Version Sensitivity
+
+**Problem:** Adding `show_tool_calls=False` to `Agent()` initialization throws `TypeError: Agent.__init__() got an unexpected keyword argument 'show_tool_calls'`.
+
+**Root Cause:** The `agno` library version installed in this project does not support the `show_tool_calls` parameter.
+
+**Solution:** Omit `show_tool_calls` from `Agent()` calls. Use `markdown=False` and `debug_mode=False` for output control instead.
+
+**Lesson:** When working with the Agno SDK in this repo, stick to the minimal set of kwargs: `model`, `instructions`, `tools`, `markdown`, `debug_mode`.
+
+### Null vs Undefined in Frontend Numeric Guards
+
+**Problem:** React crashes with `TypeError: Cannot read properties of null (reading 'toFixed')` even though the code has `!== undefined` checks.
+
+**Root Cause:** The backend returns `null` for missing numeric fields. In JavaScript, `null !== undefined` is `true`, so the guard passes and `null.toFixed()` crashes.
+
+**Solution:** Use `!= null` (loose equality) which matches both `null` and `undefined`:
+```tsx
+// WRONG - crashes when value is null:
+{result.eps_growth_qoq !== undefined && (
+  <span>{result.eps_growth_qoq.toFixed(1)}%</span>
+)}
+
+// CORRECT - handles both null and undefined:
+{result.eps_growth_qoq != null && (
+  <span>{result.eps_growth_qoq.toFixed(1)}%</span>
+)}
+```
+
+**Lesson:** When guarding numeric fields from backend responses, always use `!= null` not `!== undefined`. Check all fields that call `.toFixed()`, `.toLocaleString()`, or any number method.
+
+### Candlestick Chart Already Has Volume Histogram
+
+**Problem:** User requests volume bars on the candlestick chart modal.
+
+**Reality:** The `CandleStickChart` component (`frontend/src/components/quantgen/CandleStickChart.tsx`) already renders a `HistogramSeries` for volume. It is created automatically when the OHLCV data contains non-zero volume values. The volume bars are colored green for up days and red for down days, positioned in the bottom 20% of the chart.
+
+**Lesson:** Before adding volume visualization, verify the component doesn't already support it. The `/api/ohlcv/{ticker}` endpoint returns volume data and the chart consumes it.
+
+### TA Library Column Naming Convention
+
+**Context:** The Quant Strategy screener uses the `ta` library (`add_all_ta_features`) for indicator computation.
+
+**Key column names:**
+- `trend_sma_fast` → SMA(20)
+- `trend_sma_slow` → SMA(50)
+- `momentum_rsi` → RSI(14)
+- `trend_macd` → MACD
+- `Volume` → raw volume
+
+**Custom fields added per ticker:**
+- `ath_proximity` = close / all_time_high
+- `volume_ratio` = current_volume / 50_day_avg_volume
+- `volume` = raw daily volume
+- `volume_ma_50` = 50-day rolling average volume
+
+**Lesson:** When adding new indicators or filters to the technical screener, use the `ta` library's output column names. Custom computed fields should be added in `_worker_ta_analysis` and included in the `ta_to_friendly` mapping in `run_quant_strategy_screener`.

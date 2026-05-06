@@ -1,5 +1,0 @@
-Constraints:
-- Max width 1400px centered
-- Use responsive grid (auto-fit/minmax)
-- Optimize for 4K (3840px)
-- No layout stretching

@@ -1,387 +1,365 @@
 import { Link } from 'react-router-dom'
-import { Database } from 'lucide-react'
-import { FeatureCard, ThemeToggle } from '../components/ui'
-import { Activity, BarChart2, Terminal } from 'lucide-react'
+import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge } from 'lucide-react'
+import { ThemeToggle } from '../components/ui'
 import { useTheme } from '../context/ThemeContext'
 
 const tools = [
   {
     id: 'sectors',
-    title: 'Sector Rotation Scanner',
-    description: 'Analyze sector ETF performance to identify momentum and rotation patterns. Find leading stocks within outperforming sectors.',
-    icon: Activity,
-    color: 'emerald' as const,
+    title: 'Sector Rotation',
+    description: 'Identify momentum leaders across 11 sector ETFs with acceleration metrics and squeeze detection.',
+    icon: TrendingUp,
+    accent: '#10B981',
     link: '/sectors',
-    features: [
-      'Sector acceleration metrics',
-      'Momentum leader identification',
-      'Bollinger Bands squeeze detection',
-      '3M/6M performance spread analysis',
-    ],
+    stat: '11 ETFs tracked',
+    detail: 'S&P 500 sector breakdown with leading stocks per sector',
   },
   {
     id: 'screener',
     title: 'AI Stock Screener',
-    description: 'Multi-agent AI screening with technical and fundamental analysis. Find stocks with breakouts, accumulation patterns, and EPS acceleration.',
-    icon: BarChart2,
-    color: 'blue' as const,
+    description: 'Multi-agent AI that finds dormant giants before they break out. OBV, Bollinger squeeze, EPS.',
+    icon: Sparkles,
+    accent: '#10B981',
     link: '/screener',
-    features: [
-      'Volatility contraction detection',
-      'OBV hidden accumulation',
-      'EPS inflection verification',
-      'AI-powered analysis workflow',
-    ],
+    stat: '1,500 stocks',
+    detail: 'Two screening modes with Agno-powered multi-agent analysis',
   },
   {
     id: 'quantgen',
-    title: 'QuantGen Strategy Builder',
-    description: 'AI-powered quantitative strategy generator with VectorBT backtesting. Create, test, and optimize trading strategies.',
-    icon: Terminal,
-    color: 'purple' as const,
+    title: 'Strategy Builder',
+    description: 'Write, backtest, and optimize quant strategies with AI-assisted code generation and VectorBT.',
+    icon: Code,
+    accent: '#10B981',
     link: '/quantgen',
-    features: [
-      'AI code generation',
-      'VectorBT backtesting',
-      'Walk-forward optimization',
-      'Strategy management',
-    ],
+    stat: 'VectorBT engine',
+    detail: 'True walk-forward optimization with position-aware tracking',
   },
-]
-
-const stats = [
-  { label: 'S&P 1500 Coverage', value: '~1,500', suffix: 'stocks' },
-  { label: 'Sector ETFs', value: '11', suffix: 'sectors' },
-  { label: 'Historical Data', value: 'Daily', suffix: 'OHLCV' },
-  { label: 'AI Models', value: 'Agno', suffix: '+ Ollama' },
 ]
 
 export default function Landing() {
   const { isDarkMode } = useTheme()
 
-  // Theme-aware colors
   const colors = {
-    bg: isDarkMode ? '#050505' : '#f5f5f7',
-    text: isDarkMode ? '#ffffff' : '#1d1d1f',
-    muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    subtle: isDarkMode ? '#52525B' : '#86868b',
-    surface: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#ffffff',
-    border: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#d2d2d7',
-    accent: isDarkMode ? '#10B981' : '#0071e3',
-    accentText: isDarkMode ? '#000000' : '#fff',
-    badgeBg: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 113, 227, 0.1)',
-    badgeBorder: isDarkMode ? 'rgba(16, 185, 129, 0.5)' : 'rgba(0, 113, 227, 0.2)',
-    badgeText: isDarkMode ? '#6EE7B7' : '#0066cc',
-    secondaryBtnBorder: isDarkMode ? 'rgba(255, 255, 255, 0.25)' : '#d2d2d7',
-    secondaryBtnText: isDarkMode ? '#ffffff' : '#1d1d1f',
-    orb1: isDarkMode ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 113, 227, 0.1)',
-    orb2: isDarkMode ? 'rgba(59, 130, 246, 0.25)' : 'rgba(0, 113, 227, 0.08)',
-    orb3: isDarkMode ? 'rgba(168, 85, 247, 0.25)' : 'rgba(0, 113, 227, 0.06)',
-    gradient: isDarkMode
-      ? 'linear-gradient(to bottom, rgba(16, 185, 129, 0.15), transparent, transparent)'
-      : 'linear-gradient(to bottom, rgba(0, 113, 227, 0.05), transparent, transparent)',
-    heroGlow: isDarkMode
-      ? 'rgba(16, 185, 129, 0.35)'
-      : 'rgba(0, 113, 227, 0.05)',
-    heroGlowOpacity: isDarkMode ? 0.8 : 0.2,
+    bg: isDarkMode ? '#050505' : '#fafaf8',
+    surface: isDarkMode ? '#0a0a0a' : '#ffffff',
+    text: isDarkMode ? '#ffffff' : '#1a1a18',
+    muted: isDarkMode ? 'rgba(255,255,255,0.55)' : '#6b6b65',
+    subtle: isDarkMode ? 'rgba(255,255,255,0.32)' : '#8e8e88',
+    border: isDarkMode ? 'rgba(255,255,255,0.07)' : '#e5e5e0',
+    accent: '#10B981',
+    accentHover: '#059669',
+    accentMuted: isDarkMode ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.06)',
+    btnText: isDarkMode ? '#050505' : '#ffffff',
+    cardBg: isDarkMode ? 'rgba(255,255,255,0.02)' : '#ffffff',
+    cardBorder: isDarkMode ? 'rgba(255,255,255,0.06)' : '#e5e5e0',
+    featureBg: isDarkMode ? 'rgba(16,185,129,0.04)' : 'rgba(16,185,129,0.03)',
+    featureBorder: isDarkMode ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.15)',
+    featureText: isDarkMode ? '#6EE7B7' : '#059669',
+    numberColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: colors.bg, transition: 'background-color 0.3s ease' }}>
-      {/* Hero Section */}
-      <section style={{ position: 'relative', overflow: 'hidden' }}>
-        {/* Background effects */}
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: colors.bg,
+      transition: 'background-color 0.3s ease',
+      color: colors.text,
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '32px 40px',
+        maxWidth: 1280,
+        margin: '0 auto',
+      }}>
         <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: colors.gradient,
-          transition: 'background 0.3s ease'
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 800,
-          height: 600,
-          background: colors.heroGlow,
-          borderRadius: '50%',
-          filter: 'blur(100px)',
-          opacity: colors.heroGlowOpacity,
-          transition: 'background 0.3s ease, opacity 0.3s ease'
-        }} />
-
-        {/* Floating orbs */}
-        <div style={{
-          position: 'absolute',
-          top: 80,
-          left: '25%',
-          width: 256,
-          height: 256,
-          background: colors.orb1,
-          borderRadius: '50%',
-          filter: 'blur(100px)',
-          transition: 'background 0.3s ease'
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: 160,
-          right: '25%',
-          width: 192,
-          height: 192,
-          background: colors.orb2,
-          borderRadius: '50%',
-          filter: 'blur(100px)',
-          transition: 'background 0.3s ease'
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: 240,
-          right: '33%',
-          width: 128,
-          height: 128,
-          background: colors.orb3,
-          borderRadius: '50%',
-          filter: 'blur(100px)',
-          transition: 'background 0.3s ease'
-        }} />
-
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          maxWidth: 1280,
-          margin: '0 auto',
-          padding: '48px 24px'
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
         }}>
-          {/* Header with Theme Toggle */}
           <div style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            backgroundColor: '#10B981',
             display: 'flex',
-            justifyContent: 'flex-end',
-            paddingTop: 16,
-            marginBottom: 48
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            fontWeight: 800,
+            color: '#050505',
           }}>
-            <ThemeToggle variant="ghost" size="md" />
+            TC
           </div>
+          <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>TradeCraft</span>
+        </div>
+        <ThemeToggle variant="ghost" size="md" />
+      </div>
 
-          {/* Hero Content */}
-          <div style={{
-            textAlign: 'center',
-            paddingTop: 32,
-            marginBottom: 100
-          }}>
-            <div style={{
+      {/* Hero */}
+      <div style={{ maxWidth: 880, margin: '0 auto', padding: '80px 40px 100px', textAlign: 'center' }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 20px',
+          backgroundColor: colors.featureBg,
+          borderRadius: 8,
+          border: `1px solid ${colors.featureBorder}`,
+          color: colors.featureText,
+          fontSize: 13,
+          fontWeight: 500,
+          marginBottom: 40,
+          transition: 'all 0.3s ease',
+        }}>
+          <Database style={{ width: 16, height: 16 }} />
+          S&P 1500 · PostgreSQL · Agno AI
+        </div>
+
+        <h1 style={{
+          fontSize: 64,
+          fontWeight: 700,
+          marginBottom: 28,
+          letterSpacing: '-0.04em',
+          lineHeight: 1.06,
+          transition: 'color 0.3s ease',
+        }}>
+          Trading research,<br />
+          <span style={{ color: '#10B981' }}>crafted for precision</span>
+        </h1>
+
+        <p style={{
+          fontSize: 18,
+          color: colors.muted,
+          maxWidth: 600,
+          margin: '0 auto 48px',
+          lineHeight: 1.7,
+          transition: 'color 0.3s ease',
+        }}>
+          Screen stocks with AI agents, analyze sector rotation patterns, and build backtested quantitative strategies — three tools, one platform, zero compromises.
+        </p>
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          marginBottom: 80,
+        }}>
+          <Link
+            to="/sectors"
+            style={{
+              backgroundColor: colors.accent,
+              color: colors.btnText,
+              padding: '14px 32px',
+              borderRadius: 10,
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 12,
-              padding: '14px 28px',
-              background: colors.badgeBg,
-              borderRadius: 50,
-              border: `1px solid ${colors.badgeBorder}`,
-              color: colors.badgeText,
-              fontSize: 15,
-              marginBottom: 48,
-              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease'
-            }}>
-              <Database style={{ width: 20, height: 20 }} />
-              <span>PostgreSQL Powered</span>
-            </div>
-
-            <h1 style={{
-              fontSize: 96,
-              fontWeight: 800,
+              gap: 8,
+              transition: 'all 0.2s ease',
+              boxShadow: isDarkMode
+                ? '0 0 32px rgba(16,185,129,0.3)'
+                : '0 4px 16px rgba(16,185,129,0.2)',
+            }}
+          >
+            Get started
+            <ArrowRight style={{ width: 16, height: 16 }} />
+          </Link>
+          <a
+            href="#tools-section"
+            style={{
+              backgroundColor: 'transparent',
               color: colors.text,
-              marginBottom: 24,
-              letterSpacing: '-0.05em',
-              lineHeight: 1.1,
-              transition: 'color 0.3s ease'
-            }}>
-              TradeCraft
-            </h1>
-
-            <p style={{
-              fontSize: 24,
-              color: colors.muted,
-              maxWidth: 720,
-              margin: '0 auto 56px',
-              lineHeight: 1.6,
-              letterSpacing: '-0.01em',
-              transition: 'color 0.3s ease'
-            }}>
-              Leverage cutting-edge AI for smarter stock screening, dynamic sector rotation, and advanced quantitative strategy building.
-            </p>
-
-            {/* CTA Buttons */}
-            <div style={{
-              display: 'flex',
+              padding: '14px 32px',
+              borderRadius: 10,
+              fontSize: 15,
+              fontWeight: 500,
+              textDecoration: 'none',
+              border: `1px solid ${colors.border}`,
+              display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 24,
-              marginBottom: 80
-            }}>
-              <Link
-                to="/sectors"
-                style={{
-                  background: colors.accent,
-                  color: colors.accentText,
-                  padding: '18px 42px',
-                  borderRadius: 999, // Pill shape
-                  fontSize: 18,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  boxShadow: isDarkMode
-                    ? '0 0 40px rgba(16, 185, 129, 0.4), inset 0 2px 4px rgba(255,255,255,0.2)'
-                    : '0 0 30px rgba(0, 113, 227, 0.25)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  transition: 'all 0.3s ease'
-                }}
-                className="hover-lift"
-              >
-                Launch Scanner
-                <svg style={{ width: 20, height: 20 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-              </Link>
-              <Link
-                to="/sectors"
-                style={{
-                  background: isDarkMode ? 'rgba(255,255,255,0.03)' : 'transparent',
-                  color: colors.secondaryBtnText,
-                  padding: '18px 42px',
-                  borderRadius: 999, // Pill shape
-                  fontSize: 18,
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  border: `1px solid ${colors.secondaryBtnBorder}`,
-                  transition: 'all 0.3s ease'
-                }}
-                className="hover-lift"
-              >
-                Explore Features
-              </Link>
-            </div>
+              transition: 'all 0.2s ease',
+            }}
+          >
+            See what's included
+          </a>
+        </div>
 
-            {/* Dashboard Mockup Image */}
-            <div style={{
-              position: 'relative',
-              maxWidth: 1200,
-              margin: '0 auto',
-              borderRadius: 24,
-              padding: 12,
-              background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
-              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
-              boxShadow: isDarkMode ? '0 30px 60px rgba(0,0,0,0.5), 0 0 100px rgba(16,185,129,0.1)' : '0 30px 60px rgba(0,0,0,0.1)',
-              overflow: 'hidden',
-              transform: 'perspective(1000px) rotateX(2deg)',
-              transformOrigin: 'top center',
-              transition: 'all 0.5s ease'
-            }}>
-              <img 
-                src="/dashboard-mockup.png" 
-                alt="TradeCraft Dashboard" 
-                style={{
-                  width: '100%',
-                  height: 'auto',
-                  borderRadius: 16,
-                  display: 'block'
-                }}
-              />
-            </div>
-          </div>
+        {/* Dashboard Mockup */}
+        <div style={{
+          borderRadius: 16,
+          padding: 8,
+          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.015)',
+          border: `1px solid ${colors.border}`,
+          boxShadow: isDarkMode
+            ? '0 24px 48px rgba(0,0,0,0.4)'
+            : '0 16px 32px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+        }}>
+          <img
+            src="/dashboard-mockup.png"
+            alt="TradeCraft platform interface"
+            style={{ width: '100%', height: 'auto', borderRadius: 10, display: 'block' }}
+          />
+        </div>
+      </div>
 
-          {/* Stats */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: 24,
-            marginBottom: 100
+      {/* Tools section */}
+      <div id="tools-section" style={{
+        maxWidth: 1000,
+        margin: '0 auto',
+        padding: '0 40px 100px',
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <h2 style={{
+            fontSize: 32,
+            fontWeight: 700,
+            marginBottom: 12,
+            letterSpacing: '-0.03em',
           }}>
-            {stats.map((stat) => (
-              <div
-                key={stat.label}
-                style={{
-                  background: isDarkMode ? 'rgba(255, 255, 255, 0.02)' : colors.surface,
-                  border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : colors.border}`,
-                  borderRadius: 24,
-                  padding: '48px 40px',
-                  textAlign: 'center',
-                  boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : 'none',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'transform 0.3s ease, border-color 0.3s ease'
-                }}
-                className="hover-lift"
-              >
-                <p style={{
-                  fontSize: 56,
-                  fontWeight: 800,
-                  color: colors.text,
+            Three tools, one workflow
+          </h2>
+          <p style={{ fontSize: 16, color: colors.muted }}>
+            Each tool is purpose-built and works standalone or together.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {tools.map((tool, i) => (
+            <Link
+              key={tool.id}
+              to={tool.link}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: 32,
+                alignItems: 'center',
+                padding: '36px 40px',
+                backgroundColor: colors.cardBg,
+                border: `1px solid ${colors.cardBorder}`,
+                borderRadius: 16,
+                textDecoration: 'none',
+                color: 'inherit',
+                transition: 'all 0.25s ease',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: colors.accentMuted,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: colors.accent,
+                  }}>
+                    <tool.icon style={{ width: 18, height: 18 }} />
+                  </div>
+                  <span style={{ fontSize: 13, color: colors.subtle, fontWeight: 500 }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                </div>
+                <h3 style={{
+                  fontSize: 22,
+                  fontWeight: 700,
                   marginBottom: 8,
                   letterSpacing: '-0.02em',
-                  transition: 'color 0.3s ease'
-                }}>{stat.value}</p>
-                <p style={{
-                  fontSize: 14,
-                  color: colors.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.15em',
-                  fontWeight: 600,
-                  transition: 'color 0.3s ease'
-                }}>{stat.label}</p>
-                {stat.suffix && (
-                  <span style={{ fontSize: 16, color: colors.subtle, marginLeft: 6, fontWeight: 500, transition: 'color 0.3s ease' }}>
-                    {stat.suffix}
-                  </span>
-                )}
+                }}>
+                  {tool.title}
+                </h3>
+                <p style={{ fontSize: 15, color: colors.muted, lineHeight: 1.6, maxWidth: 540 }}>
+                  {tool.description}
+                </p>
+                <p style={{ fontSize: 13, color: colors.subtle, marginTop: 12 }}>
+                  {tool.detail}
+                </p>
               </div>
-            ))}
-          </div>
-
-          {/* Section Label */}
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <h2 style={{
-              fontSize: 14,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.15em',
-              color: colors.subtle,
-              transition: 'color 0.3s ease'
-            }}>Platform Tools</h2>
-          </div>
-
-          {/* Tool Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 48,
-            marginBottom: 100
-          }}>
-            {tools.map((tool) => (
-              <FeatureCard
-                key={tool.id}
-                title={tool.title}
-                description={tool.description}
-                icon={<tool.icon style={{ width: 32, height: 32 }} />}
-                features={tool.features}
-                accentColor={tool.color}
-                linkTo={tool.link}
-              />
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div style={{
-            textAlign: 'center',
-            padding: '48px 0',
-            borderTop: `1px solid ${colors.border}`,
-            transition: 'border-color 0.3s ease'
-          }}>
-            <p style={{ fontSize: 14, color: colors.subtle, transition: 'color 0.3s ease' }}>
-              Combined from StockScreener, Sector-Rotation-Scanner, and QuantGen
-            </p>
-          </div>
+              <div style={{
+                padding: '16px 24px',
+                backgroundColor: colors.accentMuted,
+                borderRadius: 10,
+                border: `1px solid ${isDarkMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.12)'}`,
+                color: colors.featureText,
+                fontSize: 14,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+              }}>
+                {tool.stat}
+              </div>
+            </Link>
+          ))}
         </div>
-      </section>
+      </div>
+
+      {/* Bottom CTA */}
+      <div style={{
+        textAlign: 'center',
+        padding: '0 40px 100px',
+        maxWidth: 600,
+        margin: '0 auto',
+      }}>
+        <div style={{
+          padding: '56px 48px',
+          backgroundColor: colors.cardBg,
+          border: `1px solid ${colors.cardBorder}`,
+          borderRadius: 20,
+        }}>
+          <Gauge style={{ width: 32, height: 32, color: '#10B981', marginBottom: 20 }} />
+          <h2 style={{
+            fontSize: 28,
+            fontWeight: 700,
+            marginBottom: 12,
+            letterSpacing: '-0.03em',
+          }}>
+            Ready to start?
+          </h2>
+          <p style={{ fontSize: 15, color: colors.muted, marginBottom: 28, lineHeight: 1.6 }}>
+            Jump into the Sector Rotation Scanner and see what's leading the market today.
+          </p>
+          <Link
+            to="/sectors"
+            style={{
+              backgroundColor: colors.accent,
+              color: colors.btnText,
+              padding: '14px 36px',
+              borderRadius: 10,
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s ease',
+              boxShadow: isDarkMode
+                ? '0 0 28px rgba(16,185,129,0.25)'
+                : '0 4px 12px rgba(16,185,129,0.18)',
+            }}
+          >
+            Launch Scanner
+            <ArrowRight style={{ width: 16, height: 16 }} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        textAlign: 'center',
+        padding: '32px 40px',
+        borderTop: `1px solid ${colors.border}`,
+        transition: 'border-color 0.3s ease',
+      }}>
+        <p style={{ fontSize: 13, color: colors.subtle }}>
+          TradeCraft
+        </p>
+      </div>
     </div>
   )
 }

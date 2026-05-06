@@ -8,54 +8,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, DollarSign, ArrowLeft, Trash2 } from 'lucide-react';
+import { TrendingDown, Activity, DollarSign, ArrowLeft, Trash2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { CandleStickChart } from '@/components/quantgen/CandleStickChart';
 import { IndicatorPanel } from '@/components/quantgen/IndicatorPanel';
 import OptimizationResults from '@/components/quantgen/OptimizationResults';
-import { Card } from '@/components/ui';
-import { motion } from 'framer-motion';
-import { useTheme } from '../../context/ThemeContext';
 
-interface MetricCardProps {
+interface Metric {
   label: string;
   value: string;
-  sub?: string;
-  positive?: boolean;
+  vs?: { label: string; value: string; positive: boolean };
 }
-
-const MetricCard = ({ label, value, sub, positive }: MetricCardProps) => {
-  const { isDarkMode } = useTheme();
-  const colors = {
-    text: isDarkMode ? '#FAFAFA' : '#1d1d1f',
-    muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    surface: isDarkMode ? '#27272A' : '#ffffff',
-    border: isDarkMode ? '#3F3F46' : '#d2d2d7',
-    positive: isDarkMode ? '#34d399' : '#059669',
-    negative: isDarkMode ? '#f43f5e' : '#dc2626',
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="rounded-xl p-6 shadow-sm flex flex-col justify-between"
-      style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}
-    >
-      <div className="text-sm uppercase tracking-wider font-semibold" style={{ color: colors.muted }}>{label}</div>
-      <div className="text-3xl font-bold mt-2 tracking-tight" style={{ color: colors.text }}>{value}</div>
-      {sub && (
-        <div
-          className="text-xs mt-2 font-medium flex items-center gap-1"
-          style={{ color: positive ? colors.positive : colors.negative }}
-        >
-          {positive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-          {sub}
-        </div>
-      )}
-    </motion.div>
-  );
-};
 
 interface Trade {
   time: number;
@@ -63,6 +26,7 @@ interface Trade {
   type: 'buy' | 'sell';
   size?: number;
   pnl?: number;
+  [key: string]: any;
 }
 
 interface OHLCV {
@@ -92,28 +56,17 @@ interface PanelIndicator {
   params: Record<string, string | number>;
 }
 
-interface HeatmapRow {
-  metric: number;
-  [key: string]: number | string;
-}
-
-interface WFOWindow {
-  window: number;
-  train_start: string;
-  train_end: string;
-  best_param: string;
-  train_metric: number;
-  test_metric: number;
-}
-
 interface OptimizationData {
   mode: 'simple' | 'wfo' | 'true_wfo';
-  heatmap?: HeatmapRow[];
-  windows?: WFOWindow[];
+  heatmap?: any[];
+  windows?: any[];
   oos_equity?: EquityPoint[];
   max_windows?: number;
   stats?: Record<string, number | string>;
   trades?: Trade[];
+  equity?: EquityPoint[];
+  ohlcv?: OHLCV[];
+  indicators?: PanelIndicator[];
 }
 
 interface DashboardData {
@@ -122,26 +75,12 @@ interface DashboardData {
   ohlcv: OHLCV[];
   optimization: OptimizationData | null;
   output: string;
-  drawdownData: Array<{
-    time: string;
-    drawdown: number;
-    bench_drawdown: number;
-  }>;
+  drawdownData: Array<{ time: string; drawdown: number; bench_drawdown: number }>;
   trades: Trade[];
   indicators: PanelIndicator[];
 }
 
 export default function Dashboard() {
-  const { isDarkMode } = useTheme();
-  const colors = {
-    text: isDarkMode ? '#FAFAFA' : '#1d1d1f',
-    muted: isDarkMode ? '#A1A1AA' : '#6e6e73',
-    surface: isDarkMode ? '#27272A' : '#ffffff',
-    surfaceAlt: isDarkMode ? '#1A1A1D' : '#f5f5f7',
-    border: isDarkMode ? '#3F3F46' : '#d2d2d7',
-  };
-
-  // Lazy load initial state from localStorage
   const [data] = useState<DashboardData>(() => {
     try {
       const storedRunData = localStorage.getItem('lastRunData');
@@ -151,15 +90,13 @@ export default function Dashboard() {
         if (parsed.drawdown) {
           const dd = parsed.drawdown;
           const bdd = parsed.benchmark_drawdown || {};
-          const allDates = new Set([...Object.keys(dd), ...Object.keys(bdd)]);
-          const sortedDates = Array.from(allDates).sort((a, b) => parseFloat(a) - parseFloat(b));
-          drawdownData = sortedDates.map((dateStr) => {
-            // Convert Unix timestamp to Date object for proper formatting
+          const allDates = Array.from(new Set([...Object.keys(dd), ...Object.keys(bdd)]))
+            .sort((a, b) => parseFloat(a) - parseFloat(b));
+          drawdownData = allDates.map((dateStr) => {
             const ts = parseFloat(dateStr);
-            const date = new Date(ts * 1000);
             return {
-              time: ts,  // Keep as Unix timestamp for chart
-              dateStr: date.toISOString().split('T')[0],  // Human-readable date string
+              time: String(ts),
+              dateStr: new Date(ts * 1000).toISOString().split('T')[0],
               drawdown: dd[dateStr] ? parseFloat(dd[dateStr]) : 0,
               bench_drawdown: bdd[dateStr] ? parseFloat(bdd[dateStr]) : 0,
             };
@@ -176,155 +113,112 @@ export default function Dashboard() {
           indicators: parsed.indicators || [],
         };
       }
-
-      // Legacy Fallback
       const storedStats = localStorage.getItem('lastRunStats');
       if (storedStats) {
-        const eq = localStorage.getItem('lastRunEquity');
         return {
           stats: JSON.parse(storedStats),
-          equity: eq ? JSON.parse(eq) : [],
-          ohlcv: [],
-          optimization: null,
-          output: '',
-          drawdownData: [],
-          trades: [],
-          indicators: [],
+          equity: JSON.parse(localStorage.getItem('lastRunEquity') || '[]'),
+          ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [],
         };
       }
-    } catch (e) {
-      console.error('Failed to load dashboard data:', e);
-    }
-    // Default empty state
+    } catch {}
     return {
-      stats: {},
-      equity: [],
-      ohlcv: [],
-      optimization: null,
-      output: '',
-      drawdownData: [],
-      trades: [],
-      indicators: [],
+      stats: {}, equity: [], ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [],
     };
   });
 
   const { stats, equity, ohlcv, drawdownData, optimization, output, trades, indicators } = data;
-
-  // State for selected indicators
   const [selIndicators, setSelIndicators] = useState<Record<string, boolean>>({});
 
-  // Initialize selected indicators when indicators change
   useState(() => {
-    if (indicators && indicators.length > 0) {
+    if (indicators?.length) {
       const initial: Record<string, boolean> = {};
-      indicators.forEach((ind) => {
-        initial[ind.name] = true;
-      });
+      indicators.forEach((ind) => { initial[ind.name] = true; });
       setSelIndicators(initial);
     }
   });
 
-  // Handler for toggling indicators
-  const handleIndicatorToggle = (indicatorName: string) => {
-    setSelIndicators((prev) => ({
-      ...prev,
-      [indicatorName]: !prev[indicatorName],
-    }));
+  const handleIndicatorToggle = (name: string) => {
+    setSelIndicators((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
-  // When optimization data exists, use trades from the best run
-  let bestTrades = trades;
-  if (optimization && typeof optimization === 'object') {
-    if (optimization.trades && Array.isArray(optimization.trades) && optimization.trades.length > 0) {
-      bestTrades = optimization.trades;
-    }
-  }
+  const bestTrades = optimization?.trades?.length ? optimization.trades : trades;
+  const bestStats = optimization?.stats && Object.keys(optimization.stats).length > 0 ? optimization.stats : stats;
 
-  // When optimization data exists, use the best run's stats
-  let bestStats = stats;
-  if (optimization && typeof optimization === 'object') {
-    if (optimization.stats && Object.keys(optimization.stats).length > 0) {
-      bestStats = optimization.stats;
-    }
-  }
-
-  // Calculate benchmark (buy and hold) equity curve from OHLCV data
   const equityWithBenchmark = useMemo(() => {
-    if (!ohlcv || ohlcv.length === 0 || !equity || equity.length === 0) {
-      return equity;
-    }
-
+    if (!ohlcv?.length || !equity?.length) return equity;
     try {
       const startValue = equity[0]?.value || 10000;
       const closePrices = ohlcv.map((d) => d.close);
       const benchmark = [1];
-
       for (let i = 1; i < closePrices.length; i++) {
-        const dailyReturn = (closePrices[i] - closePrices[i - 1]) / closePrices[i - 1];
-        benchmark.push(benchmark[i - 1] * (1 + dailyReturn));
+        benchmark.push(benchmark[i - 1] * (1 + (closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]));
       }
-
       return equity.map((item, index) => ({
         ...item,
         benchmark: benchmark[index] ? benchmark[index] * startValue : benchmark[benchmark.length - 1] * startValue,
       }));
-    } catch (e) {
-      console.error('Failed to calculate benchmark:', e);
-      return equity;
-    }
+    } catch { return equity; }
   }, [ohlcv, equity]);
 
-  // Helper to extract value with fallback keys
   const getVal = (keys: string[]) => {
     if (!bestStats) return undefined;
-    for (const k of keys) {
-      if (bestStats[k] !== undefined) return bestStats[k];
-    }
+    for (const k of keys) { if (bestStats[k] !== undefined) return bestStats[k]; }
     return undefined;
   };
 
   const fmtPct = (val: number | string | undefined) => {
     if (val === undefined || val === null) return 'N/A';
     if (typeof val === 'string' && val.includes('%')) return val;
-
     const v = parseFloat(val as string);
-    if (isNaN(v)) return String(val);
-    return `${v.toFixed(2)}%`;
+    return isNaN(v) ? String(val) : `${v.toFixed(2)}%`;
   };
 
   const fmtNum = (val: number | string | undefined) =>
     val !== undefined && val !== null ? parseFloat(val as string).toFixed(2) : 'N/A';
 
-  const totalReturn = getVal(['Total Return [%]', 'Total Return']);
-  const benchmarkReturn = getVal(['Benchmark Return [%]', 'Benchmark Return', 'Benchmark Total Return [%]', 'Benchmark Total Return']);
-  const maxDD = getVal(['Max Drawdown [%]', 'Max Drawdown']);
-  const maxDDBench = getVal(['Benchmark Max Drawdown [%]', 'Benchmark Max Drawdown', 'Benchmark Max Drawdown [%] ']);
-  const sharpe = getVal(['Sharpe Ratio', 'Sharpe']);
-  const sharpeBench = getVal(['Benchmark Sharpe Ratio', 'Benchmark Sharpe', 'Benchmark Sharpe Ratio ']);
-  const winRate = getVal(['Win Rate [%]', 'Win Rate']);
-  const totalTrades = getVal(['Total Trades']);
-  const startDt = getVal(['Start', 'Start Date']);
-  const endDt = getVal(['End', 'End Date']);
+  const metrics: Metric[] = [
+    {
+      label: 'Total Return',
+      value: fmtPct(getVal(['Total Return [%]', 'Total Return'])),
+      vs: {
+        label: 'Benchmark',
+        value: fmtPct(getVal(['Benchmark Return [%]', 'Benchmark Return', 'Benchmark Total Return [%]', 'Benchmark Total Return'])),
+        positive: parseFloat(getVal(['Total Return [%]', 'Total Return']) as string || '0') > parseFloat(getVal(['Benchmark Return [%]', 'Benchmark Return']) as string || '0'),
+      },
+    },
+    {
+      label: 'Sharpe Ratio',
+      value: fmtNum(getVal(['Sharpe Ratio', 'Sharpe'])),
+      vs: {
+        label: 'Benchmark',
+        value: fmtNum(getVal(['Benchmark Sharpe Ratio', 'Benchmark Sharpe', 'Benchmark Sharpe Ratio '])),
+        positive: parseFloat(getVal(['Sharpe Ratio', 'Sharpe']) as string || '0') > parseFloat(getVal(['Benchmark Sharpe Ratio', 'Benchmark Sharpe']) as string || '0'),
+      },
+    },
+    {
+      label: 'Max Drawdown',
+      value: fmtPct(getVal(['Max Drawdown [%]', 'Max Drawdown'])),
+      vs: {
+        label: 'Benchmark',
+        value: fmtPct(getVal(['Benchmark Max Drawdown [%]', 'Benchmark Max Drawdown', 'Benchmark Max Drawdown [%] '])),
+        positive: parseFloat(getVal(['Max Drawdown [%]', 'Max Drawdown']) as string || '0') < parseFloat(getVal(['Benchmark Max Drawdown [%]', 'Benchmark Max Drawdown']) as string || '0'),
+      },
+    },
+    {
+      label: 'Win Rate',
+      value: fmtPct(getVal(['Win Rate [%]', 'Win Rate'])),
+      vs: { label: 'Trades', value: String(getVal(['Total Trades']) || '0'), positive: parseFloat(getVal(['Win Rate [%]', 'Win Rate']) as string || '0') > 50 },
+    },
+  ];
 
-  // Comparisons
-  const benchVal = parseFloat((benchmarkReturn as string) || '0');
-  const stratVal = parseFloat((totalReturn as string) || '0');
-  const beatingBench = stratVal > benchVal;
-
-  const stratSharpe = parseFloat((sharpe as string) || '0');
-  const benchSharpeVal = parseFloat((sharpeBench as string) || '0');
-  const beatingSharpe = stratSharpe > benchSharpeVal;
-
-  const estratDD = parseFloat((maxDD as string) || '0');
-  const ebenchDD = parseFloat((maxDDBench as string) || '0');
-  const betterDD = estratDD < ebenchDD;
-
-  // True WFO may not have equity array populated, but has optimization.oos_equity or optimization.windows
   const hasOptimizationData = optimization && (
     (optimization.oos_equity && optimization.oos_equity.length > 0) ||
     (optimization.windows && optimization.windows.length > 0)
   );
-  const hasData = equity && equity.length > 0 || hasOptimizationData;
+  const hasData = (equity && equity.length > 0) || hasOptimizationData;
+  const startDt = getVal(['Start', 'Start Date']);
+  const endDt = getVal(['End', 'End Date']);
 
   const clearResults = () => {
     localStorage.removeItem('lastRunData');
@@ -335,16 +229,15 @@ export default function Dashboard() {
 
   if (!hasData) {
     return (
-      <div className="relative min-h-full flex items-center justify-center" style={{ backgroundColor: colors.surfaceAlt }}>
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4" style={{ color: colors.text }}>No Results Yet</h2>
-          <p className="mb-8" style={{ color: colors.muted }}>Run a backtest or optimization to see results here.</p>
+      <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--canvas)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--foreground)', marginBottom: '8px' }}>No Results Yet</h2>
+          <p style={{ color: 'var(--muted)', marginBottom: '24px', fontSize: '14px' }}>Run a backtest or optimization to see results here.</p>
           <NavLink
             to="/quantgen/build"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-colors text-white"
-            style={{ backgroundColor: isDarkMode ? '#10B981' : '#059669' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px', borderRadius: '999px', fontWeight: 600, fontSize: '14px', textDecoration: 'none', backgroundColor: 'var(--accent)', color: '#000000' }}
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
             Go to Builder
           </NavLink>
         </div>
@@ -353,352 +246,237 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="relative min-h-full" style={{ backgroundColor: colors.surfaceAlt }}>
-      <div
-        className="relative z-10"
-        style={{ paddingTop: '24px', paddingBottom: '96px', paddingLeft: '80px', paddingRight: '80px' }}
-      >
-        <div className="max-w-7xl mx-auto space-y-6">
+    <div style={{ minHeight: '100%', backgroundColor: 'var(--canvas)' }}>
+      <div style={{ padding: '24px 80px 64px' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight" style={{ color: colors.text }}>Performance Analysis</h1>
-              <p className="mt-1" style={{ color: colors.muted }}>
-                Period: {String(startDt || '').split(' ')[0]} - {String(endDt || '').split(' ')[0]}
+              <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--foreground)' }}>
+                Performance Analysis
+              </h1>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '2px' }}>
+                {startDt ? `${String(startDt).split(' ')[0]}  ${String(endDt || '').split(' ')[0]}` : ''}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span
-                className="text-sm px-3 py-1 rounded-full font-mono"
                 style={{
-                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
-                  border: `1px solid ${isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.3)'}`,
-                  color: isDarkMode ? '#34d399' : '#059669'
+                  fontSize: '12px',
+                  padding: '4px 14px',
+                  borderRadius: '999px',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  color: 'var(--accent)',
                 }}
               >
                 {optimization
-                  ? optimization.mode === 'true_wfo'
-                    ? 'True WFO Strategy'
-                    : optimization.mode === 'wfo'
-                      ? 'WFO Strategy'
-                      : 'Optimized Strategy'
-                  : 'Backtest Results'}
+                  ? optimization.mode === 'true_wfo' ? 'True WFO'
+                  : optimization.mode === 'wfo' ? 'WFO'
+                  : 'Optimized'
+                  : 'Backtest'}
               </span>
               <button
                 onClick={clearResults}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg transition-colors"
-                style={{ color: '#f43f5e' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px', borderRadius: '8px', border: 'none', background: 'none', color: '#f43f5e', cursor: 'pointer' }}
               >
-                <Trash2 size={14} />
-                Clear
+                <Trash2 size={13} /> Clear
               </button>
             </div>
           </div>
 
-          {/* Optimization Results (Top Priority if Available) */}
+          {/* Optimization Results */}
           {optimization && (
-            <div className="mb-8">
+            <div style={{ marginBottom: '24px' }}>
               <OptimizationResults data={optimization} />
-              <div className="my-8" style={{ borderTop: `1px solid ${colors.border}` }} />
-              <h2 className="text-xl font-bold mb-4" style={{ color: colors.muted }}>Backtest Details (Best / Last Run)</h2>
+              <div style={{ margin: '24px 0', borderTop: '1px solid var(--border)' }} />
+              <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--muted)', marginBottom: '16px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Backtest Details (Best / Last Run)
+              </h3>
             </div>
           )}
 
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: '24px' }}>
-            <MetricCard
-              label="Total Return"
-              value={fmtPct(totalReturn)}
-              sub={`vs Bench: ${fmtPct(benchmarkReturn)}`}
-              positive={beatingBench}
-            />
-            <MetricCard
-              label="Sharpe Ratio"
-              value={fmtNum(sharpe)}
-              sub={`vs Bench: ${fmtNum(sharpeBench)}`}
-              positive={beatingSharpe}
-            />
-            <MetricCard
-              label="Max Drawdown"
-              value={fmtPct(maxDD)}
-              sub={`vs Bench: ${fmtPct(maxDDBench)}`}
-              positive={betterDD}
-            />
-            <MetricCard
-              label="Win Rate"
-              value={fmtPct(winRate)}
-              sub={`${totalTrades || 0} Trades`}
-              positive={parseFloat((winRate as string) || '0') > 50}
-            />
+          {/* Compact stat row — replaces hero-metric cards */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '12px',
+              marginBottom: '24px',
+            }}
+          >
+            {metrics.map((m) => (
+              <div
+                key={m.label}
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '14px',
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
+                  {m.label}
+                </div>
+                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                  {m.value}
+                </div>
+                {m.vs && (
+                  <div style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ color: 'var(--subtle)' }}>{m.vs.label}:</span>
+                    <span style={{ color: m.vs.positive ? 'var(--accent)' : '#f43f5e', fontWeight: 600 }}>
+                      {m.vs.value}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Two Column Layout: Charts on Left, Stats on Right */}
-          <div className="grid grid-cols-1 lg:grid-cols-3" style={{ gap: '32px' }}>
-            {/* Left Column - Charts */}
-            <div className="lg:col-span-2 flex flex-col" style={{ gap: '32px' }}>
-              {/* Price Action Chart */}
-              <Card className="flex flex-col p-6" style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
-                <h3 className="font-bold mb-4 flex items-center gap-2" style={{ color: isDarkMode ? '#E4E4E7' : '#1d1d1f' }}>
-                  <DollarSign size={16} style={{ color: isDarkMode ? '#34d399' : '#059669' }} /> Price Action & Volume
+          {/* Two-Column: Charts + Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
+            {/* Left: Charts */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Price Chart */}
+              <div
+                style={{
+                  borderRadius: '14px',
+                  padding: '20px',
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <DollarSign size={14} style={{ color: 'var(--accent)' }} /> Price Action & Volume
                 </h3>
-
-                {/* Indicator Panel */}
-                {indicators && indicators.length > 0 && (
-                  <IndicatorPanel
-                    indicators={indicators}
-                    selectedIndicators={selIndicators}
-                    onToggle={handleIndicatorToggle}
-                  />
+                {indicators?.length > 0 && (
+                  <IndicatorPanel indicators={indicators} selectedIndicators={selIndicators} onToggle={handleIndicatorToggle} />
                 )}
-
-                <div
-                  className="w-full rounded-lg overflow-hidden relative"
-                  style={{ backgroundColor: isDarkMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.02)', height: '400px' }}
-                >
-                  {ohlcv && ohlcv.length > 0 ? (
+                <div style={{ borderRadius: '10px', overflow: 'hidden', backgroundColor: 'var(--canvas)', height: '360px', position: 'relative' }}>
+                  {ohlcv?.length > 0 ? (
                     (() => {
-                      // Convert trades to expected format
-                      // Handle both 'time' (Unix timestamp) and 'date' (ISO string) formats
-                      const chartTrades = bestTrades.map((t) => {
-                        // Convert date string to Unix timestamp if needed
-                        const timeVal = t.time !== undefined ? t.time : (t.date ? new Date(t.date).getTime() / 1000 : 0);
-                        return {
-                          time: timeVal,
-                          price: t.price,
-                          type: t.action === 'BUY' ? 'buy' : (t.action === 'SELL' ? 'sell' : t.type),
-                          size: t.size || 0,
-                          pnl: t.pnl || 0,
-                        };
-                      });
-
-                      // Convert indicators to chart format
+                      const chartTrades = bestTrades.map((t) => ({
+                        time: t.time ?? (t.date ? new Date(t.date).getTime() / 1000 : 0),
+                        price: t.price,
+                        type: t.action === 'BUY' ? 'buy' : t.action === 'SELL' ? 'sell' : t.type,
+                        size: t.size || 0,
+                        pnl: t.pnl || 0,
+                      }));
                       const chartIndicators: ChartIndicator[] = indicators
                         .filter((ind) => selIndicators[ind.name] !== false)
-                        .map((ind) => ({
-                          name: ind.name,
-                          type: ind.type,
-                          data: [], // Indicators panel only shows info, data comes from code execution
-                          color: `hsl(${(ind.name.length * 137.508) % 360}, 70%, 50%)`,
-                        }));
-
-                      return (
-                        <CandleStickChart
-                          data={ohlcv}
-                          trades={chartTrades}
-                          indicators={chartIndicators}
-                          height={400}
-                        />
-                      );
+                        .map((ind) => ({ name: ind.name, type: ind.type, data: [], color: `hsl(${(ind.name.length * 137.508) % 360}, 70%, 50%)` }));
+                      return <CandleStickChart data={ohlcv} trades={chartTrades} indicators={chartIndicators} height={360} />;
                     })()
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center" style={{ color: colors.muted }}>
-                      No OHLCV Data. Please re-run strategy.
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+                      No OHLCV data available
                     </div>
                   )}
                 </div>
-              </Card>
+              </div>
 
               {/* Equity Curve */}
-              <Card className="flex flex-col p-6" style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
-                <h3 className="font-bold mb-4 flex items-center gap-2" style={{ color: isDarkMode ? '#E4E4E7' : '#1d1d1f' }}>
-                  <Activity size={16} style={{ color: isDarkMode ? '#34d399' : '#059669' }} /> Equity Curve
+              <div style={{ borderRadius: '14px', padding: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={14} style={{ color: 'var(--accent)' }} /> Equity Curve
                 </h3>
-                <div className="w-full" style={{ height: '300px', minHeight: '300px' }}>
-                  <ResponsiveContainer width="99%" height="100%" minWidth={100} minHeight={100}>
-                    <AreaChart data={equityWithBenchmark} syncId="sharedXAxis">
+                <div style={{ height: '240px' }}>
+                  <ResponsiveContainer width="99%" height="100%">
+                    <AreaChart data={equityWithBenchmark}>
                       <defs>
                         <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
                           <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                         </linearGradient>
-                        <linearGradient id="colorBench" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                        </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} opacity={0.3} vertical={false} />
-                      <XAxis
-                        dataKey="time"
-                        tick={{ fontSize: 10, fill: colors.muted }}
-                        tickFormatter={(v) => {
-                          if (typeof v === 'string') {
-                            return v.split(' ')[0];
-                          }
-                          return new Date(v * 1000).toISOString().split('T')[0];
-                        }}
-                        minTickGap={50}
-                      />
-                      <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: colors.muted }} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                          borderRadius: '8px',
-                          border: `1px solid ${colors.border}`
-                        }}
-                        itemStyle={{ color: colors.text }}
-                        labelStyle={{ color: colors.muted }}
-                        labelFormatter={(label) => {
-                          if (typeof label === 'string') return label.split(' ')[0];
-                          return new Date(label * 1000).toISOString().split('T')[0];
-                        }}
-                        formatter={(value) => [Number(value).toFixed(2), '']}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorVal)"
-                        name="Strategy"
-                      />
-                      {ohlcv && ohlcv.length > 0 && (
-                        <Area
-                          type="monotone"
-                          dataKey="benchmark"
-                          stroke="#22c55e"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorBench)"
-                          name="Buy & Hold"
-                        />
-                      )}
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
+                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]} minTickGap={50} />
+                      <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }} labelFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]} />
+                      <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#colorVal)" name="Strategy" />
+                      {ohlcv?.length > 0 && <Area type="monotone" dataKey="benchmark" stroke="#22c55e" strokeWidth={1.5} fill="none" strokeDasharray="4 3" name="Buy & Hold" opacity={0.6} />}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              </Card>
+              </div>
 
-              {/* Drawdown Analysis */}
-              <Card className="flex flex-col p-6" style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
-                <h3
-                  className="font-bold mb-4 flex items-center gap-2"
-                  style={{ color: '#f43f5e' }}
-                >
-                  <TrendingDown size={16} /> Max Drawdown Analysis
+              {/* Drawdown */}
+              <div style={{ borderRadius: '14px', padding: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#f43f5e', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingDown size={14} /> Drawdown Analysis
                 </h3>
-                <div className="w-full" style={{ height: '300px', minHeight: '300px' }}>
-                  <ResponsiveContainer width="99%" height="100%" minWidth={100} minHeight={100}>
-                    <AreaChart data={drawdownData} syncId="sharedXAxis">
+                <div style={{ height: '200px' }}>
+                  <ResponsiveContainer width="99%" height="100%">
+                    <AreaChart data={drawdownData}>
                       <defs>
                         <linearGradient id="colorDD" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.1} />
                           <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.3} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={colors.border} opacity={0.3} vertical={false} />
-                      <XAxis
-                        dataKey="time"
-                        tick={{ fontSize: 10, fill: colors.muted }}
-                        tickFormatter={(v) => {
-                          // v is already Unix timestamp in seconds
-                          return new Date(v * 1000).toISOString().split('T')[0];
-                        }}
-                        minTickGap={50}
-                      />
-                      <YAxis tick={{ fontSize: 10, fill: colors.muted }} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                          borderRadius: '8px',
-                          border: `1px solid ${colors.border}`
-                        }}
-                        labelStyle={{ color: colors.muted }}
-                        labelFormatter={(label) => {
-                          return new Date(label * 1000).toISOString().split('T')[0];
-                        }}
-                        formatter={(value) => [Number(value).toFixed(2), '']}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="drawdown"
-                        name="Strategy DD%"
-                        stroke="#f43f5e"
-                        fill="url(#colorDD)"
-                        strokeWidth={2}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="bench_drawdown"
-                        name="Benchmark DD%"
-                        stroke="#9ca3af"
-                        fill="transparent"
-                        strokeDasharray="3 3"
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
+                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickFormatter={(v) => new Date(parseFloat(v) * 1000).toISOString().split('T')[0]} minTickGap={50} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--muted)' }} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }} />
+                      <Area type="monotone" dataKey="drawdown" name="Strategy DD%" stroke="#f43f5e" fill="url(#colorDD)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="bench_drawdown" name="Benchmark DD%" stroke="#9ca3af" fill="transparent" strokeDasharray="3 3" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-              </Card>
+              </div>
             </div>
 
-            {/* Right Column - Stats */}
-            <div className="flex flex-col" style={{ gap: '24px' }}>
-              {/* Detailed Stats Table */}
-              <Card className="flex flex-col p-6" style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
-                <h3 className="font-bold mb-4" style={{ color: isDarkMode ? '#E4E4E7' : '#1d1d1f' }}>Detailed Statistics</h3>
-                <div className="space-y-0 text-sm">
-                  {Object.entries(stats).map(
-                    ([k, v], i) =>
-                      k !== 'Total Return' &&
-                      k !== 'Sharpe Ratio' && (
-                        <div
-                          key={k}
-                          className="flex justify-between py-2"
-                          style={{
-                            borderBottom: `1px solid ${colors.border}`,
-                            backgroundColor: i % 2 === 0 ? (isDarkMode ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.02)') : 'transparent'
-                          }}
-                        >
-                          <span style={{ color: colors.muted }}>{k}</span>
-                          <span className="font-mono font-medium" style={{ color: colors.text }}>
-                            {typeof v === 'number' ? v.toFixed(2) : String(v)}
-                          </span>
-                        </div>
-                      ),
-                  )}
+            {/* Right: Stats Panel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Detailed Stats */}
+              <div style={{ borderRadius: '14px', padding: '20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '12px', letterSpacing: '0.02em' }}>
+                  Detailed Statistics
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {Object.entries(stats).filter(([k]) => k !== 'Total Return' && k !== 'Sharpe Ratio').map(([k, v], i) => (
+                    <div
+                      key={k}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '8px 0',
+                        fontSize: '12px',
+                        borderBottom: i < Object.keys(stats).length - 1 ? '1px solid var(--border)' : 'none',
+                      }}
+                    >
+                      <span style={{ color: 'var(--muted)' }}>{k}</span>
+                      <span style={{ color: 'var(--foreground)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                        {typeof v === 'number' ? v.toFixed(2) : String(v)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              </Card>
+              </div>
 
-              {/* Debug / Raw Data */}
-              <Card className="p-4" style={{ backgroundColor: colors.surface, border: `1px solid ${colors.border}` }}>
-                <details>
-                  <summary
-                    className="text-xs font-bold uppercase cursor-pointer"
-                    style={{ color: colors.muted }}
-                  >
-                    Raw Data & Logs
-                  </summary>
-                  <div className="flex flex-col gap-4 mt-4">
-                    <div>
-                      <h4 className="text-xs font-bold mb-2" style={{ color: colors.muted }}>Stats JSON</h4>
-                      <pre
-                        className="p-4 rounded-lg overflow-x-auto text-xs font-mono"
-                        style={{
-                          backgroundColor: isDarkMode ? '#09090B' : '#f5f5f7',
-                          color: colors.muted,
-                          height: '300px'
-                        }}
-                      >
-                        {JSON.stringify(stats || {}, null, 2)}
-                      </pre>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold mb-2" style={{ color: colors.muted }}>Execution Log</h4>
-                      <pre
-                        className="p-4 rounded-lg overflow-x-auto text-xs font-mono whitespace-pre-wrap"
-                        style={{
-                          backgroundColor: isDarkMode ? '#09090B' : '#f5f5f7',
-                          color: isDarkMode ? '#34d399' : '#059669',
-                          height: '300px'
-                        }}
-                      >
-                        {output || 'No output logs captured.'}
-                      </pre>
-                    </div>
+              {/* Raw Data */}
+              <details style={{ borderRadius: '14px', padding: '16px 20px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <summary style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--muted)', cursor: 'pointer' }}>
+                  Raw Data & Logs
+                </summary>
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px' }}>Stats JSON</h4>
+                    <pre style={{ padding: '12px', borderRadius: '8px', overflow: 'auto', fontSize: '11px', lineHeight: 1.5, backgroundColor: 'var(--canvas)', color: 'var(--muted)', maxHeight: '200px' }}>
+                      {JSON.stringify(stats || {}, null, 2)}
+                    </pre>
                   </div>
-                </details>
-              </Card>
+                  <div>
+                    <h4 style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted)', marginBottom: '6px' }}>Execution Log</h4>
+                    <pre style={{ padding: '12px', borderRadius: '8px', overflow: 'auto', fontSize: '11px', lineHeight: 1.5, backgroundColor: 'var(--canvas)', color: 'var(--accent)', maxHeight: '200px', whiteSpace: 'pre-wrap' }}>
+                      {output || 'No output logs captured.'}
+                    </pre>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         </div>

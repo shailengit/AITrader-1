@@ -24,6 +24,8 @@ class SectorPerformance(BaseModel):
     perf_3m: float
     perf_6m: float
     spread: float
+    ref_date: Optional[str] = None
+    forward_return: Optional[float] = None
     is_real_data: bool = True
 
 
@@ -53,16 +55,52 @@ class StockLeader(BaseModel):
     bb_lower: float
     sma50: Optional[float] = None
     sma200: Optional[float] = None
+    ref_date: Optional[str] = None
+    forward_return: Optional[float] = None
     is_real_data: bool = True
 
 
-async def get_ticker_performance(ticker: str) -> Optional[dict]:
-    """Calculate 3-month and 6-month performance for a ticker."""
+async def get_forward_return(ticker: str, from_date: str, holding_days: int = 30) -> Optional[float]:
+    """Calculate forward return from from_date to from_date + holding_days."""
     try:
         query = text(f'''
-            WITH latest_prices AS (
-                SELECT "Close", "Date" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 1
+            WITH from_price AS (
+                SELECT "Close", "Date" FROM {ticker.lower()}
+                WHERE "Date" <= :from_date ORDER BY "Date" DESC LIMIT 1
             ),
+            to_price AS (
+                SELECT "Close" FROM {ticker.lower()}
+                WHERE "Date" >= (SELECT "Date" FROM from_price) + INTERVAL ':hold_days days'
+                ORDER BY "Date" ASC LIMIT 1
+            )
+            SELECT
+                (SELECT "Close" FROM to_price) / NULLIF((SELECT "Close" FROM from_price), 0) - 1 as forward_return
+        ''')
+
+        with engine.connect() as conn:
+            result = conn.execute(query, {"from_date": from_date, "hold_days": holding_days}).fetchone()
+
+        if result and result[0] is not None:
+            return float(result[0])
+        return None
+    except Exception as e:
+        logger.debug(f"Error getting forward return for {ticker}: {e}")
+        return None
+
+
+async def get_ticker_performance(ticker: str, cutoff_date: Optional[str] = None) -> Optional[dict]:
+    """Calculate 3-month and 6-month performance for a ticker."""
+    try:
+        if cutoff_date:
+            latest_cte = f'''
+                (SELECT "Close", "Date" FROM {ticker.lower()}
+                 WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1)
+            '''
+        else:
+            latest_cte = f'(SELECT "Close", "Date" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 1)'
+
+        query = text(f'''
+            WITH latest_prices AS {latest_cte},
             three_months_ago AS (
                 SELECT "Close" FROM {ticker.lower()}
                 WHERE "Date" <= (SELECT "Date" FROM latest_prices) - INTERVAL '90 days'
@@ -75,18 +113,21 @@ async def get_ticker_performance(ticker: str) -> Optional[dict]:
             )
             SELECT
                 (SELECT "Close" FROM latest_prices) as current_price,
+                (SELECT "Date" FROM latest_prices) as ref_date,
                 (SELECT "Close" FROM latest_prices) / NULLIF((SELECT "Close" FROM three_months_ago), 0) - 1 as perf_3m,
                 (SELECT "Close" FROM latest_prices) / NULLIF((SELECT "Close" FROM six_months_ago), 0) - 1 as perf_6m
         ''')
 
+        params = {"cutoff_date": cutoff_date} if cutoff_date else {}
         with engine.connect() as conn:
-            result = conn.execute(query).fetchone()
+            result = conn.execute(query, params).fetchone()
 
         if result and result[0]:
             return {
                 'current_price': float(result[0]),
-                'perf_3m': float(result[1]) if result[1] else 0.0,
-                'perf_6m': float(result[2]) if result[2] else 0.0
+                'ref_date': str(result[1]) if result[1] else None,
+                'perf_3m': float(result[2]) if result[2] else 0.0,
+                'perf_6m': float(result[3]) if result[3] else 0.0
             }
         return None
     except Exception as e:
@@ -95,7 +136,10 @@ async def get_ticker_performance(ticker: str) -> Optional[dict]:
 
 
 @router.get("/sectors", response_model=List[SectorPerformance])
-async def get_sectors():
+async def get_sectors(
+    cutoff_date: Optional[str] = None,
+    holding_days: int = 30
+):
     """
     Get sector ETF performance data.
     Returns 3-month and 6-month performance for all sector ETFs,
@@ -105,14 +149,19 @@ async def get_sectors():
     failures = []
 
     for sector in SECTOR_ETFS:
-        perf = await get_ticker_performance(sector['ticker'])
+        perf = await get_ticker_performance(sector['ticker'], cutoff_date)
         if perf:
+            forward = None
+            if perf['ref_date']:
+                forward = await get_forward_return(sector['ticker'], perf['ref_date'], holding_days)
             sector_data.append({
                 'ticker': sector['ticker'].upper(),
                 'name': sector['name'],
                 'perf_3m': perf['perf_3m'],
                 'perf_6m': perf['perf_6m'],
                 'spread': perf['perf_3m'] - perf['perf_6m'],
+                'ref_date': perf['ref_date'],
+                'forward_return': forward,
                 'is_real_data': True
             })
         else:
@@ -146,7 +195,11 @@ async def get_sectors():
 
 
 @router.get("/stocks/{sector}", response_model=List[StockLeader])
-async def get_sector_stocks(sector: str):
+async def get_sector_stocks(
+    sector: str,
+    cutoff_date: Optional[str] = None,
+    holding_days: int = 30
+):
     """
     Get top performing stocks within a sector.
     Returns stocks outperforming the sector ETF with momentum indicators.
@@ -158,8 +211,9 @@ async def get_sector_stocks(sector: str):
 
     try:
         # Get sector ETF performance for comparison
-        sector_perf = await get_ticker_performance(sector_lower)
+        sector_perf = await get_ticker_performance(sector_lower, cutoff_date)
         sector_3m = sector_perf['perf_3m'] if sector_perf else 0.0
+        ref_date = sector_perf['ref_date'] if sector_perf else None
 
         # Get stocks in this sector from metadata
         metadata_query = text(
@@ -178,11 +232,21 @@ async def get_sector_stocks(sector: str):
             name = stock[1]
 
             try:
-                # Complex query to get all metrics in one call
+                # Build latest CTE with optional cutoff
+                if cutoff_date:
+                    latest_cte = f'''
+                        SELECT "Close", "Volume", "Date" FROM {ticker.lower()}
+                        WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1
+                    '''
+                else:
+                    latest_cte = f'''
+                        SELECT "Close", "Volume", "Date" FROM {ticker.lower()}
+                        ORDER BY "Date" DESC LIMIT 1
+                    '''
+
+                # Complex query to get all metrics in one call (all windows relative to ref date)
                 stock_query = text(f'''
-                    WITH latest AS (
-                        SELECT "Close", "Volume", "Date" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 1
-                    ),
+                    WITH latest AS ({latest_cte}),
                     three_months_ago AS (
                         SELECT "Close" FROM {ticker.lower()}
                         WHERE "Date" <= (SELECT "Date" FROM latest) - INTERVAL '90 days'
@@ -190,37 +254,50 @@ async def get_sector_stocks(sector: str):
                     ),
                     ten_day_high AS (
                         SELECT MAX("High") as high_10d FROM (
-                            SELECT "High" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 10
+                            SELECT "High" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 10
                         ) t
                     ),
                     avg_vol AS (
                         SELECT AVG("Volume") as vol_20d FROM (
-                            SELECT "Volume" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 20
+                            SELECT "Volume" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 20
                         ) v
                     ),
                     sma_20 AS (
                         SELECT AVG("Close") as sma20 FROM (
-                            SELECT "Close" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 20
+                            SELECT "Close" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 20
                         ) s
                     ),
                     sd_20 AS (
                         SELECT STDDEV("Close") as sd20 FROM (
-                            SELECT "Close" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 20
+                            SELECT "Close" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 20
                         ) d
                     ),
                     sma_50 AS (
                         SELECT AVG("Close") as sma50 FROM (
-                            SELECT "Close" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 50
+                            SELECT "Close" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 50
                         ) f
                     ),
                     sma_200 AS (
                         SELECT AVG("Close") as sma200 FROM (
-                            SELECT "Close" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 200
+                            SELECT "Close" FROM {ticker.lower()}
+                            WHERE "Date" <= (SELECT "Date" FROM latest)
+                            ORDER BY "Date" DESC LIMIT 200
                         ) h
                     )
                     SELECT
                         l."Close" as price,
                         l."Volume" as volume_today,
+                        l."Date" as ref_date,
                         l."Close" / NULLIF((SELECT "Close" FROM three_months_ago), 0) - 1 as perf_3m,
                         h.high_10d,
                         v.vol_20d,
@@ -231,19 +308,21 @@ async def get_sector_stocks(sector: str):
                     FROM latest l, ten_day_high h, avg_vol v, sma_20, sd_20, sma_50, sma_200
                 ''')
 
+                params = {"cutoff_date": cutoff_date} if cutoff_date else {}
                 with engine.connect() as conn:
-                    row = conn.execute(stock_query).fetchone()
+                    row = conn.execute(stock_query, params).fetchone()
 
                 if row and row[0]:
                     price = float(row[0])
                     volume_today = float(row[1])
-                    perf_3m = float(row[2]) if row[2] else 0.0
-                    high_10d = float(row[3])
-                    volume_avg_20d = float(row[4])
-                    sma20 = float(row[5])
-                    sd20 = float(row[6])
-                    sma50 = float(row[7]) if row[7] else None
-                    sma200 = float(row[8]) if row[8] else None
+                    stock_ref_date = str(row[2]) if row[2] else ref_date
+                    perf_3m = float(row[3]) if row[3] else 0.0
+                    high_10d = float(row[4])
+                    volume_avg_20d = float(row[5])
+                    sma20 = float(row[6])
+                    sd20 = float(row[7])
+                    sma50 = float(row[8]) if row[8] else None
+                    sma200 = float(row[9]) if row[9] else None
 
                     # Calculate Bollinger Bands
                     bb_middle = sma20
@@ -255,6 +334,10 @@ async def get_sector_stocks(sector: str):
                     min_perf = 0 if is_high_perf_sector else sector_3m * 0.5
 
                     if perf_3m > min_perf:
+                        forward = None
+                        if stock_ref_date:
+                            forward = await get_forward_return(ticker, stock_ref_date, holding_days)
+
                         leaders.append({
                             'ticker': ticker.upper(),
                             'name': name,
@@ -270,6 +353,8 @@ async def get_sector_stocks(sector: str):
                             'bb_lower': bb_lower,
                             'sma50': sma50,
                             'sma200': sma200,
+                            'ref_date': stock_ref_date,
+                            'forward_return': forward,
                             'is_real_data': True
                         })
 
@@ -288,7 +373,9 @@ async def get_sector_stocks(sector: str):
                 'ticker': 'AAPL', 'name': 'Apple Inc.', 'price': 185.20, 'perf_3m': 0.18,
                 'sector_perf_3m': sector_3m, 'volume_today': 75000000, 'volume_avg_20d': 50000000,
                 'high_10d': 184.50, 'bb_expanding': True, 'bb_upper': 188.50, 'bb_middle': 183.00,
-                'bb_lower': 177.50, 'sma50': 182.00, 'sma200': 178.00, 'is_real_data': False
+                'bb_lower': 177.50, 'sma50': 182.00, 'sma200': 178.00,
+                'ref_date': ref_date, 'forward_return': None,
+                'is_real_data': False
             }
         ]
 

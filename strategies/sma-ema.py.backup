@@ -1,0 +1,45 @@
+import vectorbt as vbt
+import pandas as pd
+import numpy as np
+
+# Parameters
+sma_window = 20
+ema_window = 9
+trailing_stop_pct = 0.05
+
+# Configuration
+ticker = 'AAPL'
+start = '2020-01-01'
+end = '2024-01-01'
+
+# Load data from local database
+data = DataService.get_ohlcv_data(ticker, start, end)
+
+# Get close price
+close = data['Close']
+
+# Calculate indicators
+sma = vbt.MA.run(close, window=sma_window)
+ema = vbt.MA.run(close, window=ema_window, ewm=True)
+
+# Generate continuous signals for True WFO using VBT comparison methods
+# Entry: Price above both SMA-20 and EMA-9 (MA is below close)
+entries = sma.ma_below(close) & ema.ma_below(close)
+# Exit: Price below either SMA-20 or EMA-9 (MA is above close)
+exits = sma.ma_above(close) | ema.ma_above(close)
+
+# Create portfolio with trailing stop
+pf = vbt.Portfolio.from_signals(
+    close,
+    entries=entries,
+    exits=exits,
+    open=data['Open'],
+    high=data['High'],
+    low=data['Low'],
+    direction='longonly',
+    freq='1d',
+    sl_stop=trailing_stop_pct,
+    sl_trail=True
+)
+
+print(pf.total_return())

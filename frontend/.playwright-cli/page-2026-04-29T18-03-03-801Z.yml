@@ -1,0 +1,72 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - heading "TradeCraft" [level=1] [ref=e10]
+      - button "Switch to dark mode" [ref=e12]:
+        - generic [ref=e13]:
+          - img [ref=e14]
+          - img [ref=e20]
+    - main [ref=e22]:
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - heading "Strategy Library" [level=1] [ref=e28]
+            - paragraph [ref=e29]: Manage and organize your trading strategies
+          - link "New Strategy" [ref=e30] [cursor=pointer]:
+            - /url: /quantgen/build
+            - img [ref=e31]
+            - text: New Strategy
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - textbox "Search strategies..." [ref=e37]
+          - generic [ref=e38]:
+            - img [ref=e39]
+            - combobox [ref=e41]:
+              - option "All Status" [selected]
+              - option "Draft"
+              - option "Backtested"
+              - option "Optimized"
+              - option "Live"
+        - generic [ref=e42]:
+          - button "Name" [ref=e43] [cursor=pointer]
+          - button "Status" [ref=e44] [cursor=pointer]
+          - button "Return" [ref=e45] [cursor=pointer]
+          - generic [ref=e46]: Metrics
+          - button "Updated" [ref=e47] [cursor=pointer]:
+            - text: Updated
+            - img [ref=e48]
+        - generic [ref=e52]:
+          - img [ref=e54]
+          - heading "No Strategies Yet" [level=3] [ref=e57]
+          - paragraph [ref=e58]: Create your first trading strategy to get started.
+          - link "Create Strategy" [ref=e59] [cursor=pointer]:
+            - /url: /quantgen/build
+            - img [ref=e60]
+            - text: Create Strategy
+  - generic [ref=e61]:
+    - generic "Impeccable" [ref=e62]: /
+    - generic [ref=e63]:
+      - button "Pick element" [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: Pick
+      - button "Detect anti-patterns" [ref=e68] [cursor=pointer]:
+        - img [ref=e69]
+        - generic: Detect
+      - button "Toggle DESIGN.md panel" [ref=e72] [cursor=pointer]:
+        - generic: DESIGN.md
+      - button "Exit live mode" [ref=e79] [cursor=pointer]:
+        - img [ref=e80]
+  - generic:
+    - generic:
+      - complementary:
+        - generic:
+          - generic: DESIGN.md
+          - generic:
+            - button "Visual"
+            - button "Raw"
+          - button "Close panel": ✕
+        - generic:
+          - generic: No design system data available.

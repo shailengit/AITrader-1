@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Card } from '@/components/ui';
 import { NavLink } from 'react-router-dom';
 
 interface Strategy {
@@ -39,6 +38,13 @@ type SortField = 'name' | 'updatedAt' | 'status' | 'return';
 type SortDirection = 'asc' | 'desc';
 type StatusFilter = 'all' | 'draft' | 'backtested' | 'optimized' | 'live';
 
+const statusConfig: Record<Strategy['status'], { icon: typeof AlertCircle; label: string; dot: string }> = {
+  draft: { icon: AlertCircle, label: 'Draft', dot: 'var(--subtle)' },
+  backtested: { icon: Clock, label: 'Backtested', dot: '#3b82f6' },
+  optimized: { icon: CheckCircle2, label: 'Optimized', dot: 'var(--accent)' },
+  live: { icon: TrendingUp, label: 'Live', dot: '#a855f7' },
+};
+
 export default function Library() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,448 +54,355 @@ export default function Library() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load strategies from localStorage
   useEffect(() => {
-    const loadStrategies = () => {
-      try {
-        const saved = localStorage.getItem('builderState');
-        if (saved) {
-          const state = JSON.parse(saved);
-          if (state.strategies && Array.isArray(state.strategies)) {
-            setStrategies(state.strategies);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load strategies:', e);
-      }
-      setIsLoading(false);
-    };
-    loadStrategies();
-  }, []);
-
-  // Delete strategy
-  const deleteStrategy = (id: string) => {
-    if (!confirm('Are you sure you want to delete this strategy?')) return;
-
-    const newStrategies = strategies.filter((s) => s.id !== id);
-    setStrategies(newStrategies);
-
-    // Update localStorage
     try {
       const saved = localStorage.getItem('builderState');
       if (saved) {
         const state = JSON.parse(saved);
-        state.strategies = newStrategies;
-        localStorage.setItem('builderState', JSON.stringify(state));
+        if (state.strategies && Array.isArray(state.strategies)) setStrategies(state.strategies);
       }
-    } catch (e) {
-      console.error('Failed to save strategies:', e);
-    }
+    } catch {}
+    setIsLoading(false);
+  }, []);
+
+  const deleteStrategy = (id: string) => {
+    if (!confirm('Are you sure?')) return;
+    const newStrategies = strategies.filter((s) => s.id !== id);
+    setStrategies(newStrategies);
+    try {
+      const saved = localStorage.getItem('builderState');
+      if (saved) { const state = JSON.parse(saved); state.strategies = newStrategies; localStorage.setItem('builderState', JSON.stringify(state)); }
+    } catch {}
   };
 
-  // Load strategy into builder
   const loadStrategy = (strategy: Strategy) => {
-    // Store the strategy data for the builder to load
     sessionStorage.setItem('loadStrategy', JSON.stringify(strategy));
     window.location.href = '/quantgen/build';
   };
 
-  // Toggle sort
   const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
+    if (sortField === field) setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDirection('desc'); }
   };
 
-  // Filter and sort strategies
   const filteredStrategies = strategies
     .filter((s) => {
-      const matchesSearch =
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const q = searchQuery.toLowerCase();
+      return (s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)) && (statusFilter === 'all' || s.status === statusFilter);
     })
     .sort((a, b) => {
-      let comparison = 0;
+      let cmp = 0;
       switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'updatedAt':
-          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-          break;
-        case 'status':
-          comparison = a.status.localeCompare(b.status);
-          break;
-        case 'return':
-          comparison =
-            (a.metrics?.totalReturn || 0) - (b.metrics?.totalReturn || 0);
-          break;
+        case 'name': cmp = a.name.localeCompare(b.name); break;
+        case 'updatedAt': cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(); break;
+        case 'status': cmp = a.status.localeCompare(b.status); break;
+        case 'return': cmp = (a.metrics?.totalReturn || 0) - (b.metrics?.totalReturn || 0); break;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === 'asc' ? cmp : -cmp;
     });
 
-  const getStatusIcon = (status: Strategy['status']) => {
-    switch (status) {
-      case 'draft':
-        return <AlertCircle size={14} className="text-zinc-400" />;
-      case 'backtested':
-        return <Clock size={14} className="text-blue-400" />;
-      case 'optimized':
-        return <CheckCircle2 size={14} className="text-emerald-400" />;
-      case 'live':
-        return <TrendingUp size={14} className="text-purple-400" />;
-    }
-  };
-
-  const getStatusColor = (status: Strategy['status']) => {
-    switch (status) {
-      case 'draft':
-        return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
-      case 'backtested':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      case 'optimized':
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'live':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="relative min-h-full">
-      <div
-        className="relative z-10"
-        style={{ paddingTop: '24px', paddingBottom: '96px', paddingLeft: '80px', paddingRight: '80px' }}
-      >
-        <div className="max-w-7xl mx-auto">
+    <div style={{ minHeight: '100%', backgroundColor: 'var(--canvas)' }}>
+      <div style={{ padding: '24px 80px 64px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">Strategy Library</h1>
-              <p className="text-zinc-400 mt-1">Manage and organize your trading strategies</p>
+              <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--foreground)' }}>
+                Strategy Library
+              </h1>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '2px' }}>
+                Manage and organize your trading strategies
+              </p>
             </div>
             <NavLink
               to="/quantgen/build"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-colors"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'var(--accent)', color: '#000000' }}
             >
-              <Plus size={16} />
+              <Plus size={15} />
               New Strategy
             </NavLink>
           </div>
 
           {/* Filters */}
-          <Card className="mb-6 p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search strategies..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-300 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter size={16} className="text-zinc-500" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                  className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-300 focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="all">All Status</option>
-                  <option value="draft">Draft</option>
-                  <option value="backtested">Backtested</option>
-                  <option value="optimized">Optimized</option>
-                  <option value="live">Live</option>
-                </select>
-              </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: '12px',
+              marginBottom: '20px',
+              padding: '12px 16px',
+              borderRadius: '14px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              alignItems: 'center',
+            }}
+          >
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--subtle)' }} />
+              <input
+                type="text"
+                placeholder="Search strategies..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 32px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--canvas)',
+                  color: 'var(--foreground)',
+                  fontSize: '13px',
+                  outline: 'none',
+                }}
+              />
             </div>
-          </Card>
-
-          {/* Sort Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800/60">
-            <button
-              onClick={() => toggleSort('name')}
-              className="col-span-3 flex items-center gap-1 hover:text-zinc-300"
-            >
-              Strategy Name
-              {sortField === 'name' &&
-                (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-            </button>
-            <button
-              onClick={() => toggleSort('status')}
-              className="col-span-2 flex items-center gap-1 hover:text-zinc-300"
-            >
-              Status
-              {sortField === 'status' &&
-                (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-            </button>
-            <button
-              onClick={() => toggleSort('return')}
-              className="col-span-2 flex items-center gap-1 hover:text-zinc-300 justify-end"
-            >
-              Return
-              {sortField === 'return' &&
-                (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-            </button>
-            <div className="col-span-2 text-right">Metrics</div>
-            <button
-              onClick={() => toggleSort('updatedAt')}
-              className="col-span-2 flex items-center gap-1 hover:text-zinc-300 justify-end"
-            >
-              Updated
-              {sortField === 'updatedAt' &&
-                (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-            </button>
-            <div className="col-span-1"></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Filter size={14} style={{ color: 'var(--subtle)' }} />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--canvas)',
+                  color: 'var(--foreground)',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="backtested">Backtested</option>
+                <option value="optimized">Optimized</option>
+                <option value="live">Live</option>
+              </select>
+            </div>
           </div>
 
-          {/* Strategy List */}
-          <div className="space-y-2">
+          {/* Column headers */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '3fr 1.5fr 1fr 1.5fr 1.5fr 48px',
+              gap: '12px',
+              padding: '0 16px 10px',
+              fontSize: '11px',
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: 'var(--subtle)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <button onClick={() => toggleSort('name')} style={{ textAlign: 'left', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontSize: 'inherit', fontWeight: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit' }}>
+              Name {sortField === 'name' && (sortDirection === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+            </button>
+            <button onClick={() => toggleSort('status')} style={{ textAlign: 'left', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontSize: 'inherit', fontWeight: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit' }}>
+              Status {sortField === 'status' && (sortDirection === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+            </button>
+            <button onClick={() => toggleSort('return')} style={{ textAlign: 'right', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', padding: 0, fontSize: 'inherit', fontWeight: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit' }}>
+              Return {sortField === 'return' && (sortDirection === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+            </button>
+            <div style={{ textAlign: 'right' }}>Metrics</div>
+            <button onClick={() => toggleSort('updatedAt')} style={{ textAlign: 'right', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', padding: 0, fontSize: 'inherit', fontWeight: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit' }}>
+              Updated {sortField === 'updatedAt' && (sortDirection === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+            </button>
+            <div />
+          </div>
+
+          {/* Strategy list */}
+          <div style={{ marginTop: '4px' }}>
             <AnimatePresence mode="popLayout">
               {isLoading ? (
-                <div className="text-center py-12 text-zinc-500">
-                  <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4" />
+                <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: '13px' }}>
+                  <div style={{ width: '24px', height: '24px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 12px' }} className="animate-spin" />
                   Loading strategies...
                 </div>
               ) : filteredStrategies.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-16"
-                >
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-900/50 flex items-center justify-center">
-                    <Search size={24} className="text-zinc-600" />
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', padding: '64px 24px' }}>
+                  <div style={{ width: '56px', height: '56px', margin: '0 auto 16px', borderRadius: '50%', backgroundColor: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Search size={22} style={{ color: 'var(--subtle)' }} />
                   </div>
-                  <h3 className="text-lg font-semibold text-zinc-300 mb-2">
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '4px' }}>
                     {strategies.length === 0 ? 'No Strategies Yet' : 'No Results Found'}
                   </h3>
-                  <p className="text-zinc-500 max-w-sm mx-auto mb-6">
-                    {strategies.length === 0
-                      ? 'Create your first trading strategy to get started with QuantGen.'
-                      : 'Try adjusting your search or filter criteria.'}
+                  <p style={{ fontSize: '13px', color: 'var(--muted)', maxWidth: '360px', margin: '0 auto 20px' }}>
+                    {strategies.length === 0 ? 'Create your first trading strategy to get started.' : 'Try adjusting your search or filter.'}
                   </p>
                   {strategies.length === 0 && (
-                    <NavLink
-                      to="/quantgen/build"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-colors"
-                    >
-                      <Plus size={16} />
-                      Create Strategy
+                    <NavLink to="/quantgen/build" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'var(--accent)', color: '#000000' }}>
+                      <Plus size={15} /> Create Strategy
                     </NavLink>
                   )}
                 </motion.div>
               ) : (
-                filteredStrategies.map((strategy) => (
-                  <motion.div
-                    key={strategy.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    layout
-                  >
-                    <Card
-                      className={`group cursor-pointer overflow-hidden ${
-                        expandedId === strategy.id ? 'border-emerald-500/30' : ''
-                      }`}
+                filteredStrategies.map((strategy) => {
+                  const sc = statusConfig[strategy.status];
+                  const isExpanded = expandedId === strategy.id;
+                  return (
+                    <motion.div
+                      key={strategy.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      layout
+                      style={{ marginBottom: '4px' }}
                     >
                       <div
-                        className="grid grid-cols-12 gap-4 px-6 py-4 items-center"
-                        onClick={() => setExpandedId(expandedId === strategy.id ? null : strategy.id)}
+                        style={{
+                          borderRadius: '12px',
+                          backgroundColor: 'var(--surface)',
+                          border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`,
+                          overflow: 'hidden',
+                          transition: 'border-color 0.15s ease',
+                        }}
                       >
-                        <div className="col-span-3">
-                          <h3 className="font-semibold text-zinc-200 truncate">{strategy.name}</h3>
-                          <p className="text-sm text-zinc-500 truncate">{strategy.description}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                              strategy.status
-                            )}`}
-                          >
-                            {getStatusIcon(strategy.status)}
-                            {strategy.status.charAt(0).toUpperCase() + strategy.status.slice(1)}
-                          </span>
-                        </div>
-                        <div className="col-span-2 text-right">
-                          {strategy.metrics?.totalReturn !== undefined ? (
-                            <span
-                              className={`font-mono font-semibold ${
-                                strategy.metrics.totalReturn >= 0 ? 'text-emerald-400' : 'text-rose-500'
-                              }`}
-                            >
-                              {strategy.metrics.totalReturn.toFixed(2)}%
-                            </span>
-                          ) : (
-                            <span className="text-zinc-600">—</span>
-                          )}
-                        </div>
-                        <div className="col-span-2 text-right">
-                          {strategy.metrics ? (
-                            <div className="flex flex-col gap-1 text-xs">
-                              {strategy.metrics.sharpeRatio !== undefined && (
-                                <span className="text-zinc-400">
-                                  SR: {strategy.metrics.sharpeRatio.toFixed(2)}
-                                </span>
-                              )}
-                              {strategy.metrics.winRate !== undefined && (
-                                <span className="text-zinc-400">
-                                  WR: {strategy.metrics.winRate.toFixed(1)}%
-                                </span>
-                              )}
-                              {strategy.metrics.maxDrawdown !== undefined && (
-                                <span className="text-rose-400">
-                                  DD: {strategy.metrics.maxDrawdown.toFixed(1)}%
-                                </span>
-                              )}
+                        {/* Main row */}
+                        <div
+                          onClick={() => setExpandedId(isExpanded ? null : strategy.id)}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '3fr 1.5fr 1fr 1.5fr 1.5fr 48px',
+                            gap: '12px',
+                            padding: '12px 16px',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {strategy.name}
                             </div>
-                          ) : (
-                            <span className="text-zinc-600">—</span>
-                          )}
-                        </div>
-                        <div className="col-span-2 text-right text-sm text-zinc-500">
-                          <div className="flex items-center justify-end gap-1">
-                            <Calendar size={12} />
-                            {formatDate(strategy.updatedAt)}
+                            <div style={{ fontSize: '12px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {strategy.description}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: sc.dot, flexShrink: 0 }} />
+                            <span style={{ fontSize: '12px', color: 'var(--foreground)' }}>{sc.label}</span>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            {strategy.metrics?.totalReturn !== undefined ? (
+                              <span style={{ fontSize: '13px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: strategy.metrics.totalReturn >= 0 ? 'var(--accent)' : '#f43f5e' }}>
+                                {strategy.metrics.totalReturn.toFixed(2)}%
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--subtle)', fontSize: '12px' }}>—</span>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            {strategy.metrics ? (
+                              <div style={{ fontSize: '11px', display: 'flex', gap: '6px', justifyContent: 'flex-end', color: 'var(--subtle)' }}>
+                                {strategy.metrics.sharpeRatio !== undefined && <span>SR: {strategy.metrics.sharpeRatio.toFixed(2)}</span>}
+                                {strategy.metrics.winRate !== undefined && <span>WR: {strategy.metrics.winRate.toFixed(1)}%</span>}
+                              </div>
+                            ) : <span style={{ color: 'var(--subtle)', fontSize: '12px' }}>—</span>}
+                          </div>
+                          <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--muted)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                              <Calendar size={11} />
+                              {formatDate(strategy.updatedAt)}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); loadStrategy(strategy); }}
+                              style={{ padding: '6px', borderRadius: '6px', border: 'none', background: 'none', color: 'var(--subtle)', cursor: 'pointer' }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-overlay)'; e.currentTarget.style.color = 'var(--accent)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--subtle)'; }}
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteStrategy(strategy.id); }}
+                              style={{ padding: '6px', borderRadius: '6px', border: 'none', background: 'none', color: 'var(--subtle)', cursor: 'pointer' }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(244,63,94,0.1)'; e.currentTarget.style.color = '#f43f5e'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--subtle)'; }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         </div>
-                        <div className="col-span-1 flex items-center justify-end gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              loadStrategy(strategy);
-                            }}
-                            className="p-2 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                            title="Edit"
-                          >
-                            <Edit3 size={14} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteStrategy(strategy.id);
-                            }}
-                            className="p-2 text-zinc-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Expanded Details */}
-                      <AnimatePresence>
-                        {expandedId === strategy.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="border-t border-zinc-800/60 bg-zinc-900/30"
-                          >
-                            <div className="px-6 py-4 space-y-4">
-                              {strategy.description && (
-                                <div>
-                                  <h4 className="text-xs font-semibold text-zinc-500 uppercase mb-1">
-                                    Description
-                                  </h4>
-                                  <p className="text-sm text-zinc-300">{strategy.description}</p>
-                                </div>
-                              )}
-                              {strategy.metrics && (
-                                <div>
-                                  <h4 className="text-xs font-semibold text-zinc-500 uppercase mb-2">
-                                    Performance Metrics
-                                  </h4>
-                                  <div className="grid grid-cols-4 gap-4">
-                                    {strategy.metrics.totalReturn !== undefined && (
-                                      <div className="bg-zinc-950/50 p-3 rounded-lg">
-                                        <div className="text-xs text-zinc-500">Total Return</div>
-                                        <div
-                                          className={`font-mono font-semibold ${
-                                            strategy.metrics.totalReturn >= 0
-                                              ? 'text-emerald-400'
-                                              : 'text-rose-500'
-                                          }`}
-                                        >
-                                          {strategy.metrics.totalReturn.toFixed(2)}%
-                                        </div>
-                                      </div>
-                                    )}
-                                    {strategy.metrics.sharpeRatio !== undefined && (
-                                      <div className="bg-zinc-950/50 p-3 rounded-lg">
-                                        <div className="text-xs text-zinc-500">Sharpe Ratio</div>
-                                        <div className="font-mono font-semibold text-zinc-300">
-                                          {strategy.metrics.sharpeRatio.toFixed(2)}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {strategy.metrics.maxDrawdown !== undefined && (
-                                      <div className="bg-zinc-950/50 p-3 rounded-lg">
-                                        <div className="text-xs text-zinc-500">Max Drawdown</div>
-                                        <div className="font-mono font-semibold text-rose-400">
-                                          {strategy.metrics.maxDrawdown.toFixed(2)}%
-                                        </div>
-                                      </div>
-                                    )}
-                                    {strategy.metrics.winRate !== undefined && (
-                                      <div className="bg-zinc-950/50 p-3 rounded-lg">
-                                        <div className="text-xs text-zinc-500">Win Rate</div>
-                                        <div className="font-mono font-semibold text-zinc-300">
-                                          {strategy.metrics.winRate.toFixed(1)}%
-                                        </div>
-                                      </div>
-                                    )}
+                        {/* Expanded details */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              style={{ borderTop: '1px solid var(--border)' }}
+                            >
+                              <div style={{ padding: '16px', backgroundColor: 'var(--surface-raised)' }}>
+                                {strategy.description && (
+                                  <div style={{ marginBottom: '16px' }}>
+                                    <h4 style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>Description</h4>
+                                    <p style={{ fontSize: '13px', color: 'var(--foreground)', lineHeight: 1.5 }}>{strategy.description}</p>
                                   </div>
+                                )}
+                                {strategy.metrics && (
+                                  <div style={{ marginBottom: '16px' }}>
+                                    <h4 style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '8px' }}>Performance</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                                      {strategy.metrics.totalReturn !== undefined && (
+                                        <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--canvas)' }}>
+                                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>Total Return</div>
+                                          <div style={{ fontSize: '15px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: strategy.metrics.totalReturn >= 0 ? 'var(--accent)' : '#f43f5e' }}>{strategy.metrics.totalReturn.toFixed(2)}%</div>
+                                        </div>
+                                      )}
+                                      {strategy.metrics.sharpeRatio !== undefined && (
+                                        <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--canvas)' }}>
+                                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>Sharpe Ratio</div>
+                                          <div style={{ fontSize: '15px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--foreground)' }}>{strategy.metrics.sharpeRatio.toFixed(2)}</div>
+                                        </div>
+                                      )}
+                                      {strategy.metrics.maxDrawdown !== undefined && (
+                                        <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--canvas)' }}>
+                                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>Max Drawdown</div>
+                                          <div style={{ fontSize: '15px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#f43f5e' }}>{strategy.metrics.maxDrawdown.toFixed(2)}%</div>
+                                        </div>
+                                      )}
+                                      {strategy.metrics.winRate !== undefined && (
+                                        <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--canvas)' }}>
+                                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>Win Rate</div>
+                                          <div style={{ fontSize: '15px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--foreground)' }}>{strategy.metrics.winRate.toFixed(1)}%</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {strategy.code && (
+                                  <div style={{ marginBottom: '16px' }}>
+                                    <h4 style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>Code Preview</h4>
+                                    <pre style={{ padding: '12px', borderRadius: '8px', overflow: 'auto', fontSize: '11px', lineHeight: 1.5, backgroundColor: 'var(--canvas)', color: 'var(--muted)', maxHeight: '100px' }}>{strategy.code.slice(0, 500)}...</pre>
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button
+                                    onClick={() => loadStrategy(strategy)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', backgroundColor: 'var(--accent)', color: '#000000' }}
+                                  >
+                                    <Edit3 size={13} /> Edit Strategy
+                                  </button>
+                                  <NavLink
+                                    to="/quantgen/dashboard"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--foreground)' }}
+                                  >
+                                    View Results <ArrowRight size={13} />
+                                  </NavLink>
                                 </div>
-                              )}
-                              {strategy.code && (
-                                <div>
-                                  <h4 className="text-xs font-semibold text-zinc-500 uppercase mb-2">
-                                    Code Preview
-                                  </h4>
-                                  <pre className="p-3 bg-zinc-950 rounded-lg overflow-x-auto text-xs text-zinc-400 font-mono max-h-32">
-                                    {strategy.code.slice(0, 500)}...
-                                  </pre>
-                                </div>
-                              )}
-                              <div className="flex items-center gap-3 pt-2">
-                                <button
-                                  onClick={() => loadStrategy(strategy)}
-                                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-400 transition-colors"
-                                >
-                                  <Edit3 size={14} />
-                                  Edit Strategy
-                                </button>
-                                <NavLink
-                                  to="/quantgen/dashboard"
-                                  className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm font-semibold hover:bg-zinc-700 transition-colors"
-                                >
-                                  View Results
-                                  <ArrowRight size={14} />
-                                </NavLink>
                               </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </Card>
-                  </motion.div>
-                ))
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  );
+                })
               )}
             </AnimatePresence>
           </div>

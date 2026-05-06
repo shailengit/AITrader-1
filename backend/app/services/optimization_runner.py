@@ -23,8 +23,10 @@ from app.services.true_wfo_implementation import (
     modify_code_dates,
     modify_code_dates_and_params
 )
+from app.services.executor import _apply_ticker_override
+from typing import List, Optional
 
-def run_optimization(code: str, strategy_params: dict, config: dict):
+def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Optional[List[str]] = None):
     """
     Executes Optimization using VBT-native array parameter injection.
 
@@ -88,6 +90,9 @@ def run_optimization(code: str, strategy_params: dict, config: dict):
         # fast_window = [10,10,10,10,10,10, 20,20,20,20,20,20, ...] = 30 values
         # slow_window = [100,120,140,160,180,200, 100,120,...] = 30 values
         # Now both MA.run() calls produce 30-column outputs that align perfectly!
+
+        # Apply ticker override if provided
+        code = _apply_ticker_override(code, tickers)
 
         modified_code = code
         injection_success = False

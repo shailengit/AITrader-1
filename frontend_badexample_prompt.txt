@@ -1,6 +1,0 @@
-This layout is wrong:
-- full width stretched
-- too much empty space
-- components too far apart
-
-Fix it using frontend_rules.md

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp,
   Activity,
@@ -25,6 +26,7 @@ import { StatusBadge } from '../components/ui/Badge'
 import { ProgressMetric } from '../components/ui/Metric'
 import { useTheme } from '../context/ThemeContext'
 import { CandleStickChart } from '../components/quantgen/CandleStickChart'
+import { VolumeChart } from '../components/quantgen/VolumeChart'
 
 interface Sector {
   ticker: string
@@ -32,6 +34,8 @@ interface Sector {
   perf_3m: number
   perf_6m: number
   spread: number
+  ref_date: string | null
+  forward_return: number | null
   is_real_data: boolean
 }
 
@@ -50,10 +54,13 @@ interface Stock {
   bb_lower: number
   sma50: number | null
   sma200: number | null
+  ref_date: string | null
+  forward_return: number | null
   is_real_data: boolean
 }
 
 export default function SectorRotation() {
+  const navigate = useNavigate()
   const [sectors, setSectors] = useState<Sector[]>([])
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null)
   const [stocks, setStocks] = useState<Stock[]>([])
@@ -64,6 +71,8 @@ export default function SectorRotation() {
   const [loading, setLoading] = useState(true)
   const [isDbConnected, setIsDbConnected] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString())
+  const [cutoffDate, setCutoffDate] = useState('')
+  const [holdingDays, setHoldingDays] = useState(30)
   const { isDarkMode } = useTheme()
 
   // Theme-aware colors
@@ -108,12 +117,23 @@ export default function SectorRotation() {
     if (selectedSector) {
       fetchStocks(selectedSector.ticker)
     }
-  }, [selectedSector])
+  }, [selectedSector, cutoffDate, holdingDays])
+
+  const buildQueryParams = () => {
+    const params = new URLSearchParams()
+    if (cutoffDate) {
+      params.set('cutoff_date', cutoffDate)
+      params.set('holding_days', String(holdingDays))
+    }
+    return params.toString()
+  }
 
   const fetchSectors = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/sectors')
+      const qs = buildQueryParams()
+      const url = qs ? `/api/sectors?${qs}` : '/api/sectors'
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch sectors')
       const data = await res.json()
       setSectors(data)
@@ -129,13 +149,21 @@ export default function SectorRotation() {
 
   const fetchStocks = async (sectorTicker: string) => {
     try {
-      const res = await fetch(`/api/stocks/${sectorTicker}`)
+      const qs = buildQueryParams()
+      const url = qs ? `/api/stocks/${sectorTicker}?${qs}` : `/api/stocks/${sectorTicker}`
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch stocks')
       const data = await res.json()
       setStocks(data)
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const exportToQuantGen = () => {
+    const tickers = stocks.map(s => s.ticker).join(',')
+    const fromDate = cutoffDate || new Date().toISOString().split('T')[0]
+    navigate(`/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`)
   }
 
   const fetchChartData = async (ticker: string) => {
@@ -251,7 +279,52 @@ export default function SectorRotation() {
               <p className="text-base" style={{ color: colors.muted }}>Identify momentum and rotation patterns</p>
             </div>
           </div>
-          <div className="flex items-center gap-6 text-sm font-mono" style={{ color: colors.muted }}>
+          <div className="flex items-center gap-4 text-sm font-mono" style={{ color: colors.muted }}>
+            {/* Cutoff Date Picker */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs uppercase tracking-wider" style={{ color: colors.subtle }}>As of</label>
+              <input
+                type="date"
+                value={cutoffDate}
+                onChange={(e) => {
+                  setCutoffDate(e.target.value)
+                  setTimeout(() => handleRefresh(), 0)
+                }}
+                max={new Date().toISOString().split('T')[0]}
+                className="px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-emerald-500/50"
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                  borderColor: colors.border,
+                  color: colors.text,
+                }}
+              />
+            </div>
+
+            {/* Holding Period */}
+            {cutoffDate && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs uppercase tracking-wider" style={{ color: colors.subtle }}>Fwd</label>
+                <select
+                  value={holdingDays}
+                  onChange={(e) => {
+                    setHoldingDays(Number(e.target.value))
+                    setTimeout(() => handleRefresh(), 0)
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#ffffff',
+                    borderColor: colors.border,
+                    color: colors.text,
+                  }}
+                >
+                  <option value={7}>7d</option>
+                  <option value={30}>30d</option>
+                  <option value={60}>60d</option>
+                  <option value={90}>90d</option>
+                </select>
+              </div>
+            )}
+
             <StatusBadge
               status={isDbConnected ? 'connected' : 'disconnected'}
               label={isDbConnected ? 'S&P 1500 Connected' : 'Demo Mode'}
@@ -333,69 +406,116 @@ export default function SectorRotation() {
           </div>
         </Card>
 
-        {/* Top 3 Sectors - ~65% width */}
-        <div className="flex flex-col sm:flex-row xl:w-[65%] gap-4">
-          {sectors.slice(0, 3).map((sector, index) => {
-            const isSelected = selectedSector?.ticker === sector.ticker;
-            return (
-              <Card
-                key={sector.ticker}
-                className="flex-1 p-5 relative overflow-hidden cursor-pointer hover-lift flex flex-col justify-between"
-                onClick={() => setSelectedSector(sector)}
-                style={{
-                  background: isSelected
-                    ? (isDarkMode ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.02) 100%)' : 'rgba(16, 185, 129, 0.08)')
-                    : colors.surface,
-                  border: `1px solid ${isSelected ? (isDarkMode ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.5)') : colors.border}`,
-                  boxShadow: isSelected ? '0 10px 30px rgba(16,185,129,0.15)' : 'none',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {isSelected && isDarkMode && <div style={{ position: 'absolute', top: '0', right: '0', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />}
-                
-                <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-4">
-                    <div 
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                      style={{ 
-                        backgroundColor: index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : '#b45309',
-                        color: '#000',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      {index + 1}
-                    </div>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
-                  </div>
-                  
-                  <h3 className="text-3xl font-bold mb-1 tracking-tight" style={{ color: colors.text }}>{sector.ticker}</h3>
-                  <p className="text-xs truncate mb-6" style={{ color: colors.muted }}>{sector.name}</p>
-                </div>
+        {/* All 11 Sectors - sorted by acceleration best to worst */}
+        <div className="xl:w-[65%]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+            {sectors.map((sector, index) => {
+              const isSelected = selectedSector?.ticker === sector.ticker;
+              const rankColors = [
+                '#fbbf24', // 1st - Gold
+                '#9ca3af', // 2nd - Silver
+                '#b45309', // 3rd - Bronze
+              ];
+              const rankBg = index < 3 ? rankColors[index] : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)');
+              const rankText = index < 3 ? '#000' : colors.muted;
 
-                <div className="space-y-4 relative z-10">
-                  <div>
-                    <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>Acceleration</p>
-                    <p className="text-xl font-mono text-emerald-500">+{formatPercent(sector.spread)}</p>
+              return (
+                <Card
+                  key={sector.ticker}
+                  className="p-4 relative overflow-hidden cursor-pointer hover-lift flex flex-col justify-between"
+                  onClick={() => setSelectedSector(sector)}
+                  style={{
+                    background: isSelected
+                      ? (isDarkMode ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.02) 100%)' : 'rgba(16, 185, 129, 0.08)')
+                      : colors.surface,
+                    border: `1px solid ${isSelected ? (isDarkMode ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.5)') : colors.border}`,
+                    boxShadow: isSelected ? '0 10px 30px rgba(16,185,129,0.15)' : 'none',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease',
+                    minHeight: 180,
+                  }}
+                >
+                  {isSelected && isDarkMode && <div style={{ position: 'absolute', top: '0', right: '0', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />}
+
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-3">
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                        style={{
+                          backgroundColor: rankBg,
+                          color: rankText,
+                          boxShadow: index < 3 ? '0 2px 10px rgba(0,0,0,0.2)' : 'none',
+                        }}
+                      >
+                        {index + 1}
+                      </div>
+                      {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                    </div>
+
+                    <h3 className="text-2xl font-bold mb-1 tracking-tight" style={{ color: colors.text }}>{sector.ticker}</h3>
+                    <p className="text-xs truncate mb-4" style={{ color: colors.muted }}>{sector.name}</p>
                   </div>
-                  <div className="pt-3" style={{ borderTop: `1px solid ${colors.border}` }}>
-                    <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>3M Perf</p>
-                    <p className="text-sm font-mono" style={{ color: colors.text }}>{(sector.perf_3m * 100).toFixed(2)}%</p>
+
+                  <div className="space-y-3 relative z-10">
+                    <div>
+                      <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>Acceleration</p>
+                      <p className={`text-lg font-mono ${sector.spread >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {sector.spread >= 0 ? '+' : ''}{formatPercent(sector.spread)}
+                      </p>
+                    </div>
+                    <div className="pt-2" style={{ borderTop: `1px solid ${colors.border}` }}>
+                      <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>3M Perf</p>
+                      <p className="text-sm font-mono" style={{ color: colors.text }}>{(sector.perf_3m * 100).toFixed(2)}%</p>
+                    </div>
+                    {sector.forward_return != null && (
+                      <div className="pt-2" style={{ borderTop: `1px solid ${colors.border}` }}>
+                        <p className="text-[10px] font-mono uppercase tracking-widest mb-1" style={{ color: colors.muted }}>{holdingDays}d Fwd</p>
+                        <p className={`text-sm font-mono font-bold ${sector.forward_return >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                          {sector.forward_return >= 0 ? '+' : ''}{(sector.forward_return * 100).toFixed(2)}%
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </Card>
-            )
-          })}
+                </Card>
+              )
+            })}
+          </div>
         </div>
       </div>
 
       {/* Stock Leaders */}
       <div style={{ marginTop: '100px', marginBottom: '60px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 className="text-3xl font-bold tracking-tight mb-2" style={{ color: colors.text }}>
-            Momentum Leaders in {selectedSector?.ticker}
-          </h2>
-          <p className="text-base" style={{ color: colors.muted }}>Top performing stocks currently exhibiting technical strength</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight mb-2" style={{ color: colors.text }}>
+                Momentum Leaders in {selectedSector?.ticker}
+              </h2>
+              <p className="text-base" style={{ color: colors.muted }}>Top performing stocks currently exhibiting technical strength</p>
+            </div>
+            {stocks.length > 0 && (
+              <button
+                onClick={exportToQuantGen}
+                className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all hover:scale-105"
+                style={{
+                  backgroundColor: '#10B981',
+                  color: '#000000',
+                  border: '1px solid #10B981',
+                  boxShadow: '0 0 20px rgba(16,185,129,0.3)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#34D399'
+                  e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#10B981'
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.3)'
+                }}
+              >
+                Export {stocks.length} Tickers to QuantGen
+              </button>
+            )}
+          </div>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
@@ -441,7 +561,12 @@ export default function SectorRotation() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-mono" style={{ color: colors.text }}>${stock.price.toFixed(2)}</p>
-                    <p className="text-xs uppercase mt-1" style={{ color: colors.muted }}>Current Price</p>
+                    <p className="text-xs uppercase mt-1" style={{ color: colors.muted }}>Price on {stock.ref_date || 'latest'}</p>
+                    {stock.forward_return != null && (
+                      <p className={`text-sm font-mono font-bold mt-1 ${stock.forward_return >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                        {stock.forward_return >= 0 ? '+' : ''}{(stock.forward_return * 100).toFixed(2)}% ({holdingDays}d fwd)
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -743,7 +868,21 @@ export default function SectorRotation() {
                         }
                       ]}
                     />
-                    
+
+                    {/* Volume Chart */}
+                    <div className="mt-6 px-4">
+                      <p className="text-sm text-zinc-500 uppercase font-bold tracking-widest mb-2">Volume</p>
+                      <VolumeChart
+                        key={`${chartTicker}-vol`}
+                        height={180}
+                        data={chartData.map((d: any) => ({
+                          time: d.time,
+                          value: d.volume || 0,
+                          color: d.close >= d.open ? 'rgba(16, 185, 129, 0.7)' : 'rgba(244, 63, 94, 0.7)',
+                        }))}
+                      />
+                    </div>
+
                     <div className="mt-8 grid grid-cols-3 gap-6 px-4 pb-6">
                       <div className="bg-white/5 border border-white/5 rounded-3xl p-8">
                         <div className="flex justify-between items-end mb-6">

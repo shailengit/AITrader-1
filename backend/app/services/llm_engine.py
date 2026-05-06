@@ -8,8 +8,30 @@ import re
 import logging
 from typing import List, Dict, Any, Optional
 
+# Import lessons learned store for prompt enhancement
+from app.services.lessons_learned import LessonsLearnedStore
+
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Lazy-initialized lessons store
+_lessons_store: Optional[LessonsLearnedStore] = None
+
+
+def _get_lessons_store() -> LessonsLearnedStore:
+    """Get or create the lessons learned store."""
+    global _lessons_store
+    if _lessons_store is None:
+        _lessons_store = LessonsLearnedStore()
+    return _lessons_store
+
+
+def get_enhanced_system_prompt() -> str:
+    """Build system prompt with dynamically injected lessons learned."""
+    lessons_text = _get_lessons_store().get_formatted(n_recent=20)
+    if lessons_text:
+        return SYSTEM_PROMPT + "\n\n" + lessons_text
+    return SYSTEM_PROMPT
 
 # Try to import OpenAI SDK for local API compatibility
 try:
@@ -104,37 +126,66 @@ RULES:
    ```
 6. When creating the Portfolio (e.g., `vbt.Portfolio.from_signals`), you MUST pass the Open/High/Low/Close data if available to enable realistic inspection.
    - Example: `vbt.Portfolio.from_signals(close, ..., open=data['Open'], high=data['High'], low=data['Low'])`
-7. **CRITICAL - OPTIMIZATION COMPATIBILITY**: When combining indicator conditions for entries/exits, you MUST use VectorBT's built-in comparison methods, NOT standard operators (>, <, &, |).
+7. **CRITICAL - OPTIMIZATION COMPATIBILITY**: Strategy code MUST work for both single backtests AND multi-parameter optimization. VectorBT uses scalar Series for single parameters but DataFrames with MultiIndex columns for optimization grids. Standard Python operators (`>`, `<`, `&`, `|`) fail on DataFrames with "cannot join with no overlapping index names".
 
-   WRONG (fails during optimization):
+   **A. Comparison Operators**
+   Always use `.vbt` accessor methods instead of raw operators:
+
+   | Standard | VectorBT Method |
+   |----------|-----------------|
+   | `a > b`  | `a.vbt.gt(b)`   |
+   | `a < b`  | `a.vbt.lt(b)`   |
+   | `a == b` | `a.vbt.eq(b)`   |
+   | `a & b`  | `vbt.combine_logic(a, b, combine_func=np.logical_and)` |
+   | `a | b`  | `vbt.combine_logic(a, b, combine_func=np.logical_or)` |
+
+   WRONG (fails in optimization):
    ```python
    entries = (fast_ma.ma > slow_ma.ma) & (rsi.rsi < 30)
    exits = (rsi.rsi > 70) | (close < stop_loss)
    ```
 
-   CORRECT (works for both backtest and optimization):
+   CORRECT (works in both):
    ```python
-   # Use VBT comparison methods for indicators
-   entries = fast_ma.ma_above(slow_ma.ma) & rsi.rsi_below(30)
-   exits = rsi.rsi_above(70) | close.vbt.crossed_below(stop_loss)
+   entries = vbt.combine_logic(
+       fast_ma.ma.vbt.gt(slow_ma.ma),
+       rsi.rsi.vbt.lt(30),
+       combine_func=np.logical_and
+   )
+   exits = vbt.combine_logic(
+       rsi.rsi.vbt.gt(70),
+       close.vbt.lt(stop_loss),
+       combine_func=np.logical_or
+   )
    ```
 
-   Available comparison methods:
-   - For MA (Moving Average): `ma_above()`, `ma_below()`, `ma_crossed_above()`, `ma_crossed_below()`
-   - For RSI: `rsi_above()`, `rsi_below()`, `rsi_crossed_above()`, `rsi_crossed_below()`
-   - For BBANDS: `percent_b_above()`, `percent_b_below()`
-   - For MACD: `macd_above()`, `macd_below()`, `macd_crossed_above()`, `macd_crossed_below()`
-   - For generic price: `vbt.crossed_above()`, `vbt.crossed_below()`
-
-   Logical operators:
-   - Use `&` for AND (e.g., `condition1 & condition2`)
-   - Use `|` for OR (e.g., `condition1 | condition2`)
-   - Use `~` for NOT (e.g., `~condition`)
-
-   Example combining multiple conditions:
+   **B. Parameterized Indicators**
+   To support optimization, call every indicator with `.run()` and pass parameters as variables (which VBT will convert to grids during optimization):
    ```python
-   entries = (close > fast_ma.ma) & (fast_ma.ma > slow_ma.ma)  # Both conditions
-   exits = (close < slow_ma.ma) | (rsi.rsi > 70)                # Either condition
+   fast_ma = vbt.MA.run(close, window=fast_window)
+   slow_ma = vbt.MA.run(close, window=slow_window)
+   rsi = vbt.RSI.run(close, window=rsi_period)
+   ```
+
+   **C. Portfolio Broadcast Flags**
+   Always pass these kwargs to `vbt.Portfolio.from_signals` so it can handle parameter grids:
+   ```python
+   pf = vbt.Portfolio.from_signals(
+       close,
+       entries=entries,
+       exits=exits,
+       broadcast_kwargs={'keep_pd': True},
+       jitted=True
+   )
+   ```
+
+   **D. Data Alignment**
+   If combining indicators that may have different parameter-grid shapes, align them explicitly with `vbt.base.widgets.indexing.broadcast`:
+   ```python
+   close_bc, fast_ma_bc, slow_ma_bc = vbt.base.widgets.indexing.broadcast(
+       close, fast_ma.ma, slow_ma.ma
+   )
+   entries = fast_ma_bc.vbt.gt(slow_ma_bc)
    ```
 
 8. **CRITICAL - CONTINUOUS SIGNALS FOR WALK-FORWARD**: For True Walk-Forward Optimization to work with short test windows, you MUST generate a signal EVERY DAY, not just on crossover events.
@@ -234,8 +285,8 @@ from app.services.data_service import DataService
 fast_window = 5
 slow_window = 20
 ticker = 'AAPL'
-start = '2020-01-01'
-end = '2024-01-01'
+start = '{{START_DATE}}'
+end = '{{END_DATE}}'
 
 # Load data from local database
 data = DataService.get_ohlcv_data(ticker, start, end)
@@ -248,8 +299,8 @@ fast_ma = vbt.MA.run(close, window=fast_window)
 slow_ma = vbt.MA.run(close, window=slow_window)
 
 # Generate continuous signals for True WFO
-entries = fast_ma.ma_above(slow_ma.ma)
-exits = fast_ma.ma_below(slow_ma.ma)
+entries = fast_ma.ma.vbt.gt(slow_ma.ma)
+exits = fast_ma.ma.vbt.lt(slow_ma.ma)
 
 # Create portfolio with OHLC data
 pf = vbt.Portfolio.from_signals(
@@ -260,7 +311,9 @@ pf = vbt.Portfolio.from_signals(
     high=data['High'],
     low=data['Low'],
     direction='longonly',
-    freq='1d'
+    freq='1d',
+    broadcast_kwargs={'keep_pd': True},
+    jitted=True
 )
 
 # Print total return
@@ -442,10 +495,13 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
         start_time = time.time()
         logger.info(f"Starting LLM request for strategy generation with model '{MODEL_NAME}'...")
 
+        # Build enhanced system prompt with lessons learned
+        enhanced_prompt = get_enhanced_system_prompt()
+
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": enhanced_prompt},
                 {"role": "user", "content": user_msg}
             ],
             temperature=0,
@@ -478,6 +534,22 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
 
         # Transform code to use local database if LLM used YFData.download
         code = transform_code_for_local_data(code)
+
+        # Ensure generated dates match the requested range
+        code = code.replace("{{START_DATE}}", start_date)
+        code = code.replace("{{END_DATE}}", end_date)
+        # Also catch common hardcoded date patterns the LLM might have used
+        code = re.sub(
+            r"start\s*=\s*['\"]\d{4}-\d{2}-\d{2}['\"]",
+            f"start = '{start_date}'",
+            code
+        )
+        code = re.sub(
+            r"end\s*=\s*['\"]\d{4}-\d{2}-\d{2}['\"]",
+            f"end = '{end_date}'",
+            code
+        )
+
         return code, None
     except Exception as e:
         error_str = str(e)
@@ -492,45 +564,72 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
             return None, error_str
 
 
-def fix_strategy_code(current_code: str, error_message: str) -> str:
-    """Fix strategy code based on error message."""
+def fix_strategy_code(current_code: str, error_context: str) -> str:
+    """
+    Fix strategy code based on error message or full error context.
+
+    Args:
+        current_code: The code that failed
+        error_context: Error message string or full structured error context
+            including category, line numbers, stdout, traceback, etc.
+
+    Returns:
+        Fixed code string, or original code if fix failed
+    """
     if client is None:
         logger.error("ERROR: Client is None in fix_strategy_code")
         return current_code
 
     # Check for VBT comparison error and add specific guidance
     vbt_hint = ""
-    if "cannot join with no overlapping index names" in error_message.lower():
+    if "cannot join with no overlapping index names" in error_context.lower():
         vbt_hint = """
 
 CRITICAL: This error is caused by using comparison operators (>, <, &, |) with VectorBT indicators.
 You MUST replace them with VBT comparison methods:
-- Replace `(fast_ma.ma > slow_ma.ma)` with `fast_ma.ma_above(slow_ma.ma)`
-- Replace `(rsi.rsi < 30)` with `rsi.rsi_below(30)`
-- Replace `(cond1) & (cond2)` with `vbt.And(cond1, cond2)`
-- Replace `(cond1) | (cond2)` with `vbt.Or(cond1, cond2)`
+- Replace `(a > b)` with `a.vbt.gt(b)`
+- Replace `(a < b)` with `a.vbt.lt(b)`
+- Replace `(cond1) & (cond2)` with `vbt.combine_logic(cond1, cond2, combine_func=np.logical_and)`
+- Replace `(cond1) | (cond2)` with `vbt.combine_logic(cond1, cond2, combine_func=np.logical_or)`
+- Also add `broadcast_kwargs={'keep_pd': True}` and `jitted=True` to `vbt.Portfolio.from_signals(...)`
 See the SYSTEM PROMPT rule #7 for the complete list of methods.
 """
 
+    # Try to find a matching lesson for additional guidance
+    lesson_hint = ""
+    try:
+        lesson = _get_lessons_store().find_match(error_context)
+        if lesson:
+            lesson_hint = f"""
+
+PREVIOUS FIX FOR SIMILAR ERROR ({lesson['error_signature']}):
+{lesson['fix_description']}
+"""
+            if lesson.get("example_after"):
+                lesson_hint += f"Example: {lesson['example_after']}\n"
+    except Exception as e:
+        logger.debug(f"Could not lookup lesson: {e}")
+
     user_msg = f"""
-    The following vectorbt code failed to run:
+The following vectorbt code failed to run:
 
-    ```python
-    {current_code}
-    ```
+```python
+{current_code}
+```
 
-    Error Message:
-    {error_message}
-    {vbt_hint}
+Error Context:
+{error_context}
+{vbt_hint}{lesson_hint}
 
-    Please fix the code. Return ONLY the full valid python code.
-    """
+Please fix the code. Return ONLY the full valid python code.
+"""
 
     try:
+        enhanced_prompt = get_enhanced_system_prompt()
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": enhanced_prompt},
                 {"role": "user", "content": user_msg}
             ],
             temperature=0,

@@ -1,0 +1,44 @@
+import vectorbt as vbt
+import pandas as pd
+import numpy as np
+
+# Parameters
+ema_window = 9
+sma_window = 20
+vol_ma_window = 20
+ticker = 'AOSL'
+start = '2020-01-01'
+end = '2024-01-01'
+
+# Load data from local database
+data = DataService.get_ohlcv_data(ticker, start, end)
+
+# Get price and volume data
+close = data['Close']
+volume = data['Volume']
+
+# Calculate indicators - Use MA with ewm=True for EMA calculation
+ema = vbt.MA.run(close, window=ema_window, ewm=True)
+sma = vbt.MA.run(close, window=sma_window)
+vol_ma = vbt.MA.run(volume, window=vol_ma_window)
+
+# Generate continuous signals for True WFO
+# Entry: EMA above SMA with volume confirmation
+entries = ema.ma_above(sma.ma) & (volume > vol_ma.ma)
+# Exit: EMA below SMA or volume dries up
+exits = ema.ma_below(sma.ma) | (volume < vol_ma.ma)
+
+# Create portfolio with OHLC data
+pf = vbt.Portfolio.from_signals(
+    close,
+    entries=entries,
+    exits=exits,
+    open=data['Open'],
+    high=data['High'],
+    low=data['Low'],
+    direction='longonly',
+    freq='1d'
+)
+
+# Print total return
+print(pf.total_return())

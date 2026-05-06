@@ -828,13 +828,32 @@ class TradeExtractor:
             logger.error(f"Error extracting trades: {e}")
             return []
 
-def execute_strategy(code: str) -> Dict[str, Any]:
+def _apply_ticker_override(code: str, tickers: Optional[List[str]]) -> str:
+    """Replace ticker assignment in code if tickers override is provided."""
+    if not tickers or len(tickers) == 0:
+        return code
+    # Replace single ticker assignment: ticker = 'AAPL'
+    override = tickers[0]
+    modified = re.sub(
+        r"^(\s*)ticker\s*=\s*['\"][^'\"]*['\"]",
+        rf"\1ticker = '{override}'",
+        code,
+        flags=re.MULTILINE,
+        count=1
+    )
+    if modified != code:
+        logger.info(f"Overrode ticker to '{override}' in strategy code")
+    return modified
+
+
+def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str, Any]:
     sys.stderr.write('DEBUG: execute_strategy called!\n')
     """
     Execute strategy code with enhanced security, validation, and error handling.
 
     Args:
         code: Python code to execute
+        tickers: Optional list of tickers to override the one in code
 
     Returns:
         Dict containing execution results and extracted data
@@ -846,6 +865,9 @@ def execute_strategy(code: str) -> Dict[str, Any]:
     resource_monitor = ResourceMonitor()
 
     logger.info(f"Starting strategy execution (length: {len(code)} chars)")
+
+    # Apply ticker override before validation
+    code = _apply_ticker_override(code, tickers)
 
     try:
         # Input validation

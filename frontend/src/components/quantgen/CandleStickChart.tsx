@@ -44,6 +44,7 @@ interface Indicator {
   type: string;
   data: IndicatorData[];
   color?: string;
+  lineWidth?: number;
 }
 
 interface CandleStickChartProps {
@@ -171,8 +172,8 @@ export function CandleStickChart({
           value: original?.volume || 0,
           color:
             d.close >= d.open
-              ? 'rgba(16, 185, 129, 0.3)'
-              : 'rgba(244, 63, 94, 0.3)',
+              ? 'rgba(16, 185, 129, 0.65)'
+              : 'rgba(244, 63, 94, 0.65)',
         };
       });
 
@@ -210,11 +211,11 @@ export function CandleStickChart({
 
     // Clear existing indicator series
     Object.values(indicatorSeriesRef.current).forEach((series) => {
-      if (series) {
+      if (series && chartRef.current) {
         try {
-          chartRef.current?.removeSeries(series);
-        } catch (e) {
-          console.warn('Error removing series:', e);
+          chartRef.current.removeSeries(series);
+        } catch {
+          // Series may already be removed during unmount; ignore
         }
       }
     });
@@ -229,7 +230,7 @@ export function CandleStickChart({
 
         const lineSeries = chartRef.current!.addSeries(LineSeries, {
           color: color,
-          lineWidth: 2,
+          lineWidth: (indicator.lineWidth || 2) as 1 | 2 | 3 | 4,
           priceLineVisible: false,
           crosshairMarkerVisible: true,
           lastValueVisible: true,
