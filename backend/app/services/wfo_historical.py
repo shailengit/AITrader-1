@@ -129,7 +129,7 @@ def run_wfo_historical(
                 "test_start": cfg['test_start'],
                 "test_end": cfg['test_end'],
                 "best_params": best_params,
-                "train_metric": float(best_metric),
+                "train_metric": float(best_metric) if best_metric is not None else 0.0,
                 "test_return": test_result.get('total_return', 0),
                 "test_sharpe": test_result.get('sharpe_ratio', 0),
                 "test_trades": test_result.get('total_trades', 0),
@@ -407,7 +407,7 @@ def _run_test_window(code: str, output_buffer: io.StringIO) -> Optional[Dict]:
 
 def _extract_trades_from_portfolio(pf) -> List[Dict]:
     """Extract trades from portfolio using proper method from executor."""
-    trades = []
+    trades: List[Dict[str, Any]] = []
 
     try:
         # Get trades from portfolio - try different attributes
@@ -503,7 +503,7 @@ def _extract_trades_from_portfolio(pf) -> List[Dict]:
             except Exception as e:
                 continue
 
-        trades.sort(key=lambda x: x['time'])
+        trades.sort(key=lambda x: x['time'])  # type: ignore[arg-type,return-value]
         return trades
 
     except Exception as e:

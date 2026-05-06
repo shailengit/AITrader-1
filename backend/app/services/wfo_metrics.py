@@ -367,6 +367,7 @@ def compute_benchmark_from_prices(
                 'Benchmark Max Drawdown [%]': round(bench_max_dd, 4),
             }
         else:
+            bench_drawdown = pd.Series(dtype=float)
             benchmark_stats = None
 
         # Benchmark drawdown dict

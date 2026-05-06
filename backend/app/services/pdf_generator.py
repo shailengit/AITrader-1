@@ -24,9 +24,9 @@ class ScreenerPDF(FPDF):
             return  # Skip header on cover page
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(16, 185, 129)
-        self.cell(0, 10, "TradeCraft AI Stock Screener", ln=False, align="L")
+        self.cell(0, 10, "TradeCraft AI Stock Screener", ln=0, align="L")  # type: ignore[arg-type]
         self.set_text_color(100, 100, 100)
-        self.cell(0, 10, f"Page {self.page_no()}", ln=True, align="R")
+        self.cell(0, 10, f"Page {self.page_no()}", ln=1, align="R")  # type: ignore[arg-type]
         self.set_draw_color(230, 230, 230)
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
@@ -36,7 +36,7 @@ class ScreenerPDF(FPDF):
         self.set_y(-15)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M')} | TradeCraft", ln=True, align="C")
+        self.cell(0, 10, f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M')} | TradeCraft", ln=1, align="C")  # type: ignore[arg-type]
 
     def add_cover_page(self, mode: str, date: str, total_stocks: int, use_ai: bool):
         """Generate the branded cover page."""
@@ -49,11 +49,11 @@ class ScreenerPDF(FPDF):
         self.set_y(80)
         self.set_font("Helvetica", "B", 32)
         self.set_text_color(16, 185, 129)
-        self.cell(0, 15, "TradeCraft", ln=True, align="C")
+        self.cell(0, 15, "TradeCraft", ln=1, align="C")  # type: ignore[arg-type]
 
         self.set_font("Helvetica", "", 20)
         self.set_text_color(50, 50, 50)
-        self.cell(0, 12, "AI Stock Screener Report", ln=True, align="C")
+        self.cell(0, 12, "AI Stock Screener Report", ln=1, align="C")  # type: ignore[arg-type]
 
         # Mode badge
         self.ln(15)
@@ -61,7 +61,7 @@ class ScreenerPDF(FPDF):
         self.set_font("Helvetica", "B", 14)
         self.set_fill_color(16, 185, 129)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 12, f"  {mode_label}  ", ln=True, align="C", fill=True)
+        self.cell(0, 12, f"  {mode_label}  ", ln=1, align="C", fill=True)  # type: ignore[arg-type]
 
         # AI badge
         if use_ai:
@@ -69,16 +69,16 @@ class ScreenerPDF(FPDF):
             self.set_font("Helvetica", "B", 11)
             self.set_fill_color(59, 130, 246)
             self.set_text_color(255, 255, 255)
-            self.cell(0, 10, "  AI Multi-Agent Analysis Enabled  ", ln=True, align="C", fill=True)
+            self.cell(0, 10, "  AI Multi-Agent Analysis Enabled  ", ln=1, align="C", fill=True)  # type: ignore[arg-type]
 
         # Meta info
         self.ln(20)
         self.set_font("Helvetica", "", 13)
         self.set_text_color(80, 80, 80)
-        self.cell(0, 10, f"Scan Date: {date}", ln=True, align="C")
+        self.cell(0, 10, f"Scan Date: {date}", ln=1, align="C")  # type: ignore[arg-type]
         self.set_font("Helvetica", "B", 13)
         self.set_text_color(16, 185, 129)
-        self.cell(0, 10, f"{total_stocks} Stocks Identified", ln=True, align="C")
+        self.cell(0, 10, f"{total_stocks} Stocks Identified", ln=1, align="C")  # type: ignore[arg-type]
 
         # Bottom accent
         self.set_y(-30)
@@ -90,7 +90,7 @@ class ScreenerPDF(FPDF):
         self.add_page()
         self.set_font("Helvetica", "B", 18)
         self.set_text_color(30, 30, 30)
-        self.cell(0, 12, "Executive Summary", ln=True)
+        self.cell(0, 12, "Executive Summary", ln=1)  # type: ignore[arg-type]
         self.ln(2)
 
         # Summary paragraph
@@ -110,8 +110,8 @@ class ScreenerPDF(FPDF):
             ("Final Results", str(stats.get("results_count", "N/A"))),
         ]
         for label, value in items:
-            self.cell(60, 12, f"  {label}", ln=False, border=1, fill=True)
-            self.cell(30, 12, f"{value}  ", ln=True, align="R", border=1)
+            self.cell(60, 12, f"  {label}", ln=0, border=1, fill=True)  # type: ignore[arg-type]
+            self.cell(30, 12, f"{value}  ", ln=1, align="R", border=1)  # type: ignore[arg-type]
             self.ln(2)
 
     def add_results_table(self, results: List[Dict[str, Any]]):
@@ -119,13 +119,13 @@ class ScreenerPDF(FPDF):
         self.add_page()
         self.set_font("Helvetica", "B", 18)
         self.set_text_color(30, 30, 30)
-        self.cell(0, 12, "Screening Results", ln=True)
+        self.cell(0, 12, "Screening Results", ln=1)  # type: ignore[arg-type]
         self.ln(5)
 
         if not results:
             self.set_font("Helvetica", "", 11)
             self.set_text_color(120, 120, 120)
-            self.cell(0, 10, "No stocks matched the screening criteria.", ln=True)
+            self.cell(0, 10, "No stocks matched the screening criteria.", ln=1)  # type: ignore[arg-type]
             return
 
         # Table headers
@@ -176,7 +176,7 @@ class ScreenerPDF(FPDF):
         self.add_page()
         self.set_font("Helvetica", "B", 18)
         self.set_text_color(30, 30, 30)
-        self.cell(0, 12, "AI Multi-Agent Analysis Report", ln=True)
+        self.cell(0, 12, "AI Multi-Agent Analysis Report", ln=1)  # type: ignore[arg-type]
         self.ln(3)
 
         self.set_font("Helvetica", "", 10)
@@ -202,7 +202,7 @@ class ScreenerPDF(FPDF):
         self.add_page()
         self.set_font("Helvetica", "B", 18)
         self.set_text_color(30, 30, 30)
-        self.cell(0, 12, "Methodology", ln=True)
+        self.cell(0, 12, "Methodology", ln=1)  # type: ignore[arg-type]
         self.ln(3)
 
         self.set_font("Helvetica", "", 10)
@@ -267,4 +267,4 @@ def generate_screener_report(
     # Methodology
     pdf.add_methodology(mode)
 
-    return bytes(pdf.output(dest="S"))
+    return bytes(pdf.output(dest="S"))  # type: ignore[call-overload]

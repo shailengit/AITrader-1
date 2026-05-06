@@ -44,11 +44,10 @@ async_engine = create_async_engine(
 # Session factories
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 AsyncSessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
     bind=async_engine,
-    class_=AsyncSession
-)
+    class_=AsyncSession,
+    expire_on_commit=False,
+)  # type: ignore[call-overload]
 
 
 def get_db():

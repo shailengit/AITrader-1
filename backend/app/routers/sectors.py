@@ -5,7 +5,7 @@ Ported from Sector-Rotation-Scanner Express.js server.
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, cast, Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -187,7 +187,7 @@ async def get_sectors(
             {'ticker': 'XLU', 'name': 'Utilities', 'perf_3m': 0.01, 'perf_6m': 0.02},
         ]
         sector_data = [
-            {**s, 'spread': s['perf_3m'] - s['perf_6m'], 'is_real_data': False}
+            {**s, 'spread': float(cast(Any, s['perf_3m'])) - float(cast(Any, s['perf_6m'])), 'is_real_data': False}
             for s in mock_sectors
         ]
 
@@ -208,6 +208,8 @@ async def get_sector_stocks(
     sector_name = SECTOR_NAME_MAP.get(sector_lower, sector_lower)
 
     leaders = []
+    sector_3m = 0.0
+    ref_date = None
 
     try:
         # Get sector ETF performance for comparison

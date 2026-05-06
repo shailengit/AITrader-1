@@ -184,7 +184,7 @@ class CodeValidator:
     @classmethod
     def validate_code(cls, code: str) -> Dict[str, Any]:
         """Comprehensive code validation"""
-        validation_result = {
+        validation_result: Dict[str, Any] = {
             "valid": True,
             "warnings": [],
             "errors": [],
@@ -221,7 +221,7 @@ class CodeValidator:
             validation_result["valid"] = False
             validation_result["errors"].append(f"Validation error: {str(e)}")
 
-        logger.info(f"Code validation completed. Valid: {validation_result['valid']}")
+        logger.info("Code validation completed. Valid: %s", validation_result['valid'])
         return validation_result
 
 class TimeoutHandler:
@@ -270,8 +270,8 @@ class ResourceMonitor:
         process = psutil.Process(os.getpid())
         end_memory = process.memory_info().rss / 1024 / 1024  # MB
 
-        self.execution_time = (end_time - self.start_time).total_seconds()
-        self.memory_usage = end_memory - self.start_memory
+        self.execution_time = (end_time - self.start_time).total_seconds()  # type: ignore[operator]
+        self.memory_usage = end_memory - self.start_memory  # type: ignore[operator]
 
         # Log resource usage
         logger.info(f"Execution time: {self.execution_time:.2f}s")
@@ -705,7 +705,7 @@ class TradeExtractor:
     def extract_trades(pf) -> List[Dict[str, Any]]:
         """Extract buy/sell signals from portfolio"""
         try:
-            trades = []
+            trades: List[Dict[str, Any]] = []
 
             # Get trades from portfolio - try different attributes
             trade_records = None
@@ -819,7 +819,7 @@ class TradeExtractor:
                     continue
 
             # Sort by time
-            trades.sort(key=lambda x: x['time'])
+            trades.sort(key=lambda x: x['time'])  # type: ignore[arg-type,return-value]
 
             logger.info(f"Extracted {len(trades)} trade markers (buy/sell signals)")
             return trades
@@ -868,6 +868,9 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
 
     # Apply ticker override before validation
     code = _apply_ticker_override(code, tickers)
+
+    output = ""
+    validation_result = None
 
     try:
         # Input validation
@@ -936,7 +939,7 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
         try:
             trades = TradeExtractor.extract_trades(pf)
         except Exception as e:
-            logger.warning(f"Trade extraction failed: {e}")
+            logger.warning("Trade extraction failed: %s", e)
             trades = []
 
         # Extract indicator data (for charting)
@@ -996,8 +999,8 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
         error_result = {
             "success": False,
             "error": f"{e.error_type}: {e.message}",
-            "output": output if 'output' in locals() else "",
-            "validation": validation_result if 'validation_result' in locals() else None
+            "output": output,
+            "validation": validation_result
         }
 
         return error_result
@@ -1008,7 +1011,7 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
         error_result = {
             "success": False,
             "error": f"Unexpected error: {str(e)}",
-            "output": output if 'output' in locals() else "",
+            "output": output,
             "traceback": traceback.format_exc()
         }
 

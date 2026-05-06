@@ -78,6 +78,8 @@ class CodeVerifier:
         lessons_applied: List[str] = []
         original_code = code
         total_start = time.time()
+        result: Dict[str, Any] = {}
+        attempt = 0
 
         for attempt in range(max_attempts):
             logger.info(f"Verification attempt {attempt + 1}/{max_attempts}")

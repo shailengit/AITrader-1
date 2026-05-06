@@ -14,7 +14,7 @@ import contextlib
 import io
 import warnings
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 
 import pandas as pd
 import numpy as np
@@ -153,7 +153,7 @@ def run_continuous_true_wfo(
                 else:
                     result["output"] += "  Warning: No training portfolio found (pf or portfolio variable missing)\n"
                     continue
-                train_returns = train_pf.returns()
+                train_returns = train_pf.returns()  # type: ignore[attr-defined]
 
                 # Calculate metric for optimization
                 if isinstance(train_returns, pd.DataFrame):
@@ -167,6 +167,7 @@ def run_continuous_true_wfo(
                     else:
                         m_vals = (1 + train_returns).prod(axis=0) - 1
                 else:
+                    m_vals: Any
                     if metric_name == "sharpe":
                         std_val = train_returns.std()
                         # Handle zero/NaN std - return 0Sharpe if insufficient data
@@ -249,8 +250,8 @@ def run_continuous_true_wfo(
                     result["output"] += f"  Warning: No entries/exits found in training result\n"
                     continue
 
-                entries = train_globals['entries']
-                exits = train_globals['exits']
+                entries: Any = train_globals['entries']
+                exits: Any = train_globals['exits']
 
                 result["output"] += f"  entries type: {type(entries)}\n"
                 result["output"] += f"  entries length: {len(entries) if hasattr(entries, '__len__') else 'N/A'}\n"
@@ -401,7 +402,8 @@ def run_continuous_true_wfo(
                         result["output"] += f"    Trade: {trade.action} {trade.shares:.2f} shares @ ${trade.price:.2f}\n"
 
                     # Update prices and record state after each trade
-                    tracker.current_state.update_prices({ticker: price}, trade_date)
+                    if tracker.current_state is not None:
+                        tracker.current_state.update_prices({ticker: price}, trade_date)
                     tracker.record_state()
 
         except Exception as err:
@@ -459,7 +461,7 @@ def run_continuous_true_wfo(
 
         # Add best params from last window
         if window_results:
-            final_params = window_results[-1].get('best_params', {})
+            final_params = cast(Dict[str, Any], window_results[-1]).get('best_params', {})
             for p_name, p_val in final_params.items():
                 stats[f"Best {p_name}"] = p_val
 

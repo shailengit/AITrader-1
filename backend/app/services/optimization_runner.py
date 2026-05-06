@@ -365,7 +365,7 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
 
                     # Try to get from existing best_pf variable
                     try:
-                        pf_for_trades = best_pf
+                        pf_for_trades = best_pf  # type: ignore[possibly-unbound]
                     except NameError:
                         pass
 
@@ -698,9 +698,9 @@ def _clean_stats_for_json(stats_dict):
             try:
                 # Convert to total seconds
                 if isinstance(v, pd.Timedelta):
-                    total_secs = v.total_seconds()
+                    total_secs = v.total_seconds()  # type: ignore[union-attr]
                 elif hasattr(v, 'total_seconds'):
-                    total_secs = v.total_seconds()
+                    total_secs = v.total_seconds()  # type: ignore[union-attr]
                 elif isinstance(v, np.timedelta64):
                     total_secs = v / np.timedelta64(1, 's')
                 else:

@@ -35,7 +35,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 # Password hashing context
 pwd_context = None
 if PASSLIB_AVAILABLE:
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # type: ignore[possibly-unbound]
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -78,7 +78,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     })
 
     try:
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)  # type: ignore[possibly-unbound]
         return encoded_jwt
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to create access token: %s", e)
@@ -99,7 +99,7 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     })
 
     try:
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)  # type: ignore[possibly-unbound]
         return encoded_jwt
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Failed to create refresh token: %s", e)
@@ -111,9 +111,9 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     if not JWT_AVAILABLE:
         return None
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # type: ignore[possibly-unbound]
         return payload
-    except JWTError as e:
+    except JWTError as e:  # type: ignore[possibly-unbound]
         logger.warning("Token verification failed: %s", e)
         return None
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -142,7 +142,7 @@ def authenticate_user(db: Dict[str, Dict[str, str]], username: str, password: st
 
 
 def create_user(db: Dict[str, Dict[str, str]], username: str, password: str,
-                email: str = None, full_name: str = None) -> Optional[Dict[str, str]]:
+                email: Optional[str] = None, full_name: Optional[str] = None) -> Optional[Dict[str, str]]:
     """Create a new user."""
     if username in db:
         return None  # User already exists

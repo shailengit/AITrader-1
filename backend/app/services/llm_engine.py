@@ -55,15 +55,15 @@ LOCAL_API_KEY = os.environ.get("LOCAL_LLM_API_KEY", "not-needed")
 client = None
 if OPENAI_AVAILABLE:
     try:
-        client = OpenAI(
+        client = OpenAI(  # type: ignore[possibly-unbound]
             base_url=LOCAL_API_BASE,
             api_key=LOCAL_API_KEY,
             timeout=REQUEST_TIMEOUT,
             max_retries=1  # Reduce retries to avoid long waits on timeout (total wait = timeout * (retries + 1))
         )
-        logger.info(f"Local LLM client initialized (endpoint: {LOCAL_API_BASE}, timeout: {REQUEST_TIMEOUT}s, max_retries=1)")
+        logger.info("Local LLM client initialized (endpoint: %s, timeout: %ds, max_retries=1)", LOCAL_API_BASE, REQUEST_TIMEOUT)
     except Exception as e:
-        logger.error(f"Failed to initialize local LLM client: {e}")
+        logger.error("Failed to initialize local LLM client: %s", e)
 
 def verify_llm_connection() -> tuple[bool, Optional[str]]:
     """Quick check to verify LLM server is responsive."""
@@ -81,7 +81,7 @@ def verify_llm_connection() -> tuple[bool, Optional[str]]:
             timeout=10,
         )
         elapsed = time.time() - start
-        logger.info(f"LLM connection verified in {elapsed:.2f}s")
+        logger.info("LLM connection verified in %.2fs", elapsed)
         return True, None
     except Exception as e:
         return False, str(e)
@@ -488,12 +488,12 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
     Do NOT include any explanation text before or after the code.
     """
 
-    logger.info(f"Generating strategy for prompt: {prompt[:100]}...")
+    logger.info("Generating strategy for prompt: %s...", prompt[:100])
 
     try:
         import time
         start_time = time.time()
-        logger.info(f"Starting LLM request for strategy generation with model '{MODEL_NAME}'...")
+        logger.info("Starting LLM request for strategy generation with model '%s'...", MODEL_NAME)
 
         # Build enhanced system prompt with lessons learned
         enhanced_prompt = get_enhanced_system_prompt()
@@ -509,27 +509,29 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
             timeout=REQUEST_TIMEOUT,
         )
         elapsed = time.time() - start_time
-        logger.info(f"LLM request completed in {elapsed:.2f}s")
+        logger.info("LLM request completed in %.2fs", elapsed)
 
         content = response.choices[0].message.content
-        logger.debug(f"Raw LLM response (first 500 chars): {content[:500]}...")
+        if content is None:
+            return None, "LLM returned empty response."
+        logger.debug("Raw LLM response (first 500 chars): %s...", content[:500])
 
         code = extract_code_block(content)
 
         # Handle case where extract_code_block returns None (empty or no code found)
         if code is None:
-            logger.warning(f"extract_code_block returned None. Raw content: {content[:1000]}...")
+            logger.warning("extract_code_block returned None. Raw content: %s...", content[:1000])
             return None, "Generated code is empty or malformed. Please try again with a clearer prompt."
 
-        logger.debug(f"Extracted code (first 500 chars): {code[:500]}...")
+        logger.debug("Extracted code (first 500 chars): %s...", code[:500])
 
         # Validate that extracted code is valid Python before returning
         import ast
         try:
             ast.parse(code)
         except SyntaxError as e:
-            logger.error(f"Extracted code has syntax error: {e}")
-            logger.error(f"Problematic code:\n{code[:1000]}")
+            logger.error("Extracted code has syntax error: %s", e)
+            logger.error("Problematic code:\n%s", code[:1000])
             return None, f"Generated code has invalid Python syntax: {e}. The LLM may have included explanatory text. Please try again with a clearer prompt."
 
         # Transform code to use local database if LLM used YFData.download
@@ -553,7 +555,7 @@ def generate_strategy_code(prompt: str, tickers: List[str], start_date: str, end
         return code, None
     except Exception as e:
         error_str = str(e)
-        logger.error(f"ERROR in generate_strategy_code: {error_str}")
+        logger.error("ERROR in generate_strategy_code: %s", error_str)
 
         # Provide more helpful error messages for common issues
         if "timed out" in error_str.lower() or "timeout" in error_str.lower():
@@ -608,7 +610,7 @@ PREVIOUS FIX FOR SIMILAR ERROR ({lesson['error_signature']}):
             if lesson.get("example_after"):
                 lesson_hint += f"Example: {lesson['example_after']}\n"
     except Exception as e:
-        logger.debug(f"Could not lookup lesson: {e}")
+        logger.debug("Could not lookup lesson: %s", e)
 
     user_msg = f"""
 The following vectorbt code failed to run:
@@ -637,15 +639,17 @@ Please fix the code. Return ONLY the full valid python code.
             timeout=REQUEST_TIMEOUT,
         )
         content = response.choices[0].message.content
+        if content is None:
+            return current_code
         code = extract_code_block(content)
         if code is None:
-            logger.warning(f"fix_strategy_code: extract_code_block returned None. Raw content: {content[:1000]}...")
+            logger.warning("fix_strategy_code: extract_code_block returned None. Raw content: %s...", content[:1000])
             return current_code
         # Transform code to use local database if LLM used YFData.download
         code = transform_code_for_local_data(code)
         return code
     except Exception as e:
-        logger.error(f"ERROR in fix_strategy_code: {str(e)}")
+        logger.error("ERROR in fix_strategy_code: %s", e)
         return current_code
 
 
@@ -670,15 +674,17 @@ def chat_about_code(code: str, messages: List[Dict[str, str]]) -> tuple[Optional
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=chat_messages,
+            messages=chat_messages,  # type: ignore[arg-type]
             temperature=0.7,
             max_tokens=MAX_TOKENS,
             timeout=REQUEST_TIMEOUT,
         )
         content = response.choices[0].message.content
+        if content is None:
+            return None, "LLM returned empty response."
         return content, None
-    except Exception as e:
-        logger.error(f"ERROR in chat_about_code: {str(e)}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("ERROR in chat_about_code: %s", e)
         return None, str(e)
 
 

@@ -183,18 +183,22 @@ class PortfolioTracker:
         Returns:
             Trade object if executed, None otherwise
         """
-        if signal == 'BUY' and ticker not in self.current_state.positions:
-            # Buy with specified % of available cash
-            buy_value = self.current_state.cash * size_pct
-            shares = buy_value / price
-            if self.current_state.execute_buy(ticker, shares, price, date):
-                return self.current_state.trade_history[-1]
+        state = self.current_state
+        if state is None:
+            return None
 
-        elif signal == 'SELL' and ticker in self.current_state.positions:
+        if signal == 'BUY' and ticker not in state.positions:
+            # Buy with specified % of available cash
+            buy_value = state.cash * size_pct
+            shares = buy_value / price
+            if state.execute_buy(ticker, shares, price, date):
+                return state.trade_history[-1]
+
+        elif signal == 'SELL' and ticker in state.positions:
             # Sell entire position
-            pos = self.current_state.positions[ticker]
-            if self.current_state.execute_sell(ticker, pos.shares, price, date):
-                return self.current_state.trade_history[-1]
+            pos = state.positions[ticker]
+            if state.execute_sell(ticker, pos.shares, price, date):
+                return state.trade_history[-1]
 
         # HOLD or no action - just update prices
         return None

@@ -63,7 +63,7 @@ def get_active_tickers() -> List[str]:
     return [t for t in tickers if t.lower() not in skip_tables]
 
 
-def analyze_single_ticker_dormant_giant(ticker: str, filters: Dict[str, Any] = None) -> Optional[Dict]:
+def analyze_single_ticker_dormant_giant(ticker: str, filters: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """Worker function for Dormant Giant technical analysis."""
     if filters is None:
         filters = {}
@@ -110,7 +110,7 @@ def analyze_single_ticker_dormant_giant(ticker: str, filters: Dict[str, Any] = N
     )
 
     if is_breakout:
-        result = {"ticker": ticker.upper(), "signal": "Active Breakout", "log": f"MATCH: {ticker.upper()} - Active Breakout detected"}
+        result: Dict[str, Any] = {"ticker": ticker.upper(), "signal": "Active Breakout", "log": f"MATCH: {ticker.upper()} - Active Breakout detected"}
     elif is_squeezing and hidden_accumulation:
         result = {"ticker": ticker.upper(), "signal": "Coiling (Accumulation)", "log": f"MATCH: {ticker.upper()} - Coiling/Accumulation detected"}
     else:
@@ -148,7 +148,7 @@ def analyze_single_ticker_dormant_giant(ticker: str, filters: Dict[str, Any] = N
     return result
 
 
-def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Dict[str, Any] = None) -> List[Dict]:
+def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Technical scan for Dormant Giant screening."""
     tickers = get_active_tickers()
     total = len(tickers)
@@ -156,7 +156,7 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
     
     if log_callback:
         log_callback(f"Technical Agent: Analyzing {total} tickers for Squeeze/Breakout patterns...")
-    logger.info(f"Starting Dormant Giant technical scan for {total} tickers")
+    logger.info("Starting Dormant Giant technical scan for %d tickers", total)
 
     with ProcessPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(analyze_single_ticker_dormant_giant, t, filters): t for t in tickers}
@@ -184,7 +184,7 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
                     progress = 10 + int((completed / total) * 70)
                     progress_callback(progress)
 
-    logger.info(f"Dormant Giant Technical Scan Summary: Total={total}, Results={len(results)}")
+    logger.info("Dormant Giant Technical Scan Summary: Total=%d, Results=%d", total, len(results))
     return results
 
 
@@ -224,7 +224,7 @@ def tool_verify_eps_acceleration(tickers: List[Dict], log_callback=None) -> List
                         catalyst = "Confirmed Revenue Growth"
 
         except Exception as e:
-            logger.error(f"Fundamental verification error for {ticker}: {e}")
+            logger.error("Fundamental verification error for %s: %s", ticker, e)
             pass
 
         if catalyst:
@@ -308,7 +308,7 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
 
         return res
     except Exception as e:
-        logger.debug(f"Error processing {ticker}: {e}")
+        logger.debug("Error processing %s: %s", ticker, e)
         return None
     finally:
         worker_engine.dispose()
@@ -471,7 +471,7 @@ def tool_get_historical_performance(tickers: List[str], cutoff_date: str) -> str
                 'pct_change': round(pct_change, 2)
             })
         except Exception as e:
-            logger.warning(f"Error processing {ticker}: {e}")
+            logger.warning("Error processing %s: %s", ticker, e)
             continue
 
     return pd.DataFrame(results).to_csv(index=False) if results else "No performance data available."
@@ -531,6 +531,9 @@ def parse_quant_filters(prompt: str) -> Dict[str, Any]:
         response = parser.run(prompt)
         content = response.content if hasattr(response, 'content') else str(response)
 
+        if content is None:
+            content = ""
+
         # Extract JSON from the response
         start = content.find('{')
         end = content.rfind('}')
@@ -539,7 +542,7 @@ def parse_quant_filters(prompt: str) -> Dict[str, Any]:
         else:
             filters = {}
     except Exception as e:
-        logger.warning(f"Filter parsing failed: {e}. Returning empty filters.")
+        logger.warning("Filter parsing failed: %s. Returning empty filters.", e)
         filters = {}
 
     # Normalize and set sensible defaults
@@ -759,7 +762,7 @@ def enrich_results(results: List[Dict]) -> List[Dict]:
         meta_df = pd.read_sql(meta_query, ENGINE, params={"t": tickers})
         meta_map = {row['ticker'].upper(): row for _, row in meta_df.iterrows()}
     except Exception as e:
-        logger.warning(f"Metadata enrichment failed: {e}")
+        logger.warning("Metadata enrichment failed: %s", e)
         meta_map = {}
 
     # 2. Financials — last 2 quarters per ticker (single batched query)
@@ -772,7 +775,7 @@ def enrich_results(results: List[Dict]) -> List[Dict]:
         """)
         fin_df = pd.read_sql(fin_query, ENGINE, params={"t": tickers})
     except Exception as e:
-        logger.warning(f"Financial enrichment failed: {e}")
+        logger.warning("Financial enrichment failed: %s", e)
         fin_df = pd.DataFrame()
 
     for r in results:
@@ -833,7 +836,7 @@ def enrich_results(results: List[Dict]) -> List[Dict]:
 # SERVICE FUNCTIONS
 # =============================================================================
 
-def run_dormant_giant_screener(prompt: str = None, progress_callback=None, log_callback=None, filters: Dict[str, Any] = None) -> Dict[str, Any]:
+def run_dormant_giant_screener(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Run the Dormant Giant screener without AI agents (fast, pure Python).
     Returns structured results for API response.
@@ -842,7 +845,7 @@ def run_dormant_giant_screener(prompt: str = None, progress_callback=None, log_c
 
     # Technical scan
     technical_results = tool_run_dormant_giant_scan(progress_callback=progress_callback, log_callback=log_callback, filters=filters)
-    logger.info(f"Technical scan found {len(technical_results)} candidates")
+    logger.info("Technical scan found %d candidates", len(technical_results))
 
     if not technical_results:
         return {
@@ -854,7 +857,7 @@ def run_dormant_giant_screener(prompt: str = None, progress_callback=None, log_c
 
     # Fundamental verification
     verified_results = tool_verify_eps_acceleration(technical_results, log_callback=log_callback)
-    logger.info(f"Fundamental verification found {len(verified_results)} stocks with catalysts")
+    logger.info("Fundamental verification found %d stocks with catalysts", len(verified_results))
 
     # Enrich with metadata, fundamentals, and price stats
     verified_results = enrich_results(verified_results)
@@ -869,7 +872,7 @@ def run_dormant_giant_screener(prompt: str = None, progress_callback=None, log_c
 
 class AgnoLogCapture:
     """Custom handler to capture Agno agent output for streaming to frontend."""
-    def __init__(self, logs_buffer: List[str], agent_log_callback: Optional[Callable] = None):
+    def __init__(self, logs_buffer: List[Dict[str, Any]], agent_log_callback: Optional[Callable] = None):
         self.logs_buffer = logs_buffer
         self.agent_log_callback = agent_log_callback
         self.current_agent = None
@@ -1015,7 +1018,7 @@ def _capture_agno_stdout(team, prompt: str, log_capture: AgnoLogCapture):
     return response
 
 
-def run_dormant_giant_screener_with_ai(prompt: str = None, progress_callback=None, log_callback=None, filters: Dict[str, Any] = None, logs_buffer: List[Dict] = None, agent_log_callback=None) -> Dict[str, Any]:
+def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None, agent_log_callback=None) -> Dict[str, Any]:
     """
     Run the Dormant Giant screener with AI multi-agent analysis.
     Returns both structured results and AI-generated report.
@@ -1064,7 +1067,7 @@ def run_dormant_giant_screener_with_ai(prompt: str = None, progress_callback=Non
 
         log_capture.log_system("AI analysis complete")
 
-        ai_report = response.content if hasattr(response, 'content') else str(response) if response else "No response"
+        ai_report = response.content if response and hasattr(response, 'content') else str(response) if response else "No response"  # type: ignore[union-attr]
 
         if progress_callback:
             progress_callback(99)
@@ -1078,21 +1081,21 @@ def run_dormant_giant_screener_with_ai(prompt: str = None, progress_callback=Non
             "logs": logs_buffer
         }
     except Exception as e:
-        logger.error(f"AI screener failed: {e}")
+        logger.error("AI screener failed: %s", e)
         log_capture.log_system(f"Error in AI analysis: {str(e)[:100]}... Falling back to non-AI mode.")
         # Fallback to non-AI mode
         logger.info("Falling back to non-AI screener...")
         return run_dormant_giant_screener(prompt, progress_callback=progress_callback, log_callback=log_callback, filters=filters)
 
 
-def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_callback=None,
-                                log_callback=None, filters: Dict[str, Any] = None) -> Dict[str, Any]:
+def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, progress_callback=None,
+                                log_callback=None, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
     Uses ta library column names and maps to frontend-friendly keys.
     Applies user-defined QuantFilters if provided.
     """
-    logger.info(f"Running Quant Strategy screener (cutoff_date={cutoff_date}, filters={filters})...")
+    logger.info("Running Quant Strategy screener (cutoff_date=%s, filters=%s)...", cutoff_date, filters)
 
     if progress_callback:
         progress_callback(5)
@@ -1184,9 +1187,9 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: str = None, progress_c
     }
 
 
-def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: str = None, logs_buffer: List[Dict] = None,
+def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: Optional[str] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None,
                                         progress_callback=None, agent_log_callback=None,
-                                        filters: Dict[str, Any] = None) -> Dict[str, Any]:
+                                        filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
     Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
@@ -1241,7 +1244,7 @@ Screening criteria applied:
         if progress_callback:
             progress_callback(99)
 
-        ai_report = response.content if hasattr(response, 'content') else str(response) if response else "No response"
+        ai_report = response.content if response and hasattr(response, 'content') else str(response) if response else "No response"  # type: ignore[union-attr]
 
         return {
             "ai_report": ai_report,
@@ -1254,7 +1257,7 @@ Screening criteria applied:
             "logs": logs_buffer
         }
     except Exception as e:
-        logger.error(f"AI screener failed: {e}")
+        logger.error("AI screener failed: %s", e)
         log_capture.log_system(f"Error in AI analysis: {str(e)[:100]}... Falling back to non-AI mode.")
         logger.info("Falling back to non-AI screener...")
         return run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback)

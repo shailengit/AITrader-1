@@ -454,7 +454,7 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
 
         mode = request.mode
         use_ai = request.use_ai
-        logs_buffer = []
+        logs_buffer: List[Dict[str, Any]] = []
 
         if mode == "dormant_giant":
             if use_ai:

@@ -163,7 +163,7 @@ class StrategyValidator:
     @classmethod
     def validate_strategy_code(cls, code: str) -> Dict[str, Any]:
         """Comprehensive strategy code validation"""
-        validation_result = {
+        validation_result: Dict[str, Any] = {
             "valid": True,
             "warnings": [],
             "errors": [],
@@ -216,7 +216,7 @@ class StrategyValidator:
             validation_result["valid"] = False
             validation_result["errors"].append(f"Validation error: {str(e)}")
 
-        logger.info(f"Strategy validation completed. Valid: {validation_result['valid']}")
+        logger.info("Strategy validation completed. Valid: %s", validation_result['valid'])
         return validation_result
 
 
