@@ -87,7 +87,8 @@ def run_continuous_true_wfo(
     window_configs = calculate_window_configs(
         start_date, end_date, n_windows,
         wfo_conf.get("type", "rolling"), wfo_conf,
-        is_true_wfo=True  # True WFO always steps 1 day at a time
+        is_true_wfo=True,  # True WFO always steps 1 day at a time
+        code=code          # Pass original code for auto train_len sizing
     )
 
     # Validate windows

@@ -46,6 +46,34 @@ def _build_freq_fix(data_var: str = "data") -> str:
     return _FREQ_FIX_TEMPLATE.format(data_var=data_var)
 
 
+def _extract_max_param_from_code(code: str) -> int:
+    """
+    Extract the largest parameter value from strategy code.
+    Searches for np.array(...), list literals, range(...), and plain integers.
+    Returns the maximum integer found, or 0 if none found.
+    """
+    values: set[int] = set()
+
+    # np.array([1, 2, 3]) or np.arange(5, 50, 5)
+    for pattern in [
+        r'np\.array\(\[([^\]]+)\]\)',
+        r'np\.arange\(([^)]+)\)',
+        r'range\(([^)]+)\)',
+        r'=\s*\[([^\]]+)\]',
+    ]:
+        for match in re.finditer(pattern, code):
+            inner = match.group(1)
+            # Extract all integers from the inner text
+            for num_str in re.findall(r'\d+', inner):
+                values.add(int(num_str))
+
+    # Plain integer assignments like "sma_window = 50"
+    for match in re.finditer(r'=\s*(\d+)(?:\s*#|\s*\n|\s*$)', code):
+        values.add(int(match.group(1)))
+
+    return max(values) if values else 0
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -325,6 +353,7 @@ def calculate_window_configs(
     split_type: str,
     wfo_conf: Dict[str, Any],
     is_true_wfo: bool = False,
+    code: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     """
     Calculate window configurations for true WFO.
@@ -367,6 +396,13 @@ def calculate_window_configs(
         train_len = max(int(train_days), MIN_TRAIN_DAYS)
         test_len  = max(int(test_days),  MIN_TEST_DAYS)
         print(f"DEBUG: Using fixed days – train_len={train_len}, test_len={test_len}")
+    elif is_true_wfo and code:
+        # True WFO: size training window by max indicator parameter + buffer
+        max_param = _extract_max_param_from_code(code)
+        indicator_warmup = max_param + 10  # e.g. EMA(20) needs ~30 days
+        train_len = max(indicator_warmup, MIN_TRAIN_DAYS)
+        test_len = 1  # True WFO always tests one day at a time
+        print(f"DEBUG: True WFO auto-sized – max_param={max_param}, train_len={train_len}, test_len={test_len}")
     else:
         train_len = max(int(total_days * ratio),       MIN_TRAIN_DAYS)
         test_len  = max(int(total_days * (1 - ratio)), MIN_TEST_DAYS)
