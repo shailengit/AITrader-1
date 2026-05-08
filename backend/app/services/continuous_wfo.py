@@ -242,8 +242,8 @@ def run_continuous_true_wfo(
             )
 
             with contextlib.redirect_stdout(output_buffer):
-                from app.services.data_service import DataService
-                train_globals = {'DataService': DataService}
+                from app.services.data_service import SafeDataService
+                train_globals = {'DataService': SafeDataService}
                 exec(train_code_with_params, train_globals)
 
                 if 'entries' not in train_globals or 'exits' not in train_globals:

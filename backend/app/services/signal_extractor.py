@@ -9,7 +9,7 @@ from typing import Optional, Dict
 
 # Import the freq-fix capable date modifier
 from app.services.true_wfo_implementation import modify_code_dates
-from app.services.data_service import DataService
+from app.services.data_service import SafeDataService
 
 
 def transform_code_for_local_data(code: str, start_date: str, end_date: str) -> str:
@@ -98,7 +98,7 @@ def extract_signal_from_strategy(code: str, target_date: datetime,
         )
 
         # Execute to get signals with DataService available
-        globals_dict = {'__name__': '__main__', 'DataService': DataService}
+        globals_dict = {'__name__': '__main__', 'DataService': SafeDataService}
         exec(modified, globals_dict)
 
         # Extract signals from the executed strategy

@@ -3,14 +3,16 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 20
-slow_ema_window = 100
+fast_ema_window = 2
+slow_ema_window = 10
 
 # Download data
-ticker = 'AOSL'
-start = '2026-01-01'
-end = '2026-05-01'
+ticker = 'CIEN'
+start = '2026-02-07'
+end = '2026-05-06'
 data = DataService.get_ohlcv_data(ticker, start, end)
+if data is None:
+    raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")
 
 # Get price data
 close = data.get('Close')

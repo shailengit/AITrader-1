@@ -13,6 +13,8 @@ end = '2026-05-04'
 
 # Load data from local database
 data = DataService.get_ohlcv_data(ticker, start, end)
+if data is None:
+    raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")
 
 # Get price and volume data
 close = data['Close']

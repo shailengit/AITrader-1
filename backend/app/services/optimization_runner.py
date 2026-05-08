@@ -26,6 +26,32 @@ from app.services.true_wfo_implementation import (
 from app.services.executor import _apply_ticker_override
 from typing import List, Optional
 
+
+def _override_dates_in_code(code: str, config: dict) -> str:
+    """Replace start/end dates in strategy code with config dates if provided."""
+    wfo = config.get("wfo", {})
+    start_date = wfo.get("start_date")
+    end_date = wfo.get("end_date")
+    if not start_date or not end_date:
+        return code
+
+    modified = code
+    # Replace standalone start / end variable assignments
+    modified = re.sub(
+        r"""^(\s*start\s*=\s*['"])\d{4}-\d{2}-\d{2}(['"])""",
+        rf"\g<1>{start_date}\g<2>",
+        modified,
+        flags=re.MULTILINE
+    )
+    modified = re.sub(
+        r"""^(\s*end\s*=\s*['"])\d{4}-\d{2}-\d{2}(['"])""",
+        rf"\g<1>{end_date}\g<2>",
+        modified,
+        flags=re.MULTILINE
+    )
+    return modified
+
+
 def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Optional[List[str]] = None):
     """
     Executes Optimization using VBT-native array parameter injection.
@@ -94,6 +120,9 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
         # Apply ticker override if provided
         code = _apply_ticker_override(code, tickers)
 
+        # Apply date override from config so OptimizationConfig dates take effect
+        code = _override_dates_in_code(code, config)
+
         modified_code = code
         injection_success = False
 
@@ -140,12 +169,12 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
         try:
             with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
                 # Build execution globals with required imports
-                from app.services.data_service import DataService
+                from app.services.data_service import SafeDataService
                 exec_globals = {
                     "vbt": vbt,
                     "pd": pd,
                     "np": np,
-                    "DataService": DataService,
+                    "DataService": SafeDataService,
                 }
                 exec(modified_code, exec_globals)
 
@@ -513,7 +542,9 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                                     source_df = unwrapped
                             except:
                                 pass
-                        elif isinstance(d, pd.DataFrame):
+                        # DataFrame.get() exists but requires a key argument,
+                        # so the unwrap above may fail silently. Fall back directly.
+                        if source_df is None and isinstance(d, pd.DataFrame):
                             source_df = d
 
                         if source_df is not None:

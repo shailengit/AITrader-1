@@ -43,7 +43,7 @@ except ImportError:
 
 # Model configuration
 # Try common Ollama model name formats
-MODEL_NAME = os.environ.get("OLLAMA_MODEL", "kimi-k2.5:cloud")
+MODEL_NAME = os.environ.get("OLLAMA_MODEL", "kimi-k2.6:cloud")
 MAX_TOKENS = 4096  # Reduced for faster responses
 REQUEST_TIMEOUT = 180  # seconds - maximum time to wait for LLM response (increased for complex strategy generation)
 
@@ -115,6 +115,7 @@ RULES:
    data = DataService.get_ohlcv_data(ticker, start, end)
    ```
    NOTE: Do NOT include `from app.services.data_service import DataService` in your code - DataService is already available.
+   NOTE: DataService will raise a clear ValueError if the ticker does not exist in the database or the date range is invalid. You do NOT need to manually check for None or empty data.
 4. CRITICAL: Store the data result in a variable named `data` and DO NOT overwrite it.
 5. Access price columns from `data` for calculations using bracket notation: `close = data['Close']`.
    ```python

@@ -644,6 +644,20 @@ export default function Builder() {
     applyExportedDates();
   }, []);
 
+  // Sync code dates with optConfig dates whenever they change
+  useEffect(() => {
+    if (code && optConfig.wfo.start_date && optConfig.wfo.end_date) {
+      const updated = replaceDatesInCode(
+        code,
+        optConfig.wfo.start_date,
+        optConfig.wfo.end_date,
+      );
+      if (updated !== code) {
+        setCode(updated);
+      }
+    }
+  }, [optConfig.wfo.start_date, optConfig.wfo.end_date]);
+
   const saveState = useCallback(() => {
     localStorage.setItem(
       "builderState",
@@ -745,7 +759,9 @@ export default function Builder() {
       });
       const data = await res.json();
       if (data.success && data.data?.code) {
-        setCode(replaceDatesInCode(data.data.code, optConfig.wfo.start_date, optConfig.wfo.end_date));
+        let generatedCode = replaceDatesInCode(data.data.code, optConfig.wfo.start_date, optConfig.wfo.end_date);
+        generatedCode = replaceTickerInCode(generatedCode, tickers.split(",")[0].trim());
+        setCode(generatedCode);
         const attempts = data.data?.fix_attempts || 0;
         const lessons = data.data?.lessons_applied || [];
         let msg = data.data.output || "Strategy generated successfully!";
@@ -869,6 +885,7 @@ export default function Builder() {
           benchmark_drawdown: data.data.benchmark_drawdown,
           trades,
           indicators: data.data.indicators || [],
+          tickers: tickerList,
           optimization:
             runMode === "optimize"
               ? {

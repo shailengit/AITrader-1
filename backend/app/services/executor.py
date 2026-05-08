@@ -293,15 +293,16 @@ class CodeExecutor:
         stdout_buffer = io.StringIO()
 
         # Define execution globals
-        # Import DataService for strategy execution
-        from app.services.data_service import DataService
+        # Import SafeDataService for strategy execution
+        from app.services.data_service import SafeDataService, safe_get_data
 
         exec_globals = {
             "vbt": vbt,
             "pd": pd,
             "np": np,
             "plt": plt,
-            "DataService": DataService,
+            "DataService": SafeDataService,
+            "get_data": safe_get_data,
             "__builtins__": {
                 # Restrict builtins for security
                 "abs": abs, "all": all, "any": any, "bool": bool,
@@ -442,11 +443,11 @@ class StatsExtractor:
             raise DataExtractionError(f"Failed to extract statistics: {str(e)}")
 
     @staticmethod
-    def extract_benchmark_comparison(pf) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Extract benchmark comparison data"""
+    def extract_benchmark_comparison(pf) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+        """Extract benchmark comparison data. Returns (strategy_drawdown, benchmark_drawdown, bench_stats)."""
         try:
             if not hasattr(pf, 'close'):
-                return {}, {}
+                return {}, {}, {}
 
             price = pf.close
             if isinstance(price, pd.DataFrame):
@@ -456,7 +457,7 @@ class StatsExtractor:
             bench_pf = vbt.Portfolio.from_holding(price, freq='1D')
             bench_stats = _serialize_pandas_object(bench_pf.stats())
 
-            # Add benchmark metrics
+            # Add benchmark Sharpe Ratio
             try:
                 bench_sharpe = bench_pf.sharpe_ratio(freq='1D')
                 if hasattr(bench_sharpe, 'item'):
@@ -464,6 +465,17 @@ class StatsExtractor:
                 bench_stats["Benchmark Sharpe Ratio"] = bench_sharpe
             except Exception as e:
                 logger.debug(f"Could not calculate benchmark Sharpe ratio: {e}")
+
+            # Add benchmark Max Drawdown
+            try:
+                bench_max_dd = bench_pf.max_drawdown()
+                if hasattr(bench_max_dd, 'item'):
+                    bench_max_dd = bench_max_dd.item()
+                # Convert to percentage format consistent with strategy stats
+                bench_max_dd_pct = bench_max_dd * 100 if abs(bench_max_dd) <= 1.0 else bench_max_dd
+                bench_stats["Benchmark Max Drawdown [%]"] = bench_max_dd_pct
+            except Exception as e:
+                logger.debug(f"Could not calculate benchmark Max Drawdown: {e}")
 
             # Extract drawdown series
             try:
@@ -474,14 +486,14 @@ class StatsExtractor:
                 strategy_drawdown = _serialize_pandas_object(strategy_dd) if len(strategy_dd) > 0 else {}
                 benchmark_drawdown = _serialize_pandas_object(benchmark_dd) if len(benchmark_dd) > 0 else {}
 
-                return strategy_drawdown, benchmark_drawdown
+                return strategy_drawdown, benchmark_drawdown, bench_stats
             except Exception as e:
                 logger.debug(f"Could not extract drawdown data: {e}")
-                return {}, {}
+                return {}, {}, bench_stats
 
         except Exception as e:
             logger.error(f"Error in benchmark comparison: {e}")
-            return {}, {}
+            return {}, {}, {}
 
 class EquityExtractor:
     """Extracts equity curve data from portfolio"""
@@ -922,7 +934,12 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
 
         # Extract drawdown data
         try:
-            drawdown, benchmark_drawdown = StatsExtractor.extract_benchmark_comparison(pf)
+            drawdown, benchmark_drawdown, bench_stats = StatsExtractor.extract_benchmark_comparison(pf)
+            # Merge only explicitly-prefixed benchmark metrics into main stats
+            if bench_stats:
+                for k, v in bench_stats.items():
+                    if k.startswith("Benchmark"):
+                        stats[k] = v
         except Exception as e:
             logger.warning(f"Drawdown extraction failed: {e}")
             drawdown = {}

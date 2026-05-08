@@ -11,6 +11,8 @@ ticker = 'AAPL'
 start = '2020-01-01'
 end = '2024-01-01'
 data = DataService.get_ohlcv_data(ticker, start, end)
+if data is None:
+    raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")
 
 # Get close price
 close = data['Close']

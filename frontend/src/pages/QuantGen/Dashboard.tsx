@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -13,6 +13,7 @@ import { NavLink } from 'react-router-dom';
 import { CandleStickChart } from '@/components/quantgen/CandleStickChart';
 import { IndicatorPanel } from '@/components/quantgen/IndicatorPanel';
 import OptimizationResults from '@/components/quantgen/OptimizationResults';
+import { TickerIdentityCard, FundamentalsPanel, ResearchPanel } from '@/components/quantgen';
 
 interface Metric {
   label: string;
@@ -111,6 +112,7 @@ export default function Dashboard() {
           drawdownData,
           trades: parsed.trades || [],
           indicators: parsed.indicators || [],
+          tickers: parsed.tickers || [],
         };
       }
       const storedStats = localStorage.getItem('lastRunStats');
@@ -128,6 +130,92 @@ export default function Dashboard() {
   });
 
   const { stats, equity, ohlcv, drawdownData, optimization, output, trades, indicators } = data;
+
+  // Extract primary ticker from stored run data or fallback to output/code parsing
+  const primaryTicker = useMemo(() => {
+    const stored = (data as any)?.tickers;
+    if (stored && Array.isArray(stored) && stored.length > 0) {
+      return stored[0].toUpperCase();
+    }
+    // Fallback: try to extract from output text
+    const match = output?.match(/ticker\s*=\s*['"]([A-Z]+)['"]/i);
+    if (match) return match[1].toUpperCase();
+    return 'AAPL';
+  }, [(data as any)?.tickers, output]);
+
+  // Fundamentals state
+  const [tickerInfo, setTickerInfo] = useState<any>(null);
+  const [tickerInfoLoading, setTickerInfoLoading] = useState(false);
+
+  // Research state
+  const [researchData, setResearchData] = useState<any>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchMode, setResearchMode] = useState<'simulated' | 'live'>('simulated');
+
+  // Load cached research from localStorage on mount
+  useEffect(() => {
+    if (!primaryTicker) return;
+    const cacheKey = `research_${primaryTicker}_${researchMode}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.data) {
+          setResearchData(parsed.data);
+        }
+      }
+    } catch {
+      // ignore corrupt cache
+    }
+  }, [primaryTicker]);
+
+  // Fetch fundamentals on mount (fast)
+  useEffect(() => {
+    if (!primaryTicker) return;
+
+    const fetchTickerInfo = async () => {
+      setTickerInfoLoading(true);
+      try {
+        const res = await fetch(`/api/ticker-info/${primaryTicker}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setTickerInfo(json.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch ticker info:', e);
+      } finally {
+        setTickerInfoLoading(false);
+      }
+    };
+
+    fetchTickerInfo();
+  }, [primaryTicker]);
+
+  const runResearch = (mode: string) => {
+    setResearchMode(mode as 'simulated' | 'live');
+    setResearchData(null);
+    setResearchLoading(true);
+    fetch(`/api/research/${primaryTicker}?mode=${mode}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setResearchData(json.data);
+          // Cache result in localStorage
+          try {
+            localStorage.setItem(`research_${primaryTicker}_${mode}`, JSON.stringify({ data: json.data, timestamp: Date.now() }));
+          } catch {
+            // ignore quota errors
+          }
+        }
+      })
+      .catch((e) => console.error('Research fetch failed:', e))
+      .finally(() => setResearchLoading(false));
+  };
+
+  const handleRegenerateResearch = (mode: string) => {
+    runResearch(mode);
+  };
+
   const [selIndicators, setSelIndicators] = useState<Record<string, boolean>>({});
 
   useState(() => {
@@ -286,6 +374,17 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Ticker Identity Card */}
+          <TickerIdentityCard
+            ticker={primaryTicker}
+            name={tickerInfo?.metadata?.name}
+            sector={tickerInfo?.metadata?.sector}
+            industry={tickerInfo?.metadata?.industry}
+            marketCap={tickerInfo?.metadata?.market_cap}
+            beta={tickerInfo?.metadata?.beta}
+            latestPrice={tickerInfo?.latest_price}
+          />
+
           {/* Optimization Results */}
           {optimization && (
             <div style={{ marginBottom: '24px' }}>
@@ -333,6 +432,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* Fundamentals Panel */}
+          <FundamentalsPanel data={tickerInfo} isLoading={tickerInfoLoading} />
 
           {/* Two-Column: Charts + Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
@@ -479,6 +581,13 @@ export default function Dashboard() {
               </details>
             </div>
           </div>
+
+          {/* Research Intelligence Panel */}
+          <ResearchPanel
+            data={researchData}
+            isLoading={researchLoading}
+            onRegenerate={handleRegenerateResearch}
+          />
         </div>
       </div>
     </div>

@@ -31,6 +31,8 @@ from app.services.code_verifier import CodeVerifier
 from app.services.lessons_learned import LessonsLearnedStore
 from app.db.database import engine
 from sqlalchemy import text
+from app.services.fundamentals_service import get_ticker_fundamentals
+from app.services.research_agents import run_research_agents
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +172,56 @@ class StrategyModel(BaseModel):
     """Model for saving/loading strategies."""
     name: str
     code: str
+
+
+@router.get("/ticker-info/{ticker}")
+async def get_ticker_info(ticker: str):
+    """
+    Get fundamentals and metadata for a ticker.
+    Returns quarterly financials with YoY/QoQ growth rates,
+    metadata from stock_metadata, and latest price.
+    """
+    try:
+        logger.info("Fetching ticker info for %s", ticker.upper())
+        data = get_ticker_fundamentals(ticker)
+        return {
+            "success": True,
+            "data": data,
+            "message": f"Fundamentals loaded for {ticker.upper()}"
+        }
+    except Exception as e:
+        logger.error("Error fetching ticker info for %s: %s", ticker.upper(), e)
+        return {
+            "success": False,
+            "error": str(e),
+            "data": None
+        }
+
+
+@router.get("/research/{ticker}")
+async def get_ticker_research(ticker: str, mode: str = "simulated"):
+    """
+    Get research intelligence for a ticker.
+    Spawns 4 research agents and returns a compiled document.
+
+    Query params:
+        mode: 'simulated' (default) or 'live'
+    """
+    try:
+        logger.info("Fetching research for %s (mode=%s)", ticker.upper(), mode)
+        data = run_research_agents(ticker, mode=mode)
+        return {
+            "success": True,
+            "data": data,
+            "message": f"Research compiled for {ticker.upper()}"
+        }
+    except Exception as e:
+        logger.error("Error fetching research for %s: %s", ticker.upper(), e)
+        return {
+            "success": False,
+            "error": str(e),
+            "data": None
+        }
 
 
 @router.get("/health")
@@ -420,15 +472,16 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
             request.tickers
         )
 
-        # Check if there was an error
-        if result.get("output", "").startswith("Optimization Error") or result.get("output", "").startswith("\nOptimization Error"):
-            logger.error("Optimization failed: %s", result.get("output", ""))
+        # Check if there was an error (look anywhere in output, not just start)
+        output_text = result.get("output", "")
+        if "Optimization Error" in output_text:
+            logger.error("Optimization failed: %s", output_text)
             return {
                 "success": False,
                 "error": {
                     "type": "OptimizationError",
                     "message": "Optimization failed",
-                    "details": result.get("output", "")
+                    "details": output_text
                 },
                 "data": result
             }

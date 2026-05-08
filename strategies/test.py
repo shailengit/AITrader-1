@@ -3,17 +3,19 @@ from app.services.data_service import DataService
 import numpy as np
 
 ticker = 'CLB'
-start = '2000-01-01'
-end = '2025-12-31'
+start = '2026-01-01'
+end = '2024-01-01'
 data = DataService.get_ohlcv_data(ticker, start, end)
+if data is None:
+    raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")
 print(data.head())
 
 
 close = data['Close']
 
 # Parameters to optimize
-fast_window = 20
-slow_window = 200
+fast_window = 5
+slow_window = 20
 
 # Create MA for each parameter combination
 fast_ma = vbt.MA.run(close, window=fast_window)

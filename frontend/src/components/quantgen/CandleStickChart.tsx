@@ -89,6 +89,10 @@ export function CandleStickChart({
       rightPriceScale: {
         borderColor: 'rgba(255, 255, 255, 0.1)',
       },
+      leftPriceScale: {
+        visible: true,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+      },
     });
 
     chartRef.current = chart;
@@ -114,6 +118,9 @@ export function CandleStickChart({
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.remove();
+      chartRef.current = null;
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
     };
   }, [height]);
 
@@ -145,13 +152,20 @@ export function CandleStickChart({
         const volumeSeries = chartRef.current.addSeries(HistogramSeries, {
           color: '#3b82f6',
           priceFormat: { type: 'volume' },
-          priceScaleId: '',
+          priceScaleId: 'left',
         });
 
         volumeSeries.priceScale().applyOptions({
           scaleMargins: {
             top: 0.8,
             bottom: 0,
+          },
+        });
+        // Ensure volume is visible by not auto-scaling with price data
+        candleSeriesRef.current.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0,
+            bottom: 0.2,
           },
         });
 

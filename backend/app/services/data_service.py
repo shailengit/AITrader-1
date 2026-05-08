@@ -215,6 +215,82 @@ class DataService:
         return df
 
 
+def _guard_dataframe(result: Optional[pd.DataFrame], ticker: str, start_date: Optional[str], end_date: Optional[str]) -> pd.DataFrame:
+    """Raise a clear error when data loading returns None."""
+    if result is not None:
+        return result
+    date_range = ""
+    if start_date and end_date:
+        date_range = f" from {start_date} to {end_date}"
+    elif start_date:
+        date_range = f" from {start_date}"
+    elif end_date:
+        date_range = f" up to {end_date}"
+    raise ValueError(
+        f"No data found for ticker '{ticker}'{date_range}. "
+        f"Check that the ticker exists in the database and the date range is valid. "
+        f"Available tickers can be retrieved with DataService.get_available_tickers()."
+    )
+
+
+class SafeDataService:
+    """
+    Wrapper around DataService that raises clear errors when data is missing.
+    Use this in strategy execution contexts instead of DataService directly
+    so that missing tickers produce actionable error messages rather than
+    downstream 'NoneType' errors.
+    """
+
+    @staticmethod
+    def get_ohlcv_data(
+        ticker: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> pd.DataFrame:
+        result = DataService.get_ohlcv_data(ticker, start_date, end_date, limit)
+        return _guard_dataframe(result, ticker, start_date, end_date)
+
+    @staticmethod
+    def prepare_vectorbt_data(
+        ticker: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> pd.DataFrame:
+        result = DataService.prepare_vectorbt_data(ticker, start_date, end_date)
+        return _guard_dataframe(result, ticker, start_date, end_date)
+
+    @staticmethod
+    def get_multi_ticker_data(
+        tickers: List[str],
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
+    ) -> Dict[str, pd.DataFrame]:
+        return DataService.get_multi_ticker_data(tickers, start_date, end_date)
+
+    @staticmethod
+    def get_ticker_table_name(ticker: str) -> str:
+        return DataService.get_ticker_table_name(ticker)
+
+    @staticmethod
+    def get_available_tickers() -> List[str]:
+        return DataService.get_available_tickers()
+
+    @staticmethod
+    def get_latest_price(ticker: str) -> Optional[float]:
+        return DataService.get_latest_price(ticker)
+
+    @staticmethod
+    def get_ticker_metadata(ticker: str) -> Optional[Dict[str, Any]]:
+        return DataService.get_ticker_metadata(ticker)
+
+
+def safe_get_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Convenience function that raises on missing data."""
+    result = get_data(ticker, start_date, end_date)
+    return _guard_dataframe(result, ticker, start_date, end_date)
+
+
 # Convenience function for use in strategy code
 def get_data(ticker: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
     """
