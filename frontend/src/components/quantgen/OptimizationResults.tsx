@@ -43,7 +43,7 @@ export default function OptimizationResults({ data }: OptimizationResultsProps) 
   };
 
   const [showAllWindows, setShowAllWindows] = useState(false);
-  const DEFAULT_WINDOW_LIMIT = 100;
+  const DEFAULT_WINDOW_LIMIT = 10;
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const displayWindows = useMemo(() => {
