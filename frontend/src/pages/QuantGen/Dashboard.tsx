@@ -79,6 +79,7 @@ interface DashboardData {
   drawdownData: Array<{ time: string; drawdown: number; bench_drawdown: number }>;
   trades: Trade[];
   indicators: PanelIndicator[];
+  benchmark_equity: EquityPoint[];
 }
 
 export default function Dashboard() {
@@ -113,6 +114,7 @@ export default function Dashboard() {
           trades: parsed.trades || [],
           indicators: parsed.indicators || [],
           tickers: parsed.tickers || [],
+          benchmark_equity: parsed.optimization?.benchmark_equity || parsed.benchmark_equity || [],
         };
       }
       const storedStats = localStorage.getItem('lastRunStats');
@@ -120,16 +122,16 @@ export default function Dashboard() {
         return {
           stats: JSON.parse(storedStats),
           equity: JSON.parse(localStorage.getItem('lastRunEquity') || '[]'),
-          ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [],
+          ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [], benchmark_equity: [],
         };
       }
     } catch {}
     return {
-      stats: {}, equity: [], ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [],
+      stats: {}, equity: [], ohlcv: [], optimization: null, output: '', drawdownData: [], trades: [], indicators: [], benchmark_equity: [],
     };
   });
 
-  const { stats, equity, ohlcv, drawdownData, optimization, output, trades, indicators } = data;
+  const { stats, equity, ohlcv, drawdownData, optimization, output, trades, indicators, benchmark_equity } = data;
 
   // Extract primary ticker from stored run data or fallback to output/code parsing
   const primaryTicker = useMemo(() => {
@@ -234,7 +236,29 @@ export default function Dashboard() {
   const bestStats = optimization?.stats && Object.keys(optimization.stats).length > 0 ? optimization.stats : stats;
 
   const equityWithBenchmark = useMemo(() => {
-    if (!ohlcv?.length || !equity?.length) return equity;
+    if (!equity?.length) return equity;
+
+    // Prefer backend-computed benchmark equity (correctly aligned to actual test period)
+    if (benchmark_equity?.length > 0) {
+      const benchByDay = new Map<number, number>();
+      benchmark_equity.forEach((p) => {
+        if (p && typeof p.time === 'number' && !isNaN(p.time)) {
+          // Normalize to start of day in UTC to handle timezone/time-of-day mismatches
+          const dayKey = Math.floor(p.time / 86400) * 86400;
+          benchByDay.set(dayKey, p.value);
+        }
+      });
+      return equity.map((item) => {
+        const dayKey = Math.floor(item.time / 86400) * 86400;
+        return {
+          ...item,
+          benchmark: benchByDay.get(dayKey) ?? null,
+        };
+      });
+    }
+
+    // Fallback: recompute from OHLCV (only valid when equity and ohlcv share the same timeline)
+    if (!ohlcv?.length) return equity;
     try {
       const startValue = equity[0]?.value || 10000;
       const closePrices = ohlcv.map((d) => d.close);
@@ -244,10 +268,10 @@ export default function Dashboard() {
       }
       return equity.map((item, index) => ({
         ...item,
-        benchmark: benchmark[index] ? benchmark[index] * startValue : benchmark[benchmark.length - 1] * startValue,
+        benchmark: benchmark[index] ? benchmark[index] * startValue : null,
       }));
     } catch { return equity; }
-  }, [ohlcv, equity]);
+  }, [equity, benchmark_equity, ohlcv]);
 
   const getVal = (keys: string[]) => {
     if (!bestStats) return undefined;
@@ -499,7 +523,7 @@ export default function Dashboard() {
                       <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }} labelFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]} />
                       <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#colorVal)" name="Strategy" />
-                      {ohlcv?.length > 0 && <Area type="monotone" dataKey="benchmark" stroke="#22c55e" strokeWidth={1.5} fill="none" strokeDasharray="4 3" name="Buy & Hold" opacity={0.6} />}
+                      {(benchmark_equity?.length > 0 || ohlcv?.length > 0) && <Area type="monotone" dataKey="benchmark" stroke="#22c55e" strokeWidth={1.5} fill="none" strokeDasharray="4 3" name="Buy & Hold" opacity={0.6} />}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
