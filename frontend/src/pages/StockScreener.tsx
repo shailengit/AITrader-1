@@ -45,6 +45,11 @@ interface ScanResult {
   peg_ratio?: number;
   market_cap?: number;
   beta?: number;
+  score?: number;
+  mfi?: number;
+  volume_cluster_days?: number;
+  rs_ratio?: number;
+  bandwidth_pct?: number;
 }
 
 interface ScanStatus {
@@ -115,10 +120,14 @@ export default function StockScreener() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showTerminal, setShowTerminal] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [scanCompleted, setScanCompleted] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [filters, setFilters] = useState({
-    squeeze_threshold: 1.5,
-    accumulation_threshold: 0.01,
-    volume_threshold: 1.2,
+    consolidation_days: 15,
+    mfi_threshold: 55,
+    volume_cluster_days: 3,
+    rs_minimum: 0.8,
+    use_sector_momentum: true,
   });
   const [quantFilters, setQuantFilters] = useState<Record<string, any> | null>(null);
   const [isParsingFilters, setIsParsingFilters] = useState(false);
@@ -300,6 +309,7 @@ export default function StockScreener() {
     setShowReport(false);
     setLogs([]);
     setProgress(0);
+    setScanCompleted(false);
 
     try {
       const res = await fetch("/api/screener/scan", {
@@ -341,10 +351,12 @@ export default function StockScreener() {
             if (eventData.status === "completed") {
               setIsScanning(false);
               setProgress(100);
+              setScanCompleted(true);
               fetchResults(scanId);
               eventSource.close();
             } else if (eventData.status === "failed") {
               setIsScanning(false);
+              setScanCompleted(true);
               setError(eventData.error || "Scan failed");
               eventSource.close();
             }
@@ -411,9 +423,11 @@ export default function StockScreener() {
         } else if (data.status === "completed") {
           setIsScanning(false);
           setProgress(100);
+          setScanCompleted(true);
           fetchResults(id);
         } else if (data.status === "failed") {
           setIsScanning(false);
+          setScanCompleted(true);
           setError(data.error || "Scan failed");
         }
       } catch {
@@ -427,6 +441,35 @@ export default function StockScreener() {
   const downloadPDF = () => {
     if (!scanStatus) return;
     window.open(`/api/screener/report/${scanStatus.scan_id}`, "_blank");
+  };
+
+  const ScoreBadge = ({ score }: { score: number }) => {
+    const color = score >= 70 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444';
+    const label = score >= 70 ? 'Strong' : score >= 50 ? 'Moderate' : 'Weak';
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: `${color}15`,
+          border: `1px solid ${color}30`,
+        }}>
+          <span style={{ fontSize: '15px', fontWeight: 700, color }}>{score.toFixed(0)}</span>
+        </div>
+        <div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: colors.muted }}>Explosiveness</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color }}>{label}</div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -448,6 +491,26 @@ export default function StockScreener() {
           <p style={{ ...BODY_TEXT, maxWidth: '600px', margin: '0 auto' }}>
             Multi-agent technical and fundamental screening powered by intelligent agents
           </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
+            <button
+              onClick={() => setShowHelp(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: `1px solid ${colors.border}`,
+                backgroundColor: 'transparent',
+                color: colors.muted,
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <span>How it works</span>
+            </button>
+          </div>
         </div>
 
         {/* === MODE SELECTION === */}
@@ -991,25 +1054,63 @@ export default function StockScreener() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {[
-                  { key: "squeeze_threshold" as const, label: "Volatility Squeeze", min: 1.0, max: 2.0, step: 0.01 },
-                  { key: "accumulation_threshold" as const, label: "Accumulation Force", min: 0.001, max: 0.02, step: 0.001 },
-                  { key: "volume_threshold" as const, label: "Relative Volume", min: 1.0, max: 3.0, step: 0.1 }
+                  {
+                    key: "consolidation_days" as const,
+                    label: "Consolidation Tightness",
+                    description: "Days price stays within 3% of 20-day SMA",
+                    min: 10,
+                    max: 20,
+                    step: 1,
+                    format: (v: number) => `${v} days`,
+                  },
+                  {
+                    key: "mfi_threshold" as const,
+                    label: "MFI Accumulation",
+                    description: "Money Flow Index threshold (volume-weighted RSI)",
+                    min: 45,
+                    max: 70,
+                    step: 1,
+                    format: (v: number) => `${v}`,
+                  },
+                  {
+                    key: "volume_cluster_days" as const,
+                    label: "Volume Cluster",
+                    description: "Days with volume > 1.2x average (out of last 5)",
+                    min: 2,
+                    max: 5,
+                    step: 1,
+                    format: (v: number) => `${v} days`,
+                  },
+                  {
+                    key: "rs_minimum" as const,
+                    label: "RS vs SPY",
+                    description: "Minimum relative strength ratio vs SPY",
+                    min: 0.5,
+                    max: 1.2,
+                    step: 0.05,
+                    format: (v: number) => v.toFixed(2),
+                  },
                 ].map((slider) => (
                   <div key={slider.key}>
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: '8px',
+                      marginBottom: '4px',
                     }}>
-                      <span style={LABEL_STYLE}>{slider.label}</span>
+                      <div>
+                        <span style={LABEL_STYLE}>{slider.label}</span>
+                        <span style={{ ...LABEL_STYLE, color: colors.subtle, marginLeft: '8px' }}>
+                          {slider.description}
+                        </span>
+                      </div>
                       <span style={{
                         fontSize: '17px',
                         fontWeight: 600,
                         fontVariantNumeric: 'tabular-nums',
                         color: '#10B981',
                       }}>
-                        {filters[slider.key].toFixed(slider.key === 'accumulation_threshold' ? 3 : 2)}
+                        {slider.format(filters[slider.key] as number)}
                       </span>
                     </div>
                     <input
@@ -1017,7 +1118,7 @@ export default function StockScreener() {
                       min={slider.min}
                       max={slider.max}
                       step={slider.step}
-                      value={filters[slider.key]}
+                      value={filters[slider.key] as number}
                       onChange={(e) => setFilters({ ...filters, [slider.key]: parseFloat(e.target.value) })}
                       disabled={selectedMode !== 'dormant_giant'}
                       style={{
@@ -1032,6 +1133,46 @@ export default function StockScreener() {
                     />
                   </div>
                 ))}
+
+                {/* Sector momentum toggle */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 0',
+                }}>
+                  <div>
+                    <span style={LABEL_STYLE}>Sector Momentum Gate</span>
+                    <span style={{ ...LABEL_STYLE, color: colors.subtle, marginLeft: '8px', display: 'block' }}>
+                      Only scan stocks in sectors above their 50-day SMA
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setFilters({ ...filters, use_sector_momentum: !filters.use_sector_momentum })}
+                    disabled={selectedMode !== 'dormant_giant'}
+                    style={{
+                      width: '48px',
+                      height: '28px',
+                      borderRadius: '14px',
+                      border: 'none',
+                      cursor: selectedMode === 'dormant_giant' ? 'pointer' : 'not-allowed',
+                      backgroundColor: filters.use_sector_momentum ? '#10B981' : 'rgba(255,255,255,0.1)',
+                      position: 'relative',
+                      transition: 'background-color 200ms ease',
+                    }}
+                  >
+                    <div style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '11px',
+                      backgroundColor: '#fff',
+                      position: 'absolute',
+                      top: '3px',
+                      left: filters.use_sector_momentum ? '23px' : '3px',
+                      transition: 'left 200ms ease',
+                    }} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1452,6 +1593,13 @@ export default function StockScreener() {
                         )}
                       </div>
 
+                      {/* Score Badge */}
+                      {result.score != null && (
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                          <ScoreBadge score={result.score} />
+                        </div>
+                      )}
+
                       {/* Price */}
                       {result.close && (
                         <div style={{ textAlign: 'center' }}>
@@ -1693,6 +1841,33 @@ export default function StockScreener() {
                           )}
                         </div>
                       )}
+
+                      {/* Signal Breakdown */}
+                      {result.mfi != null && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px',
+                          borderRadius: '10px',
+                          backgroundColor: colors.surfaceRaised,
+                          border: `1px solid ${colors.border}`,
+                        }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: colors.muted, marginBottom: '8px' }}>Signal Breakdown</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <div style={{ fontSize: '13px', color: colors.text }}>
+                              <span style={{ color: colors.muted }}>MFI: </span>{result.mfi}
+                            </div>
+                            <div style={{ fontSize: '13px', color: colors.text }}>
+                              <span style={{ color: colors.muted }}>Vol Cluster: </span>{result.volume_cluster_days} days
+                            </div>
+                            <div style={{ fontSize: '13px', color: colors.text }}>
+                              <span style={{ color: colors.muted }}>RS vs SPY: </span>{result.rs_ratio?.toFixed(2)}
+                            </div>
+                            <div style={{ fontSize: '13px', color: colors.text }}>
+                              <span style={{ color: colors.muted }}>Bandwidth: </span>{result.bandwidth_pct?.toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1719,7 +1894,11 @@ export default function StockScreener() {
               border: `1px solid ${colors.border}`,
               margin: '0 auto 16px',
             }}>
-              <Sparkles style={{ width: '20px', height: '20px', color: colors.subtle }} />
+              {scanCompleted ? (
+                <Search style={{ width: '20px', height: '20px', color: colors.subtle }} />
+              ) : (
+                <Sparkles style={{ width: '20px', height: '20px', color: colors.subtle }} />
+              )}
             </div>
             <p style={{
               fontSize: '17px',
@@ -1728,7 +1907,9 @@ export default function StockScreener() {
               color: colors.muted,
               margin: 0,
             }}>
-              Select a mode and start a scan
+              {scanCompleted
+                ? "No stocks matched the filters"
+                : "Select a mode and start a scan"}
             </p>
             <p style={{
               ...BODY_TEXT,
@@ -1736,7 +1917,9 @@ export default function StockScreener() {
               color: colors.subtle,
               marginTop: '4px',
             }}>
-              Press <kbd style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>S</kbd> to start
+              {scanCompleted
+                ? "Try relaxing the filter thresholds and run again"
+                : "Press <kbd style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.08)', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>S</kbd> to start"}
             </p>
           </div>
         )}
@@ -1803,6 +1986,124 @@ export default function StockScreener() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            padding: '24px',
+          }}
+          onClick={() => setShowHelp(false)}
+        >
+          <div
+            style={{
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              backgroundColor: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '20px',
+              padding: '32px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '21px', fontWeight: 600, color: colors.text, margin: 0 }}>How Dormant Giant Works</h2>
+              <button
+                onClick={() => setShowHelp(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: colors.muted,
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <section>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: colors.text, marginBottom: '8px' }}>What is a Dormant Giant?</h3>
+                <p style={{ fontSize: '14px', color: colors.muted, lineHeight: 1.6, margin: 0 }}>
+                  A stock that has been quietly building energy through a tight consolidation (low volatility, flat price)
+                  while institutional buyers accumulate shares beneath the surface. When the squeeze resolves, the stock
+                  often explodes upward — that's the "giant waking up."
+                </p>
+              </section>
+
+              <section>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: colors.text, marginBottom: '8px' }}>The 6 Signals</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {[
+                    {
+                      name: 'Bollinger Squeeze',
+                      desc: 'Bandwidth in the bottom 20% of its 120-day range and under 6%. True volatility contraction.',
+                    },
+                    {
+                      name: 'Consolidation Tightness',
+                      desc: 'Price stays within 3% of its 20-day SMA for at least 15 of the last 20 days. No drift.',
+                    },
+                    {
+                      name: 'MFI Accumulation',
+                      desc: 'Money Flow Index > 55. Volume-weighted RSI showing buying pressure.',
+                    },
+                    {
+                      name: 'Volume Cluster',
+                      desc: '3+ of the last 5 days with volume > 1.2x average. Institutional footprints.',
+                    },
+                    {
+                      name: 'RS vs SPY',
+                      desc: 'Stock is not severely lagging the market. Avoids false breakouts into weakness.',
+                    },
+                    {
+                      name: 'Sector Momentum',
+                      desc: 'Parent sector ETF is above its 50-day SMA. Fish in rising water.',
+                    },
+                  ].map((signal) => (
+                    <div key={signal.name} style={{ padding: '12px', borderRadius: '10px', backgroundColor: colors.surfaceRaised }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: colors.text }}>{signal.name}</div>
+                      <div style={{ fontSize: '13px', color: colors.muted, marginTop: '4px' }}>{signal.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: colors.text, marginBottom: '8px' }}>Composite Score (0-100)</h3>
+                <p style={{ fontSize: '14px', color: colors.muted, lineHeight: 1.6, margin: 0 }}>
+                  Each passing stock receives an explosiveness score based on all 6 signals.
+                  <strong style={{ color: '#10B981' }}>Green (≥70)</strong> = strong setup.
+                  <strong style={{ color: '#F59E0B' }}>Yellow (50-69)</strong> = moderate.
+                  <strong style={{ color: '#EF4444' }}>Red (&lt;50)</strong> = weaker but still passing.
+                </p>
+              </section>
+
+              <section>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: colors.text, marginBottom: '8px' }}>Tips</h3>
+                <ul style={{ fontSize: '14px', color: colors.muted, lineHeight: 1.8, margin: 0, paddingLeft: '18px' }}>
+                  <li>Lower "Consolidation Tightness" to find more candidates.</li>
+                  <li>Lower "MFI Accumulation" if you want earlier signals.</li>
+                  <li>Turn off "Sector Momentum" if the overall market is choppy.</li>
+                  <li>Scores ≥ 70 with "Active Breakout" signal are the highest-conviction setups.</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Candlestick Chart Modal */}
       {chartTicker && (

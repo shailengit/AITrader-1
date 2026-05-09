@@ -63,15 +63,81 @@ def get_active_tickers() -> List[str]:
     return [t for t in tickers if t.lower() not in skip_tables]
 
 
-def analyze_single_ticker_dormant_giant(ticker: str, filters: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Worker function for Dormant Giant technical analysis."""
+def _fetch_spy_data(days: int = 200) -> pd.DataFrame:
+    """Fetch SPY OHLCV data for relative strength calculations."""
+    try:
+        query = f'SELECT "Date", "Close" FROM "spy" ORDER BY "Date" DESC LIMIT {days}'
+        df = pd.read_sql(query, ENGINE)
+        if df.empty or len(df) < 20:
+            return pd.DataFrame()
+        return df.sort_values('Date').reset_index(drop=True)
+    except Exception as e:
+        logger.warning("Failed to fetch SPY data: %s", e)
+        return pd.DataFrame()
+
+
+def _fetch_sector_etfs(days: int = 200) -> Dict[str, bool]:
+    """Fetch sector ETF data and compute whether each is above its 50-day SMA."""
+    sector_above_sma = {}
+    etf_tickers = ['xlb', 'xlc', 'xle', 'xlf', 'xli', 'xlk', 'xlp', 'xlre', 'xlu', 'xlv', 'xly']
+    for etf in etf_tickers:
+        try:
+            query = f'SELECT "Date", "Close" FROM "{etf}" ORDER BY "Date" DESC LIMIT {days}'
+            df = pd.read_sql(query, ENGINE)
+            if df.empty or len(df) < 50:
+                sector_above_sma[etf] = True  # Default to permissive
+                continue
+            df = df.sort_values('Date').reset_index(drop=True)
+            sma_50 = df['Close'].rolling(window=50).mean().iloc[-1]
+            current = df['Close'].iloc[-1]
+            sector_above_sma[etf] = current > sma_50
+        except Exception as e:
+            logger.warning("Failed to fetch sector ETF %s: %s", etf, e)
+            sector_above_sma[etf] = True
+    return sector_above_sma
+
+
+def _get_ticker_sector_mapping() -> Dict[str, str]:
+    """Build ticker -> sector_etf mapping from stock_metadata."""
+    mapping = {}
+    try:
+        query = text("SELECT ticker, sector FROM stock_metadata WHERE ticker IS NOT NULL")
+        with ENGINE.connect() as conn:
+            result = conn.execute(query)
+            for row in result:
+                ticker = row[0].upper()
+                sector = row[1]
+                if sector:
+                    sector_to_etf = {
+                        'Technology': 'xlk', 'Energy': 'xle', 'Financials': 'xlf',
+                        'Financial Services': 'xlf', 'Health Care': 'xlv', 'Healthcare': 'xlv',
+                        'Consumer Discretionary': 'xly', 'Consumer Cyclical': 'xly',
+                        'Industrials': 'xli', 'Communication Services': 'xlc',
+                        'Consumer Staples': 'xlp', 'Consumer Defensive': 'xlp',
+                        'Materials': 'xlb', 'Basic Materials': 'xlb',
+                        'Real Estate': 'xlre', 'Utilities': 'xlu'
+                    }
+                    mapping[ticker] = sector_to_etf.get(sector, '').lower()
+    except Exception as e:
+        logger.warning("Failed to build sector mapping: %s", e)
+    return mapping
+
+
+def analyze_single_ticker_dormant_giant(
+    ticker: str,
+    filters: Optional[Dict[str, Any]] = None,
+    spy_df: Optional[pd.DataFrame] = None,
+    sector_above_sma: Optional[Dict[str, bool]] = None,
+    ticker_sector_map: Optional[Dict[str, str]] = None
+) -> Optional[Dict[str, Any]]:
+    """Worker function for Dormant Giant v2 technical analysis."""
     if filters is None:
         filters = {}
 
     worker_engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=1)
     try:
-        query = f'SELECT "Date", "Close", "Volume", "High" FROM "{ticker.lower()}" ORDER BY "Date" DESC LIMIT 200;'
-        df = pd.read_sql(query, worker_engine).sort_values('Date')
+        query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" ORDER BY "Date" DESC LIMIT 200'
+        df = pd.read_sql(query, worker_engine).sort_values('Date').reset_index(drop=True)
     except Exception as e:
         return {"error": f"DB Error for {ticker}: {e}"}
     finally:
@@ -80,62 +146,140 @@ def analyze_single_ticker_dormant_giant(ticker: str, filters: Optional[Dict[str,
     if len(df) < 120:
         return {"error": f"{ticker.upper()}: Insufficient data (<120 days)"}
 
-    # Bollinger Bandwidth Squeeze Logic
-    df['sma'] = df['Close'].rolling(window=20).mean()
-    df['std'] = df['Close'].rolling(window=20).std()
-    df['bandwidth'] = ((df['sma'] + (df['std'] * 2)) - (df['sma'] - (df['std'] * 2))) / df['sma']
+    close = df['Close']
+    high = df['High']
+    low = df['Low']
+    volume = df['Volume']
 
-    squeeze_threshold = filters.get('squeeze_threshold', 1.15)
-    min_bandwidth = df['bandwidth'].tail(120).min()
-    current_bandwidth = df['bandwidth'].iloc[-1]
-    is_squeezing = current_bandwidth <= (min_bandwidth * squeeze_threshold)
+    # --- 1. Bollinger Bandwidth Squeeze (fixed) ---
+    sma_20 = close.rolling(window=20).mean()
+    std_20 = close.rolling(window=20).std()
+    upper = sma_20 + (std_20 * 2)
+    lower = sma_20 - (std_20 * 2)
+    bandwidth = (upper - lower) / sma_20
 
-    # OBV Hidden Accumulation Logic
-    close_diff = df['Close'].diff()
-    df['obv'] = pd.Series(np.sign(close_diff.values) * df['Volume'].values).fillna(0).cumsum()
-    obv_slope = np.polyfit(np.arange(20), df['obv'].tail(20), 1)[0]
-    price_slope = np.polyfit(np.arange(20), df['Close'].tail(20), 1)[0]
+    bw_120 = bandwidth.tail(120)
+    min_bw = bw_120.min()
+    max_bw = bw_120.max()
+    current_bw = bandwidth.iloc[-1]
 
-    accumulation_threshold = filters.get('accumulation_threshold', 0.005)
-    hidden_accumulation = (obv_slope > 0) and (abs(price_slope) < (df['Close'].iloc[-1] * accumulation_threshold))
+    bandwidth_pct = (current_bw - min_bw) / (max_bw - min_bw + 1e-9)
+    is_squeezing = (bandwidth_pct < 0.20) and (current_bw < 0.06)
 
-    # Breakout Logic
-    past_resistance = df['High'].shift(3).rolling(window=120).max().iloc[-1]
+    # --- 2. Consolidation Tightness ---
+    consolidation_days = filters.get('consolidation_days', 15)
+    last_20 = df.tail(20)
+    sma_20_last = sma_20.tail(20)
+    within_band = (abs(last_20['Close'] - sma_20_last) / sma_20_last) < 0.03
+    tight_consolidation = within_band.sum() >= consolidation_days
 
-    volume_threshold = filters.get('volume_threshold', 1.5)
-    avg_vol = df['Volume'].tail(50).mean()
-    current_vol = df['Volume'].iloc[-1]
-    is_breakout = (df['Close'].iloc[-1] > past_resistance) and (
-        current_vol > (avg_vol * volume_threshold)
-    )
+    # --- 3. MFI Accumulation (replaces OBV) ---
+    def compute_mfi(df_subset: pd.DataFrame, period: int = 14) -> float:
+        tp = (df_subset['High'] + df_subset['Low'] + df_subset['Close']) / 3
+        rmf = tp * df_subset['Volume']
+        delta = tp.diff()
+        pos_flow = rmf.where(delta > 0, 0).rolling(window=period).sum()
+        neg_flow = rmf.where(delta < 0, 0).rolling(window=period).sum()
+        ratio = pos_flow / (neg_flow + 1e-9)
+        mfi = 100 - (100 / (1 + ratio))
+        return mfi.iloc[-1]
 
+    mfi_20 = compute_mfi(df.tail(30), period=14)
+    mfi_threshold = filters.get('mfi_threshold', 55)
+    has_mfi_accumulation = mfi_20 > mfi_threshold
+
+    # --- 4. Volume Cluster Detection ---
+    avg_vol_50 = volume.tail(50).mean()
+    vol_spike_days = (volume.tail(5) > (avg_vol_50 * 1.2)).sum()
+    vol_cluster_days = filters.get('volume_cluster_days', 3)
+    has_volume_cluster = vol_spike_days >= vol_cluster_days
+
+    # --- 5. Relative Strength vs SPY ---
+    rs_minimum = filters.get('rs_minimum', 0.8)
+    is_strong_rs = True
+    if spy_df is not None and not spy_df.empty and len(spy_df) >= 20:
+        try:
+            stock_20d_return = (close.iloc[-1] / close.iloc[-20]) - 1
+            spy_close = spy_df['Close']
+            spy_20d_return = (spy_close.iloc[-1] / spy_close.iloc[-20]) - 1
+            if spy_20d_return != 0:
+                rs_ratio = stock_20d_return / spy_20d_return
+                is_strong_rs = rs_ratio >= rs_minimum
+            else:
+                rs_ratio = 1.0
+        except Exception:
+            rs_ratio = 1.0
+    else:
+        rs_ratio = 1.0
+
+    # --- 6. Sector Momentum Gate ---
+    use_sector_momentum = filters.get('use_sector_momentum', True)
+    sector_ok = True
+    if use_sector_momentum and ticker_sector_map and sector_above_sma:
+        sector_etf = ticker_sector_map.get(ticker.upper(), '')
+        if sector_etf and sector_etf in sector_above_sma:
+            sector_ok = sector_above_sma[sector_etf]
+
+    # --- 7. Breakout Detection (unchanged criteria, simplified) ---
+    past_resistance = high.shift(3).rolling(window=120).max().iloc[-1]
+    current_vol = volume.iloc[-1]
+    is_breakout = (close.iloc[-1] > past_resistance) and (current_vol > (avg_vol_50 * 1.5))
+
+    # --- Signal determination ---
     if is_breakout:
-        result: Dict[str, Any] = {"ticker": ticker.upper(), "signal": "Active Breakout", "log": f"MATCH: {ticker.upper()} - Active Breakout detected"}
-    elif is_squeezing and hidden_accumulation:
-        result = {"ticker": ticker.upper(), "signal": "Coiling (Accumulation)", "log": f"MATCH: {ticker.upper()} - Coiling/Accumulation detected"}
+        signal = "Active Breakout"
+        passes = True
+    elif is_squeezing and tight_consolidation and has_mfi_accumulation and has_volume_cluster and is_strong_rs and sector_ok:
+        signal = "Coiling (Accumulation)"
+        passes = True
     else:
         return None
 
-    # Enrich with price stats from the existing DataFrame
-    result['close'] = round(float(df['Close'].iloc[-1]), 2)
-    result['sma_20'] = round(float(df['Close'].rolling(window=20).mean().iloc[-1]), 2)
-    result['ema_9'] = round(float(df['Close'].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
-    result['high_52w'] = round(float(df['High'].max()), 2)
-    result['low_52w'] = round(float(df['Low'].min()), 2)
+    # --- Composite Score (0-100) ---
+    squeeze_score = max(0, 100 - (bandwidth_pct * 100))
+    consolidation_score = (within_band.sum() / 20) * 100
+    mfi_score = min(mfi_20, 100)
+    volume_score = (vol_spike_days / 5) * 100
+    rs_score = min(max(rs_ratio * 100, 0), 100)
+    sector_score = 100 if sector_ok else 0
+
+    composite_score = (
+        squeeze_score * 0.20 +
+        consolidation_score * 0.20 +
+        mfi_score * 0.15 +
+        volume_score * 0.15 +
+        rs_score * 0.15 +
+        sector_score * 0.15
+    )
+
+    result: Dict[str, Any] = {
+        "ticker": ticker.upper(),
+        "signal": signal,
+        "log": f"MATCH: {ticker.upper()} - {signal} detected (Score: {composite_score:.1f})",
+        "score": round(composite_score, 1),
+        "close": round(float(close.iloc[-1]), 2),
+        "sma_20": round(float(sma_20.iloc[-1]), 2),
+        "ema_9": round(float(close.ewm(span=9, adjust=False).mean().iloc[-1]), 2),
+        "high_52w": round(float(high.tail(252).max()), 2),
+        "low_52w": round(float(low.tail(252).min()), 2),
+        "mfi": round(mfi_20, 1),
+        "volume_cluster_days": int(vol_spike_days),
+        "rs_ratio": round(rs_ratio, 2),
+        "bandwidth_pct": round(bandwidth_pct * 100, 1),
+    }
 
     # Volume stats
     try:
-        latest_vol = float(df['Volume'].iloc[-1])
-        avg_vol_50 = float(df['Volume'].tail(50).mean())
+        latest_vol = float(volume.iloc[-1])
         result['volume'] = int(latest_vol) if latest_vol > 0 else None
-        result['volume_ma_50'] = round(avg_vol_50, 0) if avg_vol_50 > 0 else None
+        result['volume_ma_50'] = round(float(avg_vol_50), 0) if avg_vol_50 > 0 else None
         result['volume_ratio'] = round(latest_vol / avg_vol_50, 4) if avg_vol_50 > 0 else None
     except Exception:
         result['volume'] = None
         result['volume_ma_50'] = None
         result['volume_ratio'] = None
 
-    # All-time high/low (fast indexed query)
+    # All-time high/low
     try:
         ath_query = f'SELECT MAX("High") as ath, MIN("Low") as atl FROM "{ticker.lower()}"'
         ath_df = pd.read_sql(ath_query, worker_engine)
@@ -149,17 +293,34 @@ def analyze_single_ticker_dormant_giant(ticker: str, filters: Optional[Dict[str,
 
 
 def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    """Technical scan for Dormant Giant screening."""
+    """Technical scan for Dormant Giant v2 screening."""
     tickers = get_active_tickers()
     total = len(tickers)
     results = []
-    
+
     if log_callback:
-        log_callback(f"Technical Agent: Analyzing {total} tickers for Squeeze/Breakout patterns...")
-    logger.info("Starting Dormant Giant technical scan for %d tickers", total)
+        log_callback(f"Technical Agent: Analyzing {total} tickers for explosive setups...")
+    logger.info("Starting Dormant Giant v2 scan for %d tickers", total)
+
+    # Fetch market context once
+    spy_df = _fetch_spy_data()
+    sector_above_sma = _fetch_sector_etfs()
+    ticker_sector_map = _get_ticker_sector_mapping()
+
+    if log_callback:
+        log_callback(f"Market context loaded — SPY data: {'yes' if not spy_df.empty else 'no'}, Sector ETFs: {len(sector_above_sma)}")
 
     with ProcessPoolExecutor(max_workers=8) as executor:
-        futures = {executor.submit(analyze_single_ticker_dormant_giant, t, filters): t for t in tickers}
+        futures = {
+            executor.submit(
+                analyze_single_ticker_dormant_giant,
+                t,
+                filters,
+                spy_df,
+                sector_above_sma,
+                ticker_sector_map
+            ): t for t in tickers
+        }
         completed = 0
         total = len(tickers)
         for future in futures:
@@ -170,21 +331,21 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
                         log_callback(result["log"])
                     if "error" in result and log_callback:
                         log_callback(result["error"])
-
                     if "ticker" in result:
                         results.append(result)
             except Exception as e:
                 if log_callback:
                     log_callback(f"Worker error: {e}")
-                pass
             finally:
                 completed += 1
                 if progress_callback and total > 0:
-                    # Progress from 10% to 80%
                     progress = 10 + int((completed / total) * 70)
                     progress_callback(progress)
 
-    logger.info("Dormant Giant Technical Scan Summary: Total=%d, Results=%d", total, len(results))
+    # Sort by composite score descending
+    results.sort(key=lambda x: x.get('score', 0), reverse=True)
+
+    logger.info("Dormant Giant v2 Scan Summary: Total=%d, Results=%d", total, len(results))
     return results
 
 
