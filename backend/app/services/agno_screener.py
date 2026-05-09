@@ -63,10 +63,13 @@ def get_active_tickers() -> List[str]:
     return [t for t in tickers if t.lower() not in skip_tables]
 
 
-def _fetch_spy_data(days: int = 200) -> pd.DataFrame:
+def _fetch_spy_data(days: int = 200, cutoff_date: Optional[str] = None) -> pd.DataFrame:
     """Fetch SPY OHLCV data for relative strength calculations."""
     try:
-        query = f'SELECT "Date", "Close" FROM "spy" ORDER BY "Date" DESC LIMIT {days}'
+        if cutoff_date:
+            query = f'SELECT "Date", "Close" FROM "spy" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT {days}'
+        else:
+            query = f'SELECT "Date", "Close" FROM "spy" ORDER BY "Date" DESC LIMIT {days}'
         df = pd.read_sql(query, ENGINE)
         if df.empty or len(df) < 20:
             return pd.DataFrame()
@@ -76,13 +79,16 @@ def _fetch_spy_data(days: int = 200) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _fetch_sector_etfs(days: int = 200) -> Dict[str, bool]:
+def _fetch_sector_etfs(days: int = 200, cutoff_date: Optional[str] = None) -> Dict[str, bool]:
     """Fetch sector ETF data and compute whether each is above its 50-day SMA."""
     sector_above_sma = {}
     etf_tickers = ['xlb', 'xlc', 'xle', 'xlf', 'xli', 'xlk', 'xlp', 'xlre', 'xlu', 'xlv', 'xly']
     for etf in etf_tickers:
         try:
-            query = f'SELECT "Date", "Close" FROM "{etf}" ORDER BY "Date" DESC LIMIT {days}'
+            if cutoff_date:
+                query = f'SELECT "Date", "Close" FROM "{etf}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT {days}'
+            else:
+                query = f'SELECT "Date", "Close" FROM "{etf}" ORDER BY "Date" DESC LIMIT {days}'
             df = pd.read_sql(query, ENGINE)
             if df.empty or len(df) < 50:
                 sector_above_sma[etf] = True  # Default to permissive
@@ -128,7 +134,8 @@ def analyze_single_ticker_dormant_giant(
     filters: Optional[Dict[str, Any]] = None,
     spy_df: Optional[pd.DataFrame] = None,
     sector_above_sma: Optional[Dict[str, bool]] = None,
-    ticker_sector_map: Optional[Dict[str, str]] = None
+    ticker_sector_map: Optional[Dict[str, str]] = None,
+    cutoff_date: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Worker function for Dormant Giant v2 technical analysis."""
     if filters is None:
@@ -136,8 +143,12 @@ def analyze_single_ticker_dormant_giant(
 
     worker_engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=1)
     try:
-        query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" ORDER BY "Date" DESC LIMIT 200'
-        df = pd.read_sql(query, worker_engine).sort_values('Date').reset_index(drop=True)
+        if cutoff_date:
+            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT 200'
+        else:
+            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" ORDER BY "Date" DESC LIMIT 200'
+        df = pd.read_sql(query, worker_engine)
+        df = df.sort_values('Date').reset_index(drop=True)
     except Exception as e:
         return {"error": f"DB Error for {ticker}: {e}"}
     finally:
@@ -292,7 +303,7 @@ def analyze_single_ticker_dormant_giant(
     return result
 
 
-def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None, cutoff_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Technical scan for Dormant Giant v2 screening."""
     tickers = get_active_tickers()
     total = len(tickers)
@@ -303,8 +314,8 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
     logger.info("Starting Dormant Giant v2 scan for %d tickers", total)
 
     # Fetch market context once
-    spy_df = _fetch_spy_data()
-    sector_above_sma = _fetch_sector_etfs()
+    spy_df = _fetch_spy_data(cutoff_date=cutoff_date)
+    sector_above_sma = _fetch_sector_etfs(cutoff_date=cutoff_date)
     ticker_sector_map = _get_ticker_sector_mapping()
 
     if log_callback:
@@ -318,7 +329,8 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
                 filters,
                 spy_df,
                 sector_above_sma,
-                ticker_sector_map
+                ticker_sector_map,
+                cutoff_date
             ): t for t in tickers
         }
         completed = 0
@@ -997,7 +1009,7 @@ def enrich_results(results: List[Dict]) -> List[Dict]:
 # SERVICE FUNCTIONS
 # =============================================================================
 
-def run_dormant_giant_screener(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def run_dormant_giant_screener(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None, cutoff_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Run the Dormant Giant screener without AI agents (fast, pure Python).
     Returns structured results for API response.
@@ -1005,7 +1017,7 @@ def run_dormant_giant_screener(prompt: Optional[str] = None, progress_callback=N
     logger.info("Running Dormant Giant screener...")
 
     # Technical scan
-    technical_results = tool_run_dormant_giant_scan(progress_callback=progress_callback, log_callback=log_callback, filters=filters)
+    technical_results = tool_run_dormant_giant_scan(progress_callback=progress_callback, log_callback=log_callback, filters=filters, cutoff_date=cutoff_date)
     logger.info("Technical scan found %d candidates", len(technical_results))
 
     if not technical_results:
@@ -1179,7 +1191,7 @@ def _capture_agno_stdout(team, prompt: str, log_capture: AgnoLogCapture):
     return response
 
 
-def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None, agent_log_callback=None) -> Dict[str, Any]:
+def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_callback=None, log_callback=None, filters: Optional[Dict[str, Any]] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None, agent_log_callback=None, cutoff_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Run the Dormant Giant screener with AI multi-agent analysis.
     Returns both structured results and AI-generated report.
@@ -1192,7 +1204,7 @@ def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_ca
     try:
         # 1. Run technical scan first to provide immediate progress updates (10% -> 80%)
         log_capture.log_system("Starting Dormant Giant technical analysis...")
-        structured = run_dormant_giant_screener(progress_callback=progress_callback, log_callback=log_callback, filters=filters)
+        structured = run_dormant_giant_screener(progress_callback=progress_callback, log_callback=log_callback, filters=filters, cutoff_date=cutoff_date)
         log_capture.log_system(f"Technical scan complete. Found {structured.get('technical_candidates', 0)} candidates.")
 
         if structured.get('verified_candidates', 0) == 0:

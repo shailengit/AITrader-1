@@ -465,7 +465,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         log_callback=update_logs,
                         filters=request.filters,
                         logs_buffer=logs_buffer,
-                        agent_log_callback=update_agent_log
+                        agent_log_callback=update_agent_log,
+                        cutoff_date=request.cutoff_date
                     )
                 )
             else:
@@ -474,7 +475,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         prompt=request.prompt,
                         progress_callback=update_progress,
                         log_callback=update_logs,
-                        filters=request.filters
+                        filters=request.filters,
+                        cutoff_date=request.cutoff_date
                     )
                 )
 
