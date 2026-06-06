@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -19,7 +19,7 @@ import {
 import { AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
 import TerminalLog from "../components/screener/TerminalLog";
-import { CandleStickChart } from "../components/quantgen/CandleStickChart";
+import ChartModal from "../components/screener/ChartModal";
 
 interface ScanResult {
   ticker: string;
@@ -151,8 +151,6 @@ export default function StockScreener() {
 
   // Chart modal state
   const [chartTicker, setChartTicker] = useState<string | null>(null);
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [chartLoading, setChartLoading] = useState(false);
 
   const colors = {
     text: isDarkMode ? "#FAFAFA" : "#1d1d1f",
@@ -264,72 +262,19 @@ export default function StockScreener() {
 
   const openChart = async (ticker: string) => {
     setChartTicker(ticker);
-    setChartLoading(true);
-    setChartData([]);
     try {
       const res = await fetch(`/api/ohlcv/${ticker.toLowerCase()}`);
-      const data = await res.json();
-      setChartData(data);
+      await res.json();
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
     } finally {
-      setChartLoading(false);
     }
   };
 
   const closeChart = () => {
     setChartTicker(null);
-    setChartData([]);
   };
 
-  // Compute SMA-20 and EMA-9 from chart data for the candlestick modal
-  const chartIndicators = useMemo(() => {
-    if (!chartData.length) return [];
-
-    const sorted = [...chartData].sort((a, b) => a.time - b.time);
-    const closes = sorted.map((d) => d.close);
-
-    // SMA-20
-    const sma20 = sorted
-      .map((d, i) => {
-        if (i < 19) return null;
-        const sum = closes.slice(i - 19, i + 1).reduce((a, b) => a + b, 0);
-        return { time: d.time, value: sum / 20 };
-      })
-      .filter((d): d is { time: number; value: number } => d !== null);
-
-    // EMA-9
-    const ema9: { time: number; value: number }[] = [];
-    const multiplier = 2 / (9 + 1);
-    for (let i = 0; i < sorted.length; i++) {
-      if (i < 8) continue;
-      if (ema9.length === 0) {
-        const seed = closes.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
-        ema9.push({ time: sorted[i].time, value: seed });
-      } else {
-        const prevEma = ema9[ema9.length - 1].value;
-        const ema = closes[i] * multiplier + prevEma * (1 - multiplier);
-        ema9.push({ time: sorted[i].time, value: ema });
-      }
-    }
-
-    return [
-      {
-        name: "SMA 20",
-        type: "line",
-        data: sma20,
-        color: "#ef4444",
-        lineWidth: 3,
-      },
-      {
-        name: "EMA 9",
-        type: "line",
-        data: ema9,
-        color: "#3b82f6",
-        lineWidth: 3,
-      },
-    ];
-  }, [chartData]);
 
   const generateFilters = async () => {
     if (!customPrompt.trim()) {
@@ -5000,160 +4945,11 @@ export default function StockScreener() {
       )}
 
       {/* Candlestick Chart Modal */}
-      {chartTicker && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.7)",
-            backdropFilter: "blur(8px)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeChart();
-          }}
-        >
-          <div
-            style={{
-              width: "95%",
-              maxWidth: "1680px",
-              maxHeight: "92vh",
-              borderRadius: "20px",
-              backgroundColor: colors.surface,
-              border: `1px solid ${colors.border}`,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            {/* Modal Header */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "20px 24px",
-                borderBottom: `1px solid ${colors.border}`,
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "12px" }}
-              >
-                <div
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "rgba(16,185,129,0.15)",
-                  }}
-                >
-                  <BarChart3
-                    style={{ width: "18px", height: "18px", color: "#10B981" }}
-                  />
-                </div>
-                <div>
-                  <h3
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: 600,
-                      letterSpacing: "-0.02em",
-                      color: colors.text,
-                      margin: 0,
-                    }}
-                  >
-                    {chartTicker}
-                  </h3>
-                  <span style={{ ...LABEL_STYLE, fontSize: "11px" }}>
-                    Candlestick Chart
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={closeChart}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "8px",
-                  border: `1px solid ${colors.border}`,
-                  backgroundColor: "transparent",
-                  color: colors.muted,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all 150ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = colors.borderHover;
-                  e.currentTarget.style.color = colors.text;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = colors.border;
-                  e.currentTarget.style.color = colors.muted;
-                }}
-              >
-                <X style={{ width: "16px", height: "16px" }} />
-              </button>
-            </div>
-
-            {/* Chart Body */}
-            <div
-              style={{ flex: 1, padding: "16px 24px 24px", minHeight: "735px" }}
-            >
-              {chartLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "735px",
-                    gap: "12px",
-                  }}
-                >
-                  <Loader2
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      color: colors.muted,
-                    }}
-                    className="animate-spin"
-                  />
-                  <span style={{ ...LABEL_STYLE, fontSize: "13px" }}>
-                    Loading chart data...
-                  </span>
-                </div>
-              ) : chartData.length > 0 ? (
-                <CandleStickChart
-                  data={chartData}
-                  height={735}
-                  indicators={chartIndicators}
-                  cutoffDate={cutoffDate || undefined}
-                />
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: "735px",
-                    color: colors.subtle,
-                    fontSize: "15px",
-                  }}
-                >
-                  No chart data available
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <ChartModal
+        ticker={chartTicker}
+        onClose={closeChart}
+        colors={colors}
+      />
     </div>
   );
 }
