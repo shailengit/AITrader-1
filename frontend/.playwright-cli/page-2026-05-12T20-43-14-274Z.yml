@@ -1,0 +1,17 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+      - text: Home
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "TradeCraft" [level=1] [ref=e13]
+    - button "Switch to dark mode" [ref=e15]:
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - img [ref=e23]
+  - main [ref=e25]:
+    - generic [ref=e26]:
+      - heading "Chart Primitive Test" [level=2] [ref=e27]
+      - paragraph [ref=e28]: "Cutoff date: 04/01/2024"
+      - paragraph [ref=e29]: Loading...

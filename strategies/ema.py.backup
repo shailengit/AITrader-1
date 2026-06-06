@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 2
-slow_ema_window = 10
+fast_ema_window = 5
+slow_ema_window = 150
 
 # Download data
-ticker = 'AOSL'
-start = '2026-02-07'
+ticker = 'CRK'
+start = '2025-01-01'
 end = '2026-05-06'
 data = DataService.get_ohlcv_data(ticker, start, end)
 if data is None:

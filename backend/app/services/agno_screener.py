@@ -18,6 +18,8 @@ from typing import List, Optional, Dict, Any, Callable
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sqlalchemy import create_engine, text
+
+from app.utils.security import sanitize_ticker, get_safe_table_name
 from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ def _apply_earnings_filter(results: List[Dict[str, Any]], filters: Optional[Dict
 
 # Database configuration
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "sarina00")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5431")
 DB_NAME = os.getenv("DB_NAME", "sp1500_1d")
@@ -275,9 +277,9 @@ def analyze_single_ticker_dormant_giant(
     worker_engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=1)
     try:
         if cutoff_date:
-            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT 200'
+            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{safe_table}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT 200'
         else:
-            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{ticker.lower()}" ORDER BY "Date" DESC LIMIT 200'
+            query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{safe_table}" ORDER BY "Date" DESC LIMIT 200'
         df = pd.read_sql(query, worker_engine)
         df = df.sort_values('Date').reset_index(drop=True)
     except Exception as e:
@@ -426,7 +428,7 @@ def analyze_single_ticker_dormant_giant(
 
     # All-time high/low
     try:
-        ath_query = f'SELECT MAX("High") as ath, MIN("Low") as atl FROM "{ticker.lower()}"'
+        ath_query = f'SELECT MAX("High") as ath, MIN("Low") as atl FROM "{safe_table}"'
         ath_df = pd.read_sql(ath_query, worker_engine)
         result['all_time_high'] = round(float(ath_df['ath'].iloc[0]), 2) if pd.notnull(ath_df['ath'].iloc[0]) else None
         result['all_time_low'] = round(float(ath_df['atl'].iloc[0]), 2) if pd.notnull(ath_df['atl'].iloc[0]) else None

@@ -12,12 +12,19 @@ from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
 
-# Database configuration from environment
+# Database configuration from environment (no hardcoded defaults for sensitive values)
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "sarina00")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5431")
 DB_NAME = os.getenv("DB_NAME", "sp1500_1d")
+
+# Fail fast if password is not set
+if not DB_PASSWORD:
+    raise ValueError(
+        "DB_PASSWORD environment variable is required. "
+        "Please set it in your .env file. See .env.example for reference."
+    )
 
 # Connection URLs
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"

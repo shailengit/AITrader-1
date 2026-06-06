@@ -3,6 +3,7 @@ TradeCraft - Unified Trading Application Backend
 FastAPI application combining Sector Rotation, Stock Screener, and QuantGen.
 """
 
+import os
 import logging
 
 from fastapi import FastAPI, Request
@@ -26,15 +27,23 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS configuration
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React dev server
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:5174",  # Vite dev server (alternate)
+# CORS configuration from environment
+_DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
 ]
+
+_cors_env = os.getenv("CORS_ORIGINS")
+if _cors_env:
+    ALLOWED_ORIGINS = [origin.strip() for origin in _cors_env.split(",") if origin.strip()]
+    logger.info("Loaded CORS origins from environment: %s", ALLOWED_ORIGINS)
+else:
+    ALLOWED_ORIGINS = _DEFAULT_ORIGINS
+    logger.info("Using default CORS origins (set CORS_ORIGINS env var for production)")
 
 app.add_middleware(
     CORSMiddleware,

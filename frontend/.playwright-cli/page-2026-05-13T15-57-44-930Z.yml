@@ -1,0 +1,1728 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+      - text: Home
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "AI Stock Screener" [level=1] [ref=e13]
+    - button "Switch to dark mode" [ref=e15]:
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - img [ref=e23]
+  - main [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - heading "AI Stock Screener" [level=1] [ref=e29]
+          - paragraph [ref=e30]: Multi-agent technical and fundamental screening powered by intelligent agents
+        - generic [ref=e31]:
+          - heading "Select Mode" [level=2] [ref=e32]
+          - generic [ref=e118]:
+            - button "Dormant Giant Screener Identifies stocks with Bollinger Band squeeze, OBV hidden accumulation, or resistance breakouts. Verifies with EPS acceleration as catalyst. Technical Specialist Fundamental Specialist Risk Manager How it works" [ref=e119] [cursor=pointer]:
+              - generic [ref=e120]:
+                - img [ref=e122]
+                - heading "Dormant Giant Screener" [level=3] [ref=e124]
+              - paragraph [ref=e125]: Identifies stocks with Bollinger Band squeeze, OBV hidden accumulation, or resistance breakouts. Verifies with EPS acceleration as catalyst.
+              - generic [ref=e126]:
+                - generic [ref=e127]: Technical Specialist
+                - generic [ref=e128]: Fundamental Specialist
+                - generic [ref=e129]: Risk Manager
+              - button "How it works" [ref=e130]:
+                - generic [ref=e131]: How it works
+            - button "Quant Strategy Screener Technical analysis screening with fundamental health verification, risk assessment, and optional historical backtesting. Technical Specialist Fundamental Specialist Risk Manager Performance Analyst How it works" [ref=e132] [cursor=pointer]:
+              - generic [ref=e133]:
+                - img [ref=e135]
+                - heading "Quant Strategy Screener" [level=3] [ref=e137]
+              - paragraph [ref=e138]: Technical analysis screening with fundamental health verification, risk assessment, and optional historical backtesting.
+              - generic [ref=e139]:
+                - generic [ref=e140]: Technical Specialist
+                - generic [ref=e141]: Fundamental Specialist
+                - generic [ref=e142]: Risk Manager
+                - generic [ref=e143]: Performance Analyst
+              - button "How it works" [ref=e144]:
+                - generic [ref=e145]: How it works
+        - generic [ref=e33]:
+          - heading "Configuration" [level=2] [ref=e34]
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - generic [ref=e37]:
+                - img [ref=e39]
+                - generic [ref=e42]:
+                  - text: AI Analysis
+                  - generic [ref=e43]: Disabled
+                - button "Toggle AI analysis on" [ref=e44] [cursor=pointer]
+              - generic [ref=e46]:
+                - generic [ref=e47]: Cutoff Date
+                - textbox [ref=e48]: 2026-04-01
+                - generic [ref=e49]: Screen as of this date
+              - generic [ref=e50]:
+                - generic [ref=e51]: Custom Directives
+                - textbox "Find me candidates for a high-growth breakout..." [ref=e52]
+                - button "Generate Filters from Prompt" [disabled] [ref=e53]:
+                  - img [ref=e54]
+                  - text: Generate Filters from Prompt
+                - generic [ref=e57]:
+                  - generic [ref=e58]:
+                    - generic [ref=e59]: Scoring Split
+                    - generic [ref=e60]: 60% Base / 40% Filter
+                  - slider [ref=e61] [cursor=pointer]: "60"
+                  - generic [ref=e62]:
+                    - generic [ref=e63]: 0% — Pure filter match
+                    - generic [ref=e64]: 100% — Pure setup quality
+            - generic [ref=e65]:
+              - generic [ref=e66]:
+                - img [ref=e68]
+                - generic [ref=e69]:
+                  - text: Thresholds
+                  - generic [ref=e70]: Dormant Giant only
+              - generic [ref=e71]:
+                - generic [ref=e72]:
+                  - generic [ref=e73]:
+                    - generic [ref=e74]: Consolidation TightnessDays price stays within 3% of 20-day SMA
+                    - generic [ref=e75]: 15 days
+                  - slider [disabled] [ref=e76]: "15"
+                - generic [ref=e77]:
+                  - generic [ref=e78]:
+                    - generic [ref=e79]: MFI AccumulationMoney Flow Index threshold (volume-weighted RSI)
+                    - generic [ref=e80]: "55"
+                  - slider [disabled] [ref=e81]: "55"
+                - generic [ref=e82]:
+                  - generic [ref=e83]:
+                    - generic [ref=e84]: Volume ClusterDays with volume > 1.2x average (out of last 5)
+                    - generic [ref=e85]: 3 days
+                  - slider [disabled] [ref=e86]: "3"
+                - generic [ref=e87]:
+                  - generic [ref=e88]:
+                    - generic [ref=e89]: RS vs MarketMinimum relative strength ratio vs market (sector ETF proxy)
+                    - generic [ref=e90]: "0.80"
+                  - slider [disabled] [ref=e91]: "0.8"
+                - generic [ref=e92]:
+                  - generic [ref=e93]:
+                    - text: Sector Momentum Gate
+                    - generic [ref=e94]: Only scan stocks in sectors above their 50-day SMA
+                  - button [disabled] [ref=e95]
+        - generic [ref=e97]:
+          - button "Start Screen" [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+            - text: Start Screen
+          - button "Show Logs" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - text: Show Logs
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - heading "20 Targets" [level=2] [ref=e160]
+            - generic [ref=e161]:
+              - img [ref=e162]
+              - text: Verified
+            - button "PDF Report" [ref=e165] [cursor=pointer]:
+              - img [ref=e166]
+              - text: PDF Report
+            - button "Export to QuantGen" [ref=e170] [cursor=pointer]:
+              - img [ref=e171]
+              - text: Export to QuantGen
+            - button "Clear" [ref=e173] [cursor=pointer]:
+              - img [ref=e174]
+              - text: Clear
+          - generic [ref=e177]:
+            - generic [ref=e178] [cursor=pointer]:
+              - generic [ref=e179]:
+                - generic [ref=e180]:
+                  - heading "UTHR" [level=3] [ref=e182]
+                  - generic [ref=e184]: United Therapeutics Corporation
+                - generic [ref=e185]: Healthcare
+              - generic [ref=e1686]:
+                - generic [ref=e1688]: "73"
+                - generic [ref=e1689]:
+                  - generic [ref=e1690]: Explosiveness
+                  - generic [ref=e1691]: Strong
+              - generic [ref=e193]:
+                - generic [ref=e194]:
+                  - generic [ref=e195]: Trend
+                  - generic [ref=e196]: "88"
+                - generic [ref=e197]:
+                  - generic [ref=e198]: Momentum
+                  - generic [ref=e199]: "83"
+                - generic [ref=e200]:
+                  - generic [ref=e201]: Volatility
+                  - generic [ref=e202]: "88"
+                - generic [ref=e203]:
+                  - generic [ref=e204]: Volume
+                  - generic [ref=e205]: "96"
+              - generic [ref=e206]:
+                - paragraph [ref=e207]: $570.27
+                - generic [ref=e208]:
+                  - generic [ref=e209]: 52W Low $266.98
+                  - generic [ref=e210]: 52W High $607.89
+              - generic [ref=e211]:
+                - generic [ref=e212]:
+                  - generic [ref=e213]: 52W High
+                  - generic [ref=e214]: $607.89
+                - generic [ref=e215]:
+                  - generic [ref=e216]: 52W Low
+                  - generic [ref=e217]: $266.98
+                - generic [ref=e218]:
+                  - generic [ref=e219]: ATH
+                  - generic [ref=e220]: $609.35
+                - generic [ref=e221]:
+                  - generic [ref=e222]: ATL
+                  - generic [ref=e223]: $4.28
+                - generic [ref=e224]:
+                  - generic [ref=e225]: ATH Proximity
+                  - generic [ref=e226]: 93.6%
+                - generic [ref=e227]:
+                  - generic [ref=e228]: Vol Ratio
+                  - generic [ref=e229]: 1.42x
+              - generic [ref=e230]:
+                - generic [ref=e231]:
+                  - generic [ref=e232]: Volume
+                  - text: 704,502
+                - generic [ref=e233]:
+                  - generic [ref=e234]: Vol MA(50)
+                  - text: 497,105
+              - generic [ref=e235]:
+                - generic [ref=e236]:
+                  - generic [ref=e237]: EPS Growth
+                  - generic [ref=e238]: 11.7%
+                - generic [ref=e239]:
+                  - generic [ref=e240]: Rev Growth
+                  - generic [ref=e241]: 0.1%
+                - generic [ref=e242]:
+                  - generic [ref=e243]: PEG
+                  - text: "170.18"
+                - generic [ref=e244]:
+                  - generic [ref=e245]: Beta
+                  - text: "0.86"
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - generic [ref=e248]: SMA(20)
+                  - text: "543.61"
+                - generic [ref=e249]:
+                  - generic [ref=e250]: EMA(9)
+                  - text: "555.05"
+                - generic [ref=e251]:
+                  - generic [ref=e252]: RSI(14)
+                  - text: "61.8"
+                - generic [ref=e253]:
+                  - generic [ref=e254]: MACD
+                  - text: "18.185"
+            - generic [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]:
+                - generic [ref=e257]:
+                  - heading "LYB" [level=3] [ref=e259]
+                  - generic [ref=e261]: LyondellBasell Industries N.V.
+                - generic [ref=e262]: Basic Materials
+              - generic [ref=e1692]:
+                - generic [ref=e1694]: "73"
+                - generic [ref=e1695]:
+                  - generic [ref=e1696]: Explosiveness
+                  - generic [ref=e1697]: Strong
+              - generic [ref=e270]:
+                - generic [ref=e271]:
+                  - generic [ref=e272]: Trend
+                  - generic [ref=e273]: "93"
+                - generic [ref=e274]:
+                  - generic [ref=e275]: Momentum
+                  - generic [ref=e276]: "88"
+                - generic [ref=e277]:
+                  - generic [ref=e278]: Volatility
+                  - generic [ref=e279]: "72"
+                - generic [ref=e280]:
+                  - generic [ref=e281]: Volume
+                  - generic [ref=e282]: "95"
+              - generic [ref=e283]:
+                - paragraph [ref=e284]: $76.71
+                - generic [ref=e285]:
+                  - generic [ref=e286]: 52W Low $40.42
+                  - generic [ref=e287]: 52W High $83.94
+              - generic [ref=e288]:
+                - generic [ref=e289]:
+                  - generic [ref=e290]: 52W High
+                  - generic [ref=e291]: $83.94
+                - generic [ref=e292]:
+                  - generic [ref=e293]: 52W Low
+                  - generic [ref=e294]: $40.42
+                - generic [ref=e295]:
+                  - generic [ref=e296]: ATH
+                  - generic [ref=e297]: $93.28
+                - generic [ref=e298]:
+                  - generic [ref=e299]: ATL
+                  - generic [ref=e300]: $6.07
+                - generic [ref=e301]:
+                  - generic [ref=e302]: ATH Proximity
+                  - generic [ref=e303]: 82.2%
+                - generic [ref=e304]:
+                  - generic [ref=e305]: Vol Ratio
+                  - generic [ref=e306]: 1.47x
+              - generic [ref=e307]:
+                - generic [ref=e308]:
+                  - generic [ref=e309]: Volume
+                  - text: 12,319,496
+                - generic [ref=e310]:
+                  - generic [ref=e311]: Vol MA(50)
+                  - text: 8,378,342
+              - generic [ref=e312]:
+                - generic [ref=e313]:
+                  - generic [ref=e314]: EPS Growth
+                  - generic [ref=e315]: "-914.7%"
+                - generic [ref=e316]:
+                  - generic [ref=e317]: Rev Growth
+                  - generic [ref=e318]: 0.9%
+                - generic [ref=e319]:
+                  - generic [ref=e320]: Beta
+                  - text: "0.71"
+              - generic [ref=e321]:
+                - generic [ref=e322]:
+                  - generic [ref=e323]: SMA(20)
+                  - text: "76.40"
+                - generic [ref=e324]:
+                  - generic [ref=e325]: EMA(9)
+                  - text: "77.39"
+                - generic [ref=e326]:
+                  - generic [ref=e327]: RSI(14)
+                  - text: "61.6"
+                - generic [ref=e328]:
+                  - generic [ref=e329]: MACD
+                  - text: "5.214"
+            - generic [ref=e330] [cursor=pointer]:
+              - generic [ref=e331]:
+                - generic [ref=e332]:
+                  - heading "PR" [level=3] [ref=e334]
+                  - generic [ref=e336]: Permian Resources Corporation
+                - generic [ref=e337]: Energy
+              - generic [ref=e1698]:
+                - generic [ref=e1700]: "73"
+                - generic [ref=e1701]:
+                  - generic [ref=e1702]: Explosiveness
+                  - generic [ref=e1703]: Strong
+              - generic [ref=e345]:
+                - generic [ref=e346]:
+                  - generic [ref=e347]: Trend
+                  - generic [ref=e348]: "99"
+                - generic [ref=e349]:
+                  - generic [ref=e350]: Momentum
+                  - generic [ref=e351]: "85"
+                - generic [ref=e352]:
+                  - generic [ref=e353]: Volatility
+                  - generic [ref=e354]: "87"
+                - generic [ref=e355]:
+                  - generic [ref=e356]: Volume
+                  - generic [ref=e357]: "79"
+              - generic [ref=e358]:
+                - paragraph [ref=e359]: $20.60
+                - generic [ref=e360]:
+                  - generic [ref=e361]: 52W Low $9.69
+                  - generic [ref=e362]: 52W High $21.99
+              - generic [ref=e363]:
+                - generic [ref=e364]:
+                  - generic [ref=e365]: 52W High
+                  - generic [ref=e366]: $21.99
+                - generic [ref=e367]:
+                  - generic [ref=e368]: 52W Low
+                  - generic [ref=e369]: $9.69
+                - generic [ref=e370]:
+                  - generic [ref=e371]: ATH
+                  - generic [ref=e372]: $22.67
+                - generic [ref=e373]:
+                  - generic [ref=e374]: ATL
+                  - generic [ref=e375]: $0.21
+                - generic [ref=e376]:
+                  - generic [ref=e377]: ATH Proximity
+                  - generic [ref=e378]: 90.8%
+                - generic [ref=e379]:
+                  - generic [ref=e380]: Vol Ratio
+                  - generic [ref=e381]: 1.33x
+              - generic [ref=e382]:
+                - generic [ref=e383]:
+                  - generic [ref=e384]: Volume
+                  - text: 17,302,647
+                - generic [ref=e385]:
+                  - generic [ref=e386]: Vol MA(50)
+                  - text: 13,040,603
+              - generic [ref=e387]:
+                - generic [ref=e388]:
+                  - generic [ref=e389]: EPS Growth
+                  - generic [ref=e390]: "-71.4%"
+                - generic [ref=e391]:
+                  - generic [ref=e392]: Rev Growth
+                  - generic [ref=e393]: 10.4%
+                - generic [ref=e394]:
+                  - generic [ref=e395]: Beta
+                  - text: "0.66"
+              - generic [ref=e396]:
+                - generic [ref=e397]:
+                  - generic [ref=e398]: SMA(20)
+                  - text: "20.60"
+                - generic [ref=e399]:
+                  - generic [ref=e400]: EMA(9)
+                  - text: "20.81"
+                - generic [ref=e401]:
+                  - generic [ref=e402]: RSI(14)
+                  - text: "62.3"
+                - generic [ref=e403]:
+                  - generic [ref=e404]: MACD
+                  - text: "0.949"
+            - generic [ref=e405] [cursor=pointer]:
+              - generic [ref=e406]:
+                - generic [ref=e407]:
+                  - heading "CRC" [level=3] [ref=e409]
+                  - generic [ref=e411]: California Resources Corporation
+                - generic [ref=e412]: Energy
+              - generic [ref=e1704]:
+                - generic [ref=e1706]: "72"
+                - generic [ref=e1707]:
+                  - generic [ref=e1708]: Explosiveness
+                  - generic [ref=e1709]: Strong
+              - generic [ref=e420]:
+                - generic [ref=e421]:
+                  - generic [ref=e422]: Trend
+                  - generic [ref=e423]: "98"
+                - generic [ref=e424]:
+                  - generic [ref=e425]: Momentum
+                  - generic [ref=e426]: "85"
+                - generic [ref=e427]:
+                  - generic [ref=e428]: Volatility
+                  - generic [ref=e429]: "99"
+                - generic [ref=e430]:
+                  - generic [ref=e431]: Volume
+                  - generic [ref=e432]: "68"
+              - generic [ref=e433]:
+                - paragraph [ref=e434]: $66.03
+                - generic [ref=e435]:
+                  - generic [ref=e436]: 52W Low $30.19
+                  - generic [ref=e437]: 52W High $71.98
+              - generic [ref=e438]:
+                - generic [ref=e439]:
+                  - generic [ref=e440]: 52W High
+                  - generic [ref=e441]: $71.98
+                - generic [ref=e442]:
+                  - generic [ref=e443]: 52W Low
+                  - generic [ref=e444]: $30.19
+                - generic [ref=e445]:
+                  - generic [ref=e446]: ATH
+                  - generic [ref=e447]: $71.98
+                - generic [ref=e448]:
+                  - generic [ref=e449]: ATL
+                  - generic [ref=e450]: $9.86
+                - generic [ref=e451]:
+                  - generic [ref=e452]: ATH Proximity
+                  - generic [ref=e453]: 91.7%
+                - generic [ref=e454]:
+                  - generic [ref=e455]: Vol Ratio
+                  - generic [ref=e456]: 0.71x
+              - generic [ref=e457]:
+                - generic [ref=e458]:
+                  - generic [ref=e459]: Volume
+                  - text: 685,166
+                - generic [ref=e460]:
+                  - generic [ref=e461]: Vol MA(50)
+                  - text: 962,673
+              - generic [ref=e462]:
+                - generic [ref=e463]:
+                  - generic [ref=e464]: EPS Growth
+                  - generic [ref=e465]: "-60.4%"
+                - generic [ref=e466]:
+                  - generic [ref=e467]: Rev Growth
+                  - generic [ref=e468]: 7.6%
+                - generic [ref=e469]:
+                  - generic [ref=e470]: Beta
+                  - text: "1.13"
+              - generic [ref=e471]:
+                - generic [ref=e472]:
+                  - generic [ref=e473]: SMA(20)
+                  - text: "65.98"
+                - generic [ref=e474]:
+                  - generic [ref=e475]: EMA(9)
+                  - text: "66.76"
+                - generic [ref=e476]:
+                  - generic [ref=e477]: RSI(14)
+                  - text: "59.4"
+                - generic [ref=e478]:
+                  - generic [ref=e479]: MACD
+                  - text: "2.606"
+            - generic [ref=e480] [cursor=pointer]:
+              - generic [ref=e481]:
+                - generic [ref=e482]:
+                  - heading "HAL" [level=3] [ref=e484]
+                  - generic [ref=e486]: Halliburton Company
+                - generic [ref=e487]: Energy
+              - generic [ref=e1710]:
+                - generic [ref=e1712]: "72"
+                - generic [ref=e1713]:
+                  - generic [ref=e1714]: Explosiveness
+                  - generic [ref=e1715]: Strong
+              - generic [ref=e495]:
+                - generic [ref=e496]:
+                  - generic [ref=e497]: Trend
+                  - generic [ref=e498]: "85"
+                - generic [ref=e499]:
+                  - generic [ref=e500]: Momentum
+                  - generic [ref=e501]: "93"
+                - generic [ref=e502]:
+                  - generic [ref=e503]: Volatility
+                  - generic [ref=e504]: "83"
+                - generic [ref=e505]:
+                  - generic [ref=e506]: Volume
+                  - generic [ref=e507]: "85"
+              - generic [ref=e508]:
+                - paragraph [ref=e509]: $38.00
+                - generic [ref=e510]:
+                  - generic [ref=e511]: 52W Low $18.31
+                  - generic [ref=e512]: 52W High $41.17
+              - generic [ref=e513]:
+                - generic [ref=e514]:
+                  - generic [ref=e515]: 52W High
+                  - generic [ref=e516]: $41.17
+                - generic [ref=e517]:
+                  - generic [ref=e518]: 52W Low
+                  - generic [ref=e519]: $18.31
+                - generic [ref=e520]:
+                  - generic [ref=e521]: ATH
+                  - generic [ref=e522]: $59.79
+                - generic [ref=e523]:
+                  - generic [ref=e524]: ATL
+                  - generic [ref=e525]: $1.18
+                - generic [ref=e526]:
+                  - generic [ref=e527]: ATH Proximity
+                  - generic [ref=e528]: 63.5%
+                - generic [ref=e529]:
+                  - generic [ref=e530]: Vol Ratio
+                  - generic [ref=e531]: 1.21x
+              - generic [ref=e532]:
+                - generic [ref=e533]:
+                  - generic [ref=e534]: Volume
+                  - text: 17,517,524
+                - generic [ref=e535]:
+                  - generic [ref=e536]: Vol MA(50)
+                  - text: 14,470,055
+              - generic [ref=e537]:
+                - generic [ref=e538]:
+                  - generic [ref=e539]: EPS Growth
+                  - generic [ref=e540]: 3400.0%
+                - generic [ref=e541]:
+                  - generic [ref=e542]: Rev Growth
+                  - generic [ref=e543]: 1.0%
+                - generic [ref=e544]:
+                  - generic [ref=e545]: PEG
+                  - text: "0.40"
+                - generic [ref=e546]:
+                  - generic [ref=e547]: Beta
+                  - text: "0.75"
+              - generic [ref=e548]:
+                - generic [ref=e549]:
+                  - generic [ref=e550]: SMA(20)
+                  - text: "37.92"
+                - generic [ref=e551]:
+                  - generic [ref=e552]: EMA(9)
+                  - text: "38.27"
+                - generic [ref=e553]:
+                  - generic [ref=e554]: RSI(14)
+                  - text: "57.4"
+                - generic [ref=e555]:
+                  - generic [ref=e556]: MACD
+                  - text: "1.208"
+            - generic [ref=e557] [cursor=pointer]:
+              - generic [ref=e558]:
+                - generic [ref=e559]:
+                  - heading "FOX" [level=3] [ref=e561]
+                  - generic [ref=e563]: Fox Corporation
+                - generic [ref=e564]: Communication Services
+              - generic [ref=e1716]:
+                - generic [ref=e1718]: "72"
+                - generic [ref=e1719]:
+                  - generic [ref=e1720]: Explosiveness
+                  - generic [ref=e1721]: Strong
+              - generic [ref=e572]:
+                - generic [ref=e573]:
+                  - generic [ref=e574]: Trend
+                  - generic [ref=e575]: "82"
+                - generic [ref=e576]:
+                  - generic [ref=e577]: Momentum
+                  - generic [ref=e578]: "77"
+                - generic [ref=e579]:
+                  - generic [ref=e580]: Volatility
+                  - generic [ref=e581]: "100"
+                - generic [ref=e582]:
+                  - generic [ref=e583]: Volume
+                  - generic [ref=e584]: "89"
+              - generic [ref=e585]:
+                - paragraph [ref=e586]: $52.88
+                - generic [ref=e587]:
+                  - generic [ref=e588]: 52W Low $42.96
+                  - generic [ref=e589]: 52W High $68.18
+              - generic [ref=e590]:
+                - generic [ref=e591]:
+                  - generic [ref=e592]: 52W High
+                  - generic [ref=e593]: $68.18
+                - generic [ref=e594]:
+                  - generic [ref=e595]: 52W Low
+                  - generic [ref=e596]: $42.96
+                - generic [ref=e597]:
+                  - generic [ref=e598]: ATH
+                  - generic [ref=e599]: $68.18
+                - generic [ref=e600]:
+                  - generic [ref=e601]: ATL
+                  - generic [ref=e602]: $17.68
+                - generic [ref=e603]:
+                  - generic [ref=e604]: ATH Proximity
+                  - generic [ref=e605]: 77.6%
+                - generic [ref=e606]:
+                  - generic [ref=e607]: Vol Ratio
+                  - generic [ref=e608]: 1.14x
+              - generic [ref=e609]:
+                - generic [ref=e610]:
+                  - generic [ref=e611]: Volume
+                  - text: 2,212,917
+                - generic [ref=e612]:
+                  - generic [ref=e613]: Vol MA(50)
+                  - text: 1,936,552
+              - generic [ref=e614]:
+                - generic [ref=e615]:
+                  - generic [ref=e616]: EPS Growth
+                  - generic [ref=e617]: "-60.6%"
+                - generic [ref=e618]:
+                  - generic [ref=e619]: Rev Growth
+                  - generic [ref=e620]: 38.6%
+                - generic [ref=e621]:
+                  - generic [ref=e622]: Beta
+                  - text: "0.51"
+              - generic [ref=e623]:
+                - generic [ref=e624]:
+                  - generic [ref=e625]: SMA(20)
+                  - text: "52.60"
+                - generic [ref=e626]:
+                  - generic [ref=e627]: EMA(9)
+                  - text: "52.87"
+                - generic [ref=e628]:
+                  - generic [ref=e629]: RSI(14)
+                  - text: "46.6"
+                - generic [ref=e630]:
+                  - generic [ref=e631]: MACD
+                  - text: "-0.491"
+            - generic [ref=e632] [cursor=pointer]:
+              - generic [ref=e633]:
+                - generic [ref=e634]:
+                  - heading "CRUS" [level=3] [ref=e636]
+                  - generic [ref=e638]: Cirrus Logic, Inc.
+                - generic [ref=e639]: Technology
+              - generic [ref=e1722]:
+                - generic [ref=e1724]: "72"
+                - generic [ref=e1725]:
+                  - generic [ref=e1726]: Explosiveness
+                  - generic [ref=e1727]: Strong
+              - generic [ref=e647]:
+                - generic [ref=e648]:
+                  - generic [ref=e649]: Trend
+                  - generic [ref=e650]: "75"
+                - generic [ref=e651]:
+                  - generic [ref=e652]: Momentum
+                  - generic [ref=e653]: "83"
+                - generic [ref=e654]:
+                  - generic [ref=e655]: Volatility
+                  - generic [ref=e656]: "100"
+                - generic [ref=e657]:
+                  - generic [ref=e658]: Volume
+                  - generic [ref=e659]: "91"
+              - generic [ref=e660]:
+                - paragraph [ref=e661]: $147.13
+                - generic [ref=e662]:
+                  - generic [ref=e663]: 52W Low $75.83
+                  - generic [ref=e664]: 52W High $154.90
+              - generic [ref=e665]:
+                - generic [ref=e666]:
+                  - generic [ref=e667]: 52W High
+                  - generic [ref=e668]: $154.90
+                - generic [ref=e669]:
+                  - generic [ref=e670]: 52W Low
+                  - generic [ref=e671]: $75.83
+                - generic [ref=e672]:
+                  - generic [ref=e673]: ATH
+                  - generic [ref=e674]: $179.00
+                - generic [ref=e675]:
+                  - generic [ref=e676]: ATL
+                  - generic [ref=e677]: $1.47
+                - generic [ref=e678]:
+                  - generic [ref=e679]: ATH Proximity
+                  - generic [ref=e680]: 82.2%
+                - generic [ref=e681]:
+                  - generic [ref=e682]: Vol Ratio
+                  - generic [ref=e683]: 1.04x
+              - generic [ref=e684]:
+                - generic [ref=e685]:
+                  - generic [ref=e686]: Volume
+                  - text: 693,388
+                - generic [ref=e687]:
+                  - generic [ref=e688]: Vol MA(50)
+                  - text: 668,543
+              - generic [ref=e689]:
+                - generic [ref=e690]:
+                  - generic [ref=e691]: EPS Growth
+                  - generic [ref=e692]: 7.3%
+                - generic [ref=e693]:
+                  - generic [ref=e694]: Rev Growth
+                  - generic [ref=e695]: 3.5%
+                - generic [ref=e696]:
+                  - generic [ref=e697]: PEG
+                  - text: "190.52"
+                - generic [ref=e698]:
+                  - generic [ref=e699]: Beta
+                  - text: "1.14"
+              - generic [ref=e700]:
+                - generic [ref=e701]:
+                  - generic [ref=e702]: SMA(20)
+                  - text: "140.66"
+                - generic [ref=e703]:
+                  - generic [ref=e704]: EMA(9)
+                  - text: "142.50"
+                - generic [ref=e705]:
+                  - generic [ref=e706]: RSI(14)
+                  - text: "60.1"
+                - generic [ref=e707]:
+                  - generic [ref=e708]: MACD
+                  - text: "2.141"
+            - generic [ref=e709] [cursor=pointer]:
+              - generic [ref=e710]:
+                - generic [ref=e711]:
+                  - heading "HLI" [level=3] [ref=e713]
+                  - generic [ref=e715]: Houlihan Lokey, Inc.
+                - generic [ref=e716]: Financial Services
+              - generic [ref=e1728]:
+                - generic [ref=e1730]: "71"
+                - generic [ref=e1731]:
+                  - generic [ref=e1732]: Explosiveness
+                  - generic [ref=e1733]: Strong
+              - generic [ref=e724]:
+                - generic [ref=e725]:
+                  - generic [ref=e726]: Trend
+                  - generic [ref=e727]: "89"
+                - generic [ref=e728]:
+                  - generic [ref=e729]: Momentum
+                  - generic [ref=e730]: "62"
+                - generic [ref=e731]:
+                  - generic [ref=e732]: Volatility
+                  - generic [ref=e733]: "100"
+                - generic [ref=e734]:
+                  - generic [ref=e735]: Volume
+                  - generic [ref=e736]: "95"
+              - generic [ref=e737]:
+                - paragraph [ref=e738]: $141.03
+                - generic [ref=e739]:
+                  - generic [ref=e740]: 52W Low $134.41
+                  - generic [ref=e741]: 52W High $211.05
+              - generic [ref=e742]:
+                - generic [ref=e743]:
+                  - generic [ref=e744]: 52W High
+                  - generic [ref=e745]: $211.05
+                - generic [ref=e746]:
+                  - generic [ref=e747]: 52W Low
+                  - generic [ref=e748]: $134.41
+                - generic [ref=e749]:
+                  - generic [ref=e750]: ATH
+                  - generic [ref=e751]: $211.05
+                - generic [ref=e752]:
+                  - generic [ref=e753]: ATL
+                  - generic [ref=e754]: $14.66
+                - generic [ref=e755]:
+                  - generic [ref=e756]: ATH Proximity
+                  - generic [ref=e757]: 66.8%
+                - generic [ref=e758]:
+                  - generic [ref=e759]: Vol Ratio
+                  - generic [ref=e760]: 1.15x
+              - generic [ref=e761]:
+                - generic [ref=e762]:
+                  - generic [ref=e763]: Volume
+                  - text: 693,780
+                - generic [ref=e764]:
+                  - generic [ref=e765]: Vol MA(50)
+                  - text: 602,869
+              - generic [ref=e766]:
+                - generic [ref=e767]:
+                  - generic [ref=e768]: EPS Growth
+                  - generic [ref=e769]: 4.3%
+                - generic [ref=e770]:
+                  - generic [ref=e771]: Rev Growth
+                  - generic [ref=e772]: 8.7%
+                - generic [ref=e773]:
+                  - generic [ref=e774]: PEG
+                  - text: "482.94"
+                - generic [ref=e775]:
+                  - generic [ref=e776]: Beta
+                  - text: "0.96"
+              - generic [ref=e777]:
+                - generic [ref=e778]:
+                  - generic [ref=e779]: SMA(20)
+                  - text: "140.40"
+                - generic [ref=e780]:
+                  - generic [ref=e781]: EMA(9)
+                  - text: "141.40"
+                - generic [ref=e782]:
+                  - generic [ref=e783]: RSI(14)
+                  - text: "36.6"
+                - generic [ref=e784]:
+                  - generic [ref=e785]: MACD
+                  - text: "-5.352"
+            - generic [ref=e786] [cursor=pointer]:
+              - generic [ref=e787]:
+                - generic [ref=e788]:
+                  - heading "SF" [level=3] [ref=e790]
+                  - generic [ref=e792]: Stifel Financial Corp.
+                - generic [ref=e793]: Financial Services
+              - generic [ref=e1734]:
+                - generic [ref=e1736]: "71"
+                - generic [ref=e1737]:
+                  - generic [ref=e1738]: Explosiveness
+                  - generic [ref=e1739]: Strong
+              - generic [ref=e801]:
+                - generic [ref=e802]:
+                  - generic [ref=e803]: Trend
+                  - generic [ref=e804]: "90"
+                - generic [ref=e805]:
+                  - generic [ref=e806]: Momentum
+                  - generic [ref=e807]: "58"
+                - generic [ref=e808]:
+                  - generic [ref=e809]: Volatility
+                  - generic [ref=e810]: "100"
+                - generic [ref=e811]:
+                  - generic [ref=e812]: Volume
+                  - generic [ref=e813]: "95"
+              - generic [ref=e814]:
+                - paragraph [ref=e815]: $73.98
+                - generic [ref=e816]:
+                  - generic [ref=e817]: 52W Low $69.31
+                  - generic [ref=e818]: 52W High $134.74
+              - generic [ref=e819]:
+                - generic [ref=e820]:
+                  - generic [ref=e821]: 52W High
+                  - generic [ref=e822]: $134.74
+                - generic [ref=e823]:
+                  - generic [ref=e824]: 52W Low
+                  - generic [ref=e825]: $69.31
+                - generic [ref=e826]:
+                  - generic [ref=e827]: ATH
+                  - generic [ref=e828]: $134.74
+                - generic [ref=e829]:
+                  - generic [ref=e830]: ATL
+                  - generic [ref=e831]: $0.42
+                - generic [ref=e832]:
+                  - generic [ref=e833]: ATH Proximity
+                  - generic [ref=e834]: 54.9%
+                - generic [ref=e835]:
+                  - generic [ref=e836]: Vol Ratio
+                  - generic [ref=e837]: 1.13x
+              - generic [ref=e838]:
+                - generic [ref=e839]:
+                  - generic [ref=e840]: Volume
+                  - text: 1,409,623
+                - generic [ref=e841]:
+                  - generic [ref=e842]: Vol MA(50)
+                  - text: 1,245,272
+              - generic [ref=e843]:
+                - generic [ref=e844]:
+                  - generic [ref=e845]: EPS Growth
+                  - generic [ref=e846]: 25.5%
+                - generic [ref=e847]:
+                  - generic [ref=e848]: PEG
+                  - text: "31.34"
+                - generic [ref=e849]:
+                  - generic [ref=e850]: Beta
+                  - text: "1.12"
+              - generic [ref=e851]:
+                - generic [ref=e852]:
+                  - generic [ref=e853]: SMA(20)
+                  - text: "71.84"
+                - generic [ref=e854]:
+                  - generic [ref=e855]: EMA(9)
+                  - text: "72.70"
+                - generic [ref=e856]:
+                  - generic [ref=e857]: RSI(14)
+                  - text: "33.8"
+                - generic [ref=e858]:
+                  - generic [ref=e859]: MACD
+                  - text: "-6.867"
+            - generic [ref=e860] [cursor=pointer]:
+              - generic [ref=e861]:
+                - generic [ref=e862]:
+                  - heading "OXY" [level=3] [ref=e864]
+                  - generic [ref=e866]: Occidental Petroleum Corporation
+                - generic [ref=e867]: Energy
+              - generic [ref=e1740]:
+                - generic [ref=e1742]: "71"
+                - generic [ref=e1743]:
+                  - generic [ref=e1744]: Explosiveness
+                  - generic [ref=e1745]: Strong
+              - generic [ref=e875]:
+                - generic [ref=e876]:
+                  - generic [ref=e877]: Trend
+                  - generic [ref=e878]: "95"
+                - generic [ref=e879]:
+                  - generic [ref=e880]: Momentum
+                  - generic [ref=e881]: "88"
+                - generic [ref=e882]:
+                  - generic [ref=e883]: Volatility
+                  - generic [ref=e884]: "72"
+                - generic [ref=e885]:
+                  - generic [ref=e886]: Volume
+                  - generic [ref=e887]: "80"
+              - generic [ref=e888]:
+                - paragraph [ref=e889]: $62.23
+                - generic [ref=e890]:
+                  - generic [ref=e891]: 52W Low $34.20
+                  - generic [ref=e892]: 52W High $67.45
+              - generic [ref=e893]:
+                - generic [ref=e894]:
+                  - generic [ref=e895]: 52W High
+                  - generic [ref=e896]: $67.45
+                - generic [ref=e897]:
+                  - generic [ref=e898]: 52W Low
+                  - generic [ref=e899]: $34.20
+                - generic [ref=e900]:
+                  - generic [ref=e901]: ATH
+                  - generic [ref=e902]: $73.50
+                - generic [ref=e903]:
+                  - generic [ref=e904]: ATL
+                  - generic [ref=e905]: $1.24
+                - generic [ref=e906]:
+                  - generic [ref=e907]: ATH Proximity
+                  - generic [ref=e908]: 84.7%
+                - generic [ref=e909]:
+                  - generic [ref=e910]: Vol Ratio
+                  - generic [ref=e911]: 1.53x
+              - generic [ref=e912]:
+                - generic [ref=e913]:
+                  - generic [ref=e914]: Volume
+                  - text: 26,011,124
+                - generic [ref=e915]:
+                  - generic [ref=e916]: Vol MA(50)
+                  - text: 16,955,708
+              - generic [ref=e917]:
+                - generic [ref=e918]:
+                  - generic [ref=e919]: EPS Growth
+                  - generic [ref=e920]: 150.0%
+                - generic [ref=e921]:
+                  - generic [ref=e922]: Rev Growth
+                  - generic [ref=e923]: 3.3%
+                - generic [ref=e924]:
+                  - generic [ref=e925]: PEG
+                  - text: "15.96"
+                - generic [ref=e926]:
+                  - generic [ref=e927]: Beta
+                  - text: "0.37"
+              - generic [ref=e928]:
+                - generic [ref=e929]:
+                  - generic [ref=e930]: SMA(20)
+                  - text: "61.91"
+                - generic [ref=e931]:
+                  - generic [ref=e932]: EMA(9)
+                  - text: "62.78"
+                - generic [ref=e933]:
+                  - generic [ref=e934]: RSI(14)
+                  - text: "63.3"
+                - generic [ref=e935]:
+                  - generic [ref=e936]: MACD
+                  - text: "3.578"
+            - generic [ref=e937] [cursor=pointer]:
+              - generic [ref=e939]:
+                - heading "XLY" [level=3] [ref=e941]
+                - generic [ref=e943]: State Street Consumer Discretionary Select Sector SPDR ETF
+              - generic [ref=e1746]:
+                - generic [ref=e1748]: "71"
+                - generic [ref=e1749]:
+                  - generic [ref=e1750]: Explosiveness
+                  - generic [ref=e1751]: Strong
+              - generic [ref=e951]:
+                - generic [ref=e952]:
+                  - generic [ref=e953]: Trend
+                  - generic [ref=e954]: "78"
+                - generic [ref=e955]:
+                  - generic [ref=e956]: Momentum
+                  - generic [ref=e957]: "68"
+                - generic [ref=e958]:
+                  - generic [ref=e959]: Volatility
+                  - generic [ref=e960]: "100"
+                - generic [ref=e961]:
+                  - generic [ref=e962]: Volume
+                  - generic [ref=e963]: "97"
+              - generic [ref=e964]:
+                - paragraph [ref=e965]: $109.80
+                - generic [ref=e966]:
+                  - generic [ref=e967]: 52W Low $86.04
+                  - generic [ref=e968]: 52W High $125.01
+              - generic [ref=e969]:
+                - generic [ref=e970]:
+                  - generic [ref=e971]: 52W High
+                  - generic [ref=e972]: $125.01
+                - generic [ref=e973]:
+                  - generic [ref=e974]: 52W Low
+                  - generic [ref=e975]: $86.04
+                - generic [ref=e976]:
+                  - generic [ref=e977]: ATH
+                  - generic [ref=e978]: $125.01
+                - generic [ref=e979]:
+                  - generic [ref=e980]: ATL
+                  - generic [ref=e981]: $6.40
+                - generic [ref=e982]:
+                  - generic [ref=e983]: ATH Proximity
+                  - generic [ref=e984]: 87.8%
+                - generic [ref=e985]:
+                  - generic [ref=e986]: Vol Ratio
+                  - generic [ref=e987]: 1.24x
+              - generic [ref=e988]:
+                - generic [ref=e989]:
+                  - generic [ref=e990]: Volume
+                  - text: 14,450,133
+                - generic [ref=e991]:
+                  - generic [ref=e992]: Vol MA(50)
+                  - text: 11,674,730
+              - generic [ref=e994]:
+                - generic [ref=e995]:
+                  - generic [ref=e996]: SMA(20)
+                  - text: "109.22"
+                - generic [ref=e997]:
+                  - generic [ref=e998]: EMA(9)
+                  - text: "108.96"
+                - generic [ref=e999]:
+                  - generic [ref=e1000]: RSI(14)
+                  - text: "44.6"
+                - generic [ref=e1001]:
+                  - generic [ref=e1002]: MACD
+                  - text: "-2.184"
+            - generic [ref=e1003] [cursor=pointer]:
+              - generic [ref=e1004]:
+                - generic [ref=e1005]:
+                  - heading "NSC" [level=3] [ref=e1007]
+                  - generic [ref=e1009]: Norfolk Southern Corporation
+                - generic [ref=e1010]: Industrials
+              - generic [ref=e1752]:
+                - generic [ref=e1754]: "71"
+                - generic [ref=e1755]:
+                  - generic [ref=e1756]: Explosiveness
+                  - generic [ref=e1757]: Strong
+              - generic [ref=e1018]:
+                - generic [ref=e1019]:
+                  - generic [ref=e1020]: Trend
+                  - generic [ref=e1021]: "78"
+                - generic [ref=e1022]:
+                  - generic [ref=e1023]: Momentum
+                  - generic [ref=e1024]: "66"
+                - generic [ref=e1025]:
+                  - generic [ref=e1026]: Volatility
+                  - generic [ref=e1027]: "100"
+                - generic [ref=e1028]:
+                  - generic [ref=e1029]: Volume
+                  - generic [ref=e1030]: "98"
+              - generic [ref=e1031]:
+                - paragraph [ref=e1032]: $287.00
+                - generic [ref=e1033]:
+                  - generic [ref=e1034]: 52W Low $197.60
+                  - generic [ref=e1035]: 52W High $319.94
+              - generic [ref=e1036]:
+                - generic [ref=e1037]:
+                  - generic [ref=e1038]: 52W High
+                  - generic [ref=e1039]: $319.94
+                - generic [ref=e1040]:
+                  - generic [ref=e1041]: 52W Low
+                  - generic [ref=e1042]: $197.60
+                - generic [ref=e1043]:
+                  - generic [ref=e1044]: ATH
+                  - generic [ref=e1045]: $323.37
+                - generic [ref=e1046]:
+                  - generic [ref=e1047]: ATL
+                  - generic [ref=e1048]: $1.32
+                - generic [ref=e1049]:
+                  - generic [ref=e1050]: ATH Proximity
+                  - generic [ref=e1051]: 88.8%
+                - generic [ref=e1052]:
+                  - generic [ref=e1053]: Vol Ratio
+                  - generic [ref=e1054]: 1.39x
+              - generic [ref=e1055]:
+                - generic [ref=e1056]:
+                  - generic [ref=e1057]: Volume
+                  - text: 1,770,730
+                - generic [ref=e1058]:
+                  - generic [ref=e1059]: Vol MA(50)
+                  - text: 1,272,767
+              - generic [ref=e1060]:
+                - generic [ref=e1061]:
+                  - generic [ref=e1062]: EPS Growth
+                  - generic [ref=e1063]: "-9.2%"
+                - generic [ref=e1064]:
+                  - generic [ref=e1065]: Rev Growth
+                  - generic [ref=e1066]: "-4.2%"
+                - generic [ref=e1067]:
+                  - generic [ref=e1068]: Beta
+                  - text: "1.32"
+              - generic [ref=e1069]:
+                - generic [ref=e1070]:
+                  - generic [ref=e1071]: SMA(20)
+                  - text: "284.08"
+                - generic [ref=e1072]:
+                  - generic [ref=e1073]: EMA(9)
+                  - text: "285.53"
+                - generic [ref=e1074]:
+                  - generic [ref=e1075]: RSI(14)
+                  - text: "41.9"
+                - generic [ref=e1076]:
+                  - generic [ref=e1077]: MACD
+                  - text: "-5.246"
+            - generic [ref=e1078] [cursor=pointer]:
+              - generic [ref=e1079]:
+                - generic [ref=e1080]:
+                  - heading "NWS" [level=3] [ref=e1082]
+                  - generic [ref=e1084]: News Corporation
+                - generic [ref=e1085]: Communication Services
+              - generic [ref=e1758]:
+                - generic [ref=e1760]: "70"
+                - generic [ref=e1761]:
+                  - generic [ref=e1762]: Explosiveness
+                  - generic [ref=e1763]: Strong
+              - generic [ref=e1093]:
+                - generic [ref=e1094]:
+                  - generic [ref=e1095]: Trend
+                  - generic [ref=e1096]: "72"
+                - generic [ref=e1097]:
+                  - generic [ref=e1098]: Momentum
+                  - generic [ref=e1099]: "83"
+                - generic [ref=e1100]:
+                  - generic [ref=e1101]: Volatility
+                  - generic [ref=e1102]: "100"
+                - generic [ref=e1103]:
+                  - generic [ref=e1104]: Volume
+                  - generic [ref=e1105]: "86"
+              - generic [ref=e1106]:
+                - paragraph [ref=e1107]: $28.15
+                - generic [ref=e1108]:
+                  - generic [ref=e1109]: 52W Low $25.49
+                  - generic [ref=e1110]: 52W High $35.47
+              - generic [ref=e1111]:
+                - generic [ref=e1112]:
+                  - generic [ref=e1113]: 52W High
+                  - generic [ref=e1114]: $35.47
+                - generic [ref=e1115]:
+                  - generic [ref=e1116]: 52W Low
+                  - generic [ref=e1117]: $25.49
+                - generic [ref=e1118]:
+                  - generic [ref=e1119]: ATH
+                  - generic [ref=e1120]: $35.47
+                - generic [ref=e1121]:
+                  - generic [ref=e1122]: ATL
+                  - generic [ref=e1123]: $7.49
+                - generic [ref=e1124]:
+                  - generic [ref=e1125]: ATH Proximity
+                  - generic [ref=e1126]: 79.4%
+                - generic [ref=e1127]:
+                  - generic [ref=e1128]: Vol Ratio
+                  - generic [ref=e1129]: 1.07x
+              - generic [ref=e1130]:
+                - generic [ref=e1131]:
+                  - generic [ref=e1132]: Volume
+                  - text: 1,864,575
+                - generic [ref=e1133]:
+                  - generic [ref=e1134]: Vol MA(50)
+                  - text: 1,737,924
+              - generic [ref=e1135]:
+                - generic [ref=e1136]:
+                  - generic [ref=e1137]: EPS Growth
+                  - generic [ref=e1138]: 70.0%
+                - generic [ref=e1139]:
+                  - generic [ref=e1140]: Rev Growth
+                  - generic [ref=e1141]: 10.2%
+                - generic [ref=e1142]:
+                  - generic [ref=e1143]: PEG
+                  - text: "29.57"
+                - generic [ref=e1144]:
+                  - generic [ref=e1145]: Beta
+                  - text: "0.97"
+              - generic [ref=e1146]:
+                - generic [ref=e1147]:
+                  - generic [ref=e1148]: SMA(20)
+                  - text: "27.65"
+                - generic [ref=e1149]:
+                  - generic [ref=e1150]: EMA(9)
+                  - text: "27.87"
+                - generic [ref=e1151]:
+                  - generic [ref=e1152]: RSI(14)
+                  - text: "57.6"
+                - generic [ref=e1153]:
+                  - generic [ref=e1154]: MACD
+                  - text: "0.211"
+            - generic [ref=e1155] [cursor=pointer]:
+              - generic [ref=e1156]:
+                - generic [ref=e1157]:
+                  - heading "TECH" [level=3] [ref=e1159]
+                  - generic [ref=e1161]: Bio-Techne Corporation
+                - generic [ref=e1162]: Healthcare
+              - generic [ref=e1764]:
+                - generic [ref=e1766]: "70"
+                - generic [ref=e1767]:
+                  - generic [ref=e1768]: Explosiveness
+                  - generic [ref=e1769]: Strong
+              - generic [ref=e1170]:
+                - generic [ref=e1171]:
+                  - generic [ref=e1172]: Trend
+                  - generic [ref=e1173]: "84"
+                - generic [ref=e1174]:
+                  - generic [ref=e1175]: Momentum
+                  - generic [ref=e1176]: "72"
+                - generic [ref=e1177]:
+                  - generic [ref=e1178]: Volatility
+                  - generic [ref=e1179]: "100"
+                - generic [ref=e1180]:
+                  - generic [ref=e1181]: Volume
+                  - generic [ref=e1182]: "82"
+              - generic [ref=e1183]:
+                - paragraph [ref=e1184]: $53.48
+                - generic [ref=e1185]:
+                  - generic [ref=e1186]: 52W Low $45.74
+                  - generic [ref=e1187]: 52W High $72.06
+              - generic [ref=e1188]:
+                - generic [ref=e1189]:
+                  - generic [ref=e1190]: 52W High
+                  - generic [ref=e1191]: $72.06
+                - generic [ref=e1192]:
+                  - generic [ref=e1193]: 52W Low
+                  - generic [ref=e1194]: $45.74
+                - generic [ref=e1195]:
+                  - generic [ref=e1196]: ATH
+                  - generic [ref=e1197]: $133.29
+                - generic [ref=e1198]:
+                  - generic [ref=e1199]: ATL
+                  - generic [ref=e1200]: $0.07
+                - generic [ref=e1201]:
+                  - generic [ref=e1202]: ATH Proximity
+                  - generic [ref=e1203]: 40.1%
+                - generic [ref=e1204]:
+                  - generic [ref=e1205]: Vol Ratio
+                  - generic [ref=e1206]: 1.01x
+              - generic [ref=e1207]:
+                - generic [ref=e1208]:
+                  - generic [ref=e1209]: Volume
+                  - text: 2,425,844
+                - generic [ref=e1210]:
+                  - generic [ref=e1211]: Vol MA(50)
+                  - text: 2,413,537
+              - generic [ref=e1212]:
+                - generic [ref=e1213]:
+                  - generic [ref=e1214]: EPS Growth
+                  - generic [ref=e1215]: 0.0%
+                - generic [ref=e1216]:
+                  - generic [ref=e1217]: Rev Growth
+                  - generic [ref=e1218]: 3.3%
+                - generic [ref=e1219]:
+                  - generic [ref=e1220]: Beta
+                  - text: "1.47"
+              - generic [ref=e1221]:
+                - generic [ref=e1222]:
+                  - generic [ref=e1223]: SMA(20)
+                  - text: "51.96"
+                - generic [ref=e1224]:
+                  - generic [ref=e1225]: EMA(9)
+                  - text: "52.35"
+                - generic [ref=e1226]:
+                  - generic [ref=e1227]: RSI(14)
+                  - text: "47.9"
+                - generic [ref=e1228]:
+                  - generic [ref=e1229]: MACD
+                  - text: "-1.495"
+            - generic [ref=e1230] [cursor=pointer]:
+              - generic [ref=e1231]:
+                - generic [ref=e1232]:
+                  - heading "SHC" [level=3] [ref=e1234]
+                  - generic [ref=e1236]: Sotera Health Company
+                - generic [ref=e1237]: Healthcare
+              - generic [ref=e1770]:
+                - generic [ref=e1772]: "70"
+                - generic [ref=e1773]:
+                  - generic [ref=e1774]: Explosiveness
+                  - generic [ref=e1775]: Strong
+              - generic [ref=e1245]:
+                - generic [ref=e1246]:
+                  - generic [ref=e1247]: Trend
+                  - generic [ref=e1248]: "86"
+                - generic [ref=e1249]:
+                  - generic [ref=e1250]: Momentum
+                  - generic [ref=e1251]: "75"
+                - generic [ref=e1252]:
+                  - generic [ref=e1253]: Volatility
+                  - generic [ref=e1254]: "99"
+                - generic [ref=e1255]:
+                  - generic [ref=e1256]: Volume
+                  - generic [ref=e1257]: "76"
+              - generic [ref=e1258]:
+                - paragraph [ref=e1259]: $14.87
+                - generic [ref=e1260]:
+                  - generic [ref=e1261]: 52W Low $9.53
+                  - generic [ref=e1262]: 52W High $19.85
+              - generic [ref=e1263]:
+                - generic [ref=e1264]:
+                  - generic [ref=e1265]: 52W High
+                  - generic [ref=e1266]: $19.85
+                - generic [ref=e1267]:
+                  - generic [ref=e1268]: 52W Low
+                  - generic [ref=e1269]: $9.53
+                - generic [ref=e1270]:
+                  - generic [ref=e1271]: ATH
+                  - generic [ref=e1272]: $30.38
+                - generic [ref=e1273]:
+                  - generic [ref=e1274]: ATL
+                  - generic [ref=e1275]: $5.78
+                - generic [ref=e1276]:
+                  - generic [ref=e1277]: ATH Proximity
+                  - generic [ref=e1278]: 48.9%
+                - generic [ref=e1279]:
+                  - generic [ref=e1280]: Vol Ratio
+                  - generic [ref=e1281]: 1.67x
+              - generic [ref=e1282]:
+                - generic [ref=e1283]:
+                  - generic [ref=e1284]: Volume
+                  - text: 4,181,560
+                - generic [ref=e1285]:
+                  - generic [ref=e1286]: Vol MA(50)
+                  - text: 2,503,572
+              - generic [ref=e1287]:
+                - generic [ref=e1288]:
+                  - generic [ref=e1289]: EPS Growth
+                  - generic [ref=e1290]: 466.7%
+                - generic [ref=e1291]:
+                  - generic [ref=e1292]: Rev Growth
+                  - generic [ref=e1293]: 5.8%
+                - generic [ref=e1294]:
+                  - generic [ref=e1295]: PEG
+                  - text: "4.69"
+              - generic [ref=e1296]:
+                - generic [ref=e1297]:
+                  - generic [ref=e1298]: SMA(20)
+                  - text: "13.77"
+                - generic [ref=e1299]:
+                  - generic [ref=e1300]: EMA(9)
+                  - text: "13.95"
+                - generic [ref=e1301]:
+                  - generic [ref=e1302]: RSI(14)
+                  - text: "53.6"
+                - generic [ref=e1303]:
+                  - generic [ref=e1304]: MACD
+                  - text: "-0.562"
+            - generic [ref=e1305] [cursor=pointer]:
+              - generic [ref=e1306]:
+                - generic [ref=e1307]:
+                  - heading "PLUS" [level=3] [ref=e1309]
+                  - generic [ref=e1311]: ePlus inc.
+                - generic [ref=e1312]: Technology
+              - generic [ref=e1776]:
+                - generic [ref=e1778]: "70"
+                - generic [ref=e1779]:
+                  - generic [ref=e1780]: Explosiveness
+                  - generic [ref=e1781]: Moderate
+              - generic [ref=e1320]:
+                - generic [ref=e1321]:
+                  - generic [ref=e1322]: Trend
+                  - generic [ref=e1323]: "79"
+                - generic [ref=e1324]:
+                  - generic [ref=e1325]: Momentum
+                  - generic [ref=e1326]: "68"
+                - generic [ref=e1327]:
+                  - generic [ref=e1328]: Volatility
+                  - generic [ref=e1329]: "100"
+                - generic [ref=e1330]:
+                  - generic [ref=e1331]: Volume
+                  - generic [ref=e1332]: "90"
+              - generic [ref=e1333]:
+                - paragraph [ref=e1334]: $76.14
+                - generic [ref=e1335]:
+                  - generic [ref=e1336]: 52W Low $53.50
+                  - generic [ref=e1337]: 52W High $93.98
+              - generic [ref=e1338]:
+                - generic [ref=e1339]:
+                  - generic [ref=e1340]: 52W High
+                  - generic [ref=e1341]: $93.98
+                - generic [ref=e1342]:
+                  - generic [ref=e1343]: 52W Low
+                  - generic [ref=e1344]: $53.50
+                - generic [ref=e1345]:
+                  - generic [ref=e1346]: ATH
+                  - generic [ref=e1347]: $106.32
+                - generic [ref=e1348]:
+                  - generic [ref=e1349]: ATL
+                  - generic [ref=e1350]: $1.29
+                - generic [ref=e1351]:
+                  - generic [ref=e1352]: ATH Proximity
+                  - generic [ref=e1353]: 71.6%
+                - generic [ref=e1354]:
+                  - generic [ref=e1355]: Vol Ratio
+                  - generic [ref=e1356]: 1.00x
+              - generic [ref=e1357]:
+                - generic [ref=e1358]:
+                  - generic [ref=e1359]: Volume
+                  - text: 185,709
+                - generic [ref=e1360]:
+                  - generic [ref=e1361]: Vol MA(50)
+                  - text: 185,640
+              - generic [ref=e1362]:
+                - generic [ref=e1363]:
+                  - generic [ref=e1364]: EPS Growth
+                  - generic [ref=e1365]: 0.8%
+                - generic [ref=e1366]:
+                  - generic [ref=e1367]: Rev Growth
+                  - generic [ref=e1368]: 1.0%
+                - generic [ref=e1369]:
+                  - generic [ref=e1370]: PEG
+                  - text: "1889.19"
+                - generic [ref=e1371]:
+                  - generic [ref=e1372]: Beta
+                  - text: "0.99"
+              - generic [ref=e1373]:
+                - generic [ref=e1374]:
+                  - generic [ref=e1375]: SMA(20)
+                  - text: "75.47"
+                - generic [ref=e1376]:
+                  - generic [ref=e1377]: EMA(9)
+                  - text: "75.60"
+                - generic [ref=e1378]:
+                  - generic [ref=e1379]: RSI(14)
+                  - text: "45.5"
+                - generic [ref=e1380]:
+                  - generic [ref=e1381]: MACD
+                  - text: "-1.476"
+            - generic [ref=e1382] [cursor=pointer]:
+              - generic [ref=e1383]:
+                - generic [ref=e1384]:
+                  - heading "VMI" [level=3] [ref=e1386]
+                  - generic [ref=e1388]: Valmont Industries, Inc.
+                - generic [ref=e1389]: Industrials
+              - generic [ref=e1782]:
+                - generic [ref=e1784]: "70"
+                - generic [ref=e1785]:
+                  - generic [ref=e1786]: Explosiveness
+                  - generic [ref=e1787]: Moderate
+              - generic [ref=e1397]:
+                - generic [ref=e1398]:
+                  - generic [ref=e1399]: Trend
+                  - generic [ref=e1400]: "78"
+                - generic [ref=e1401]:
+                  - generic [ref=e1402]: Momentum
+                  - generic [ref=e1403]: "69"
+                - generic [ref=e1404]:
+                  - generic [ref=e1405]: Volatility
+                  - generic [ref=e1406]: "100"
+                - generic [ref=e1407]:
+                  - generic [ref=e1408]: Volume
+                  - generic [ref=e1409]: "90"
+              - generic [ref=e1410]:
+                - paragraph [ref=e1411]: $406.65
+                - generic [ref=e1412]:
+                  - generic [ref=e1413]: 52W Low $248.69
+                  - generic [ref=e1414]: 52W High $487.58
+              - generic [ref=e1415]:
+                - generic [ref=e1416]:
+                  - generic [ref=e1417]: 52W High
+                  - generic [ref=e1418]: $487.58
+                - generic [ref=e1419]:
+                  - generic [ref=e1420]: 52W Low
+                  - generic [ref=e1421]: $248.69
+                - generic [ref=e1422]:
+                  - generic [ref=e1423]: ATH
+                  - generic [ref=e1424]: $528.49
+                - generic [ref=e1425]:
+                  - generic [ref=e1426]: ATL
+                  - generic [ref=e1427]: $0.23
+                - generic [ref=e1428]:
+                  - generic [ref=e1429]: ATH Proximity
+                  - generic [ref=e1430]: 77.0%
+                - generic [ref=e1431]:
+                  - generic [ref=e1432]: Vol Ratio
+                  - generic [ref=e1433]: 1.17x
+              - generic [ref=e1434]:
+                - generic [ref=e1435]:
+                  - generic [ref=e1436]: Volume
+                  - text: 184,261
+                - generic [ref=e1437]:
+                  - generic [ref=e1438]: Vol MA(50)
+                  - text: 157,392
+              - generic [ref=e1439]:
+                - generic [ref=e1440]:
+                  - generic [ref=e1441]: EPS Growth
+                  - generic [ref=e1442]: 425.5%
+                - generic [ref=e1443]:
+                  - generic [ref=e1444]: Rev Growth
+                  - generic [ref=e1445]: "-0.4%"
+                - generic [ref=e1446]:
+                  - generic [ref=e1447]: PEG
+                  - text: "4.80"
+                - generic [ref=e1448]:
+                  - generic [ref=e1449]: Beta
+                  - text: "1.20"
+              - generic [ref=e1450]:
+                - generic [ref=e1451]:
+                  - generic [ref=e1452]: SMA(20)
+                  - text: "399.09"
+                - generic [ref=e1453]:
+                  - generic [ref=e1454]: EMA(9)
+                  - text: "400.50"
+                - generic [ref=e1455]:
+                  - generic [ref=e1456]: RSI(14)
+                  - text: "44.8"
+                - generic [ref=e1457]:
+                  - generic [ref=e1458]: MACD
+                  - text: "-12.315"
+            - generic [ref=e1459] [cursor=pointer]:
+              - generic [ref=e1460]:
+                - generic [ref=e1461]:
+                  - heading "AYI" [level=3] [ref=e1463]
+                  - generic [ref=e1465]: Acuity Inc.
+                - generic [ref=e1466]: Industrials
+              - generic [ref=e1788]:
+                - generic [ref=e1790]: "70"
+                - generic [ref=e1791]:
+                  - generic [ref=e1792]: Explosiveness
+                  - generic [ref=e1793]: Moderate
+              - generic [ref=e1474]:
+                - generic [ref=e1475]:
+                  - generic [ref=e1476]: Trend
+                  - generic [ref=e1477]: "72"
+                - generic [ref=e1478]:
+                  - generic [ref=e1479]: Momentum
+                  - generic [ref=e1480]: "77"
+                - generic [ref=e1481]:
+                  - generic [ref=e1482]: Volatility
+                  - generic [ref=e1483]: "100"
+                - generic [ref=e1484]:
+                  - generic [ref=e1485]: Volume
+                  - generic [ref=e1486]: "89"
+              - generic [ref=e1487]:
+                - paragraph [ref=e1488]: $286.98
+                - generic [ref=e1489]:
+                  - generic [ref=e1490]: 52W Low $216.28
+                  - generic [ref=e1491]: 52W High $379.92
+              - generic [ref=e1492]:
+                - generic [ref=e1493]:
+                  - generic [ref=e1494]: 52W High
+                  - generic [ref=e1495]: $379.92
+                - generic [ref=e1496]:
+                  - generic [ref=e1497]: 52W Low
+                  - generic [ref=e1498]: $216.28
+                - generic [ref=e1499]:
+                  - generic [ref=e1500]: ATH
+                  - generic [ref=e1501]: $379.92
+                - generic [ref=e1502]:
+                  - generic [ref=e1503]: ATL
+                  - generic [ref=e1504]: $6.89
+                - generic [ref=e1505]:
+                  - generic [ref=e1506]: ATH Proximity
+                  - generic [ref=e1507]: 75.5%
+                - generic [ref=e1508]:
+                  - generic [ref=e1509]: Vol Ratio
+                  - generic [ref=e1510]: 1.45x
+              - generic [ref=e1511]:
+                - generic [ref=e1512]:
+                  - generic [ref=e1513]: Volume
+                  - text: 603,786
+                - generic [ref=e1514]:
+                  - generic [ref=e1515]: Vol MA(50)
+                  - text: 416,755
+              - generic [ref=e1516]:
+                - generic [ref=e1517]:
+                  - generic [ref=e1518]: EPS Growth
+                  - generic [ref=e1519]: 5.8%
+                - generic [ref=e1520]:
+                  - generic [ref=e1521]: Rev Growth
+                  - generic [ref=e1522]: "-5.4%"
+                - generic [ref=e1523]:
+                  - generic [ref=e1524]: PEG
+                  - text: "322.86"
+                - generic [ref=e1525]:
+                  - generic [ref=e1526]: Beta
+                  - text: "1.50"
+              - generic [ref=e1527]:
+                - generic [ref=e1528]:
+                  - generic [ref=e1529]: SMA(20)
+                  - text: "274.63"
+                - generic [ref=e1530]:
+                  - generic [ref=e1531]: EMA(9)
+                  - text: "277.18"
+                - generic [ref=e1532]:
+                  - generic [ref=e1533]: RSI(14)
+                  - text: "53.8"
+                - generic [ref=e1534]:
+                  - generic [ref=e1535]: MACD
+                  - text: "-4.744"
+            - generic [ref=e1536] [cursor=pointer]:
+              - generic [ref=e1537]:
+                - generic [ref=e1538]:
+                  - heading "XPEL" [level=3] [ref=e1540]
+                  - generic [ref=e1542]: XPEL, Inc.
+                - generic [ref=e1543]: Consumer Cyclical
+              - generic [ref=e1794]:
+                - generic [ref=e1796]: "70"
+                - generic [ref=e1797]:
+                  - generic [ref=e1798]: Explosiveness
+                  - generic [ref=e1799]: Moderate
+              - generic [ref=e1551]:
+                - generic [ref=e1552]:
+                  - generic [ref=e1553]: Trend
+                  - generic [ref=e1554]: "80"
+                - generic [ref=e1555]:
+                  - generic [ref=e1556]: Momentum
+                  - generic [ref=e1557]: "80"
+                - generic [ref=e1558]:
+                  - generic [ref=e1559]: Volatility
+                  - generic [ref=e1560]: "89"
+                - generic [ref=e1561]:
+                  - generic [ref=e1562]: Volume
+                  - generic [ref=e1563]: "86"
+              - generic [ref=e1564]:
+                - paragraph [ref=e1565]: $44.71
+                - generic [ref=e1566]:
+                  - generic [ref=e1567]: 52W Low $24.25
+                  - generic [ref=e1568]: 52W High $55.91
+              - generic [ref=e1569]:
+                - generic [ref=e1570]:
+                  - generic [ref=e1571]: 52W High
+                  - generic [ref=e1572]: $55.91
+                - generic [ref=e1573]:
+                  - generic [ref=e1574]: 52W Low
+                  - generic [ref=e1575]: $24.25
+                - generic [ref=e1576]:
+                  - generic [ref=e1577]: ATH
+                  - generic [ref=e1578]: $103.84
+                - generic [ref=e1579]:
+                  - generic [ref=e1580]: ATL
+                  - generic [ref=e1581]: $5.14
+                - generic [ref=e1582]:
+                  - generic [ref=e1583]: ATH Proximity
+                  - generic [ref=e1584]: 43.1%
+                - generic [ref=e1585]:
+                  - generic [ref=e1586]: Vol Ratio
+                  - generic [ref=e1587]: 1.18x
+              - generic [ref=e1588]:
+                - generic [ref=e1589]:
+                  - generic [ref=e1590]: Volume
+                  - text: 325,048
+                - generic [ref=e1591]:
+                  - generic [ref=e1592]: Vol MA(50)
+                  - text: 274,681
+              - generic [ref=e1593]:
+                - generic [ref=e1594]:
+                  - generic [ref=e1595]: EPS Growth
+                  - generic [ref=e1596]: "-20.3%"
+                - generic [ref=e1597]:
+                  - generic [ref=e1598]: Rev Growth
+                  - generic [ref=e1599]: 0.6%
+                - generic [ref=e1600]:
+                  - generic [ref=e1601]: Beta
+                  - text: "1.26"
+              - generic [ref=e1602]:
+                - generic [ref=e1603]:
+                  - generic [ref=e1604]: SMA(20)
+                  - text: "40.22"
+                - generic [ref=e1605]:
+                  - generic [ref=e1606]: EMA(9)
+                  - text: "41.55"
+                - generic [ref=e1607]:
+                  - generic [ref=e1608]: RSI(14)
+                  - text: "59.5"
+                - generic [ref=e1609]:
+                  - generic [ref=e1610]: MACD
+                  - text: "-0.936"
+            - generic [ref=e1611] [cursor=pointer]:
+              - generic [ref=e1612]:
+                - generic [ref=e1613]:
+                  - heading "FUN" [level=3] [ref=e1615]
+                  - generic [ref=e1617]: Six Flags Entertainment Corporation
+                - generic [ref=e1618]: Consumer Cyclical
+              - generic [ref=e1800]:
+                - generic [ref=e1802]: "70"
+                - generic [ref=e1803]:
+                  - generic [ref=e1804]: Explosiveness
+                  - generic [ref=e1805]: Moderate
+              - generic [ref=e1626]:
+                - generic [ref=e1627]:
+                  - generic [ref=e1628]: Trend
+                  - generic [ref=e1629]: "68"
+                - generic [ref=e1630]:
+                  - generic [ref=e1631]: Momentum
+                  - generic [ref=e1632]: "85"
+                - generic [ref=e1633]:
+                  - generic [ref=e1634]: Volatility
+                  - generic [ref=e1635]: "91"
+                - generic [ref=e1636]:
+                  - generic [ref=e1637]: Volume
+                  - generic [ref=e1638]: "91"
+              - generic [ref=e1639]:
+                - paragraph [ref=e1640]: $17.58
+                - generic [ref=e1641]:
+                  - generic [ref=e1642]: 52W Low $12.51
+                  - generic [ref=e1643]: 52W High $38.47
+              - generic [ref=e1644]:
+                - generic [ref=e1645]:
+                  - generic [ref=e1646]: 52W High
+                  - generic [ref=e1647]: $38.47
+                - generic [ref=e1648]:
+                  - generic [ref=e1649]: 52W Low
+                  - generic [ref=e1650]: $12.51
+                - generic [ref=e1651]:
+                  - generic [ref=e1652]: ATH
+                  - generic [ref=e1653]: $59.12
+                - generic [ref=e1654]:
+                  - generic [ref=e1655]: ATL
+                  - generic [ref=e1656]: $0.29
+                - generic [ref=e1657]:
+                  - generic [ref=e1658]: ATH Proximity
+                  - generic [ref=e1659]: 29.7%
+                - generic [ref=e1660]:
+                  - generic [ref=e1661]: Vol Ratio
+                  - generic [ref=e1662]: 1.09x
+              - generic [ref=e1663]:
+                - generic [ref=e1664]:
+                  - generic [ref=e1665]: Volume
+                  - text: 2,221,362
+                - generic [ref=e1666]:
+                  - generic [ref=e1667]: Vol MA(50)
+                  - text: 2,038,647
+              - generic [ref=e1668]:
+                - generic [ref=e1669]:
+                  - generic [ref=e1670]: EPS Growth
+                  - generic [ref=e1671]: "-1088.9%"
+                - generic [ref=e1672]:
+                  - generic [ref=e1673]: Rev Growth
+                  - generic [ref=e1674]: 41.6%
+                - generic [ref=e1675]:
+                  - generic [ref=e1676]: Beta
+                  - text: "0.35"
+              - generic [ref=e1677]:
+                - generic [ref=e1678]:
+                  - generic [ref=e1679]: SMA(20)
+                  - text: "17.23"
+                - generic [ref=e1680]:
+                  - generic [ref=e1681]: EMA(9)
+                  - text: "17.24"
+                - generic [ref=e1682]:
+                  - generic [ref=e1683]: RSI(14)
+                  - text: "54.5"
+                - generic [ref=e1684]:
+                  - generic [ref=e1685]: MACD
+                  - text: "0.172"
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: System
+            - generic [ref=e115]: Ready
+          - generic [ref=e117]: 11:54:45 AM
+      - generic [ref=e1807]:
+        - generic [ref=e1808]:
+          - generic [ref=e1809]:
+            - img [ref=e1811]
+            - generic [ref=e1813]:
+              - heading "UTHR" [level=3] [ref=e1814]
+              - text: Candlestick Chart
+          - button [ref=e1815] [cursor=pointer]:
+            - img [ref=e1816]
+        - table [ref=e1822]:
+          - row [ref=e1823]:
+            - cell [ref=e1824]
+            - cell [ref=e1828]:
+              - link "Charting by TradingView" [ref=e1832] [cursor=pointer]:
+                - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/screener
+                - img [ref=e1833]
+            - cell [ref=e1837]
+          - row [ref=e1841]:
+            - cell [ref=e1842]
+            - cell [ref=e1845]
+            - cell [ref=e1849]

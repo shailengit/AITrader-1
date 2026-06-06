@@ -3,8 +3,9 @@ Authentication module for QuantGen API.
 Provides JWT token generation, verification, and password hashing.
 """
 
+import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 # Configure logging
@@ -27,7 +28,14 @@ except ImportError:
     logger.warning("passlib not available. Password hashing will be disabled.")
 
 # Configuration
-SECRET_KEY = secrets.token_urlsafe(32)
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    logger.warning(
+        "JWT_SECRET_KEY not set. Using ephemeral secret (sessions will not survive restarts). "
+        "Set JWT_SECRET_KEY in your .env file."
+    )
+    SECRET_KEY = secrets.token_urlsafe(32)
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -60,6 +68,11 @@ def get_password_hash(password: str) -> str:
         raise ValueError("Failed to hash password") from e
 
 
+def _get_utc_now() -> datetime:
+    """Return timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create a new access token."""
     if not JWT_AVAILABLE:
@@ -67,13 +80,13 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = _get_utc_now() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = _get_utc_now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": _get_utc_now(),
         "type": "access"
     })
 
@@ -90,11 +103,11 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     if not JWT_AVAILABLE:
         raise ValueError("JWT not available")
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = _get_utc_now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": _get_utc_now(),
         "type": "refresh"
     })
 

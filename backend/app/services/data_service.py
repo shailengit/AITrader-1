@@ -13,6 +13,7 @@ import numpy as np
 from sqlalchemy import text
 
 from app.db.database import engine
+from app.utils.security import get_safe_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class DataService:
             pandas DataFrame with columns: Date, Open, High, Low, Close, Volume
             Returns None if ticker not found or error occurs.
         """
-        table_name = DataService.get_ticker_table_name(ticker)
+        table_name = get_safe_table_name(ticker)
 
         try:
             # Build query with optional date filters
@@ -145,7 +146,7 @@ class DataService:
     @staticmethod
     def get_latest_price(ticker: str) -> Optional[float]:
         """Get the latest closing price for a ticker."""
-        table_name = DataService.get_ticker_table_name(ticker)
+        table_name = get_safe_table_name(ticker)
 
         try:
             query = text(f'SELECT "Close" FROM "{table_name}" ORDER BY "Date" DESC LIMIT 1')

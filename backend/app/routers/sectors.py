@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from app.db.database import engine, SECTOR_ETFS, SECTOR_NAME_MAP
 from sqlalchemy import text
 
+from app.utils.security import sanitize_ticker, get_safe_table_name
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -63,13 +65,14 @@ class StockLeader(BaseModel):
 async def get_forward_return(ticker: str, from_date: str, holding_days: int = 30) -> Optional[float]:
     """Calculate forward return from from_date to from_date + holding_days."""
     try:
+        safe_table = get_safe_table_name(ticker)
         query = text(f'''
             WITH from_price AS (
-                SELECT "Close", "Date" FROM {ticker.lower()}
+                SELECT "Close", "Date" FROM {safe_table}
                 WHERE "Date" <= :from_date ORDER BY "Date" DESC LIMIT 1
             ),
             to_price AS (
-                SELECT "Close" FROM {ticker.lower()}
+                SELECT "Close" FROM {safe_table}
                 WHERE "Date" >= (SELECT "Date" FROM from_price) + INTERVAL ':hold_days days'
                 ORDER BY "Date" ASC LIMIT 1
             )
@@ -91,23 +94,24 @@ async def get_forward_return(ticker: str, from_date: str, holding_days: int = 30
 async def get_ticker_performance(ticker: str, cutoff_date: Optional[str] = None) -> Optional[dict]:
     """Calculate 3-month and 6-month performance for a ticker."""
     try:
+        safe_table = get_safe_table_name(ticker)
         if cutoff_date:
             latest_cte = f'''
-                (SELECT "Close", "Date" FROM {ticker.lower()}
+                (SELECT "Close", "Date" FROM {safe_table}
                  WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1)
             '''
         else:
-            latest_cte = f'(SELECT "Close", "Date" FROM {ticker.lower()} ORDER BY "Date" DESC LIMIT 1)'
+            latest_cte = f'(SELECT "Close", "Date" FROM {safe_table} ORDER BY "Date" DESC LIMIT 1)'
 
         query = text(f'''
             WITH latest_prices AS {latest_cte},
             three_months_ago AS (
-                SELECT "Close" FROM {ticker.lower()}
+                SELECT "Close" FROM {safe_table}
                 WHERE "Date" <= (SELECT "Date" FROM latest_prices) - INTERVAL '90 days'
                 ORDER BY "Date" DESC LIMIT 1
             ),
             six_months_ago AS (
-                SELECT "Close" FROM {ticker.lower()}
+                SELECT "Close" FROM {safe_table}
                 WHERE "Date" <= (SELECT "Date" FROM latest_prices) - INTERVAL '180 days'
                 ORDER BY "Date" DESC LIMIT 1
             )
@@ -237,12 +241,12 @@ async def get_sector_stocks(
                 # Build latest CTE with optional cutoff
                 if cutoff_date:
                     latest_cte = f'''
-                        SELECT "Close", "Volume", "Date" FROM {ticker.lower()}
+                        SELECT "Close", "Volume", "Date" FROM {safe_table}
                         WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1
                     '''
                 else:
                     latest_cte = f'''
-                        SELECT "Close", "Volume", "Date" FROM {ticker.lower()}
+                        SELECT "Close", "Volume", "Date" FROM {safe_table}
                         ORDER BY "Date" DESC LIMIT 1
                     '''
 
@@ -250,48 +254,48 @@ async def get_sector_stocks(
                 stock_query = text(f'''
                     WITH latest AS ({latest_cte}),
                     three_months_ago AS (
-                        SELECT "Close" FROM {ticker.lower()}
+                        SELECT "Close" FROM {safe_table}
                         WHERE "Date" <= (SELECT "Date" FROM latest) - INTERVAL '90 days'
                         ORDER BY "Date" DESC LIMIT 1
                     ),
                     ten_day_high AS (
                         SELECT MAX("High") as high_10d FROM (
-                            SELECT "High" FROM {ticker.lower()}
+                            SELECT "High" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 10
                         ) t
                     ),
                     avg_vol AS (
                         SELECT AVG("Volume") as vol_20d FROM (
-                            SELECT "Volume" FROM {ticker.lower()}
+                            SELECT "Volume" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 20
                         ) v
                     ),
                     sma_20 AS (
                         SELECT AVG("Close") as sma20 FROM (
-                            SELECT "Close" FROM {ticker.lower()}
+                            SELECT "Close" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 20
                         ) s
                     ),
                     sd_20 AS (
                         SELECT STDDEV("Close") as sd20 FROM (
-                            SELECT "Close" FROM {ticker.lower()}
+                            SELECT "Close" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 20
                         ) d
                     ),
                     sma_50 AS (
                         SELECT AVG("Close") as sma50 FROM (
-                            SELECT "Close" FROM {ticker.lower()}
+                            SELECT "Close" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 50
                         ) f
                     ),
                     sma_200 AS (
                         SELECT AVG("Close") as sma200 FROM (
-                            SELECT "Close" FROM {ticker.lower()}
+                            SELECT "Close" FROM {safe_table}
                             WHERE "Date" <= (SELECT "Date" FROM latest)
                             ORDER BY "Date" DESC LIMIT 200
                         ) h
@@ -391,10 +395,11 @@ async def get_ohlcv(ticker: str):
     Used for charting in the Sector Rotation Scanner.
     """
     try:
+        safe_table = get_safe_table_name(ticker)
         # Get last 150 days of data for technical indicator calculations (Bollinger Bands etc)
         query = text(f'''
             SELECT "Date", "Open", "High", "Low", "Close", "Volume"
-            FROM {ticker.lower()}
+            FROM {safe_table}
             ORDER BY "Date" DESC
             LIMIT 150
         ''')

@@ -17,6 +17,9 @@ import contextlib
 import traceback
 import logging
 import ast
+
+# Import advanced security analyzer
+from app.services.code_security import analyze_code, regex_scan_code
 import re
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass

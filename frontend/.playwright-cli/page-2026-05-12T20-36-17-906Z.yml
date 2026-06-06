@@ -1,0 +1,116 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "Home" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+      - text: Home
+    - generic [ref=e8]:
+      - img [ref=e10]
+      - heading "AI Stock Screener" [level=1] [ref=e13]
+    - button "Switch to dark mode" [ref=e15]:
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - img [ref=e23]
+  - main [ref=e25]:
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - heading "AI Stock Screener" [level=1] [ref=e29]
+        - paragraph [ref=e30]: Multi-agent technical and fundamental screening powered by intelligent agents
+      - generic [ref=e31]:
+        - heading "Select Mode" [level=2] [ref=e32]
+        - generic [ref=e33]:
+          - button "Dormant Giant Screener Identifies stocks with Bollinger Band squeeze, OBV hidden accumulation, or resistance breakouts. Verifies with EPS acceleration as catalyst. Technical Specialist Fundamental Specialist Risk Manager How it works" [ref=e34] [cursor=pointer]:
+            - generic [ref=e35]:
+              - img [ref=e37]
+              - heading "Dormant Giant Screener" [level=3] [ref=e39]
+            - paragraph [ref=e40]: Identifies stocks with Bollinger Band squeeze, OBV hidden accumulation, or resistance breakouts. Verifies with EPS acceleration as catalyst.
+            - generic [ref=e41]:
+              - generic [ref=e42]: Technical Specialist
+              - generic [ref=e43]: Fundamental Specialist
+              - generic [ref=e44]: Risk Manager
+            - button "How it works" [ref=e45]:
+              - generic [ref=e46]: How it works
+          - button "Quant Strategy Screener Technical analysis screening with fundamental health verification, risk assessment, and optional historical backtesting. Technical Specialist Fundamental Specialist Risk Manager Performance Analyst How it works" [ref=e47] [cursor=pointer]:
+            - generic [ref=e48]:
+              - img [ref=e50]
+              - heading "Quant Strategy Screener" [level=3] [ref=e52]
+            - paragraph [ref=e53]: Technical analysis screening with fundamental health verification, risk assessment, and optional historical backtesting.
+            - generic [ref=e54]:
+              - generic [ref=e55]: Technical Specialist
+              - generic [ref=e56]: Fundamental Specialist
+              - generic [ref=e57]: Risk Manager
+              - generic [ref=e58]: Performance Analyst
+            - button "How it works" [ref=e59]:
+              - generic [ref=e60]: How it works
+      - generic [ref=e61]:
+        - heading "Configuration" [level=2] [ref=e62]
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - img [ref=e67]
+              - generic [ref=e70]:
+                - text: AI Analysis
+                - generic [ref=e71]: Enabled
+              - button "Toggle AI analysis off" [ref=e72] [cursor=pointer]
+            - generic [ref=e74]:
+              - generic [ref=e75]: Cutoff Date
+              - textbox [ref=e76]
+              - generic [ref=e77]: Leave blank for latest data
+            - generic [ref=e78]:
+              - generic [ref=e79]: Custom Directives
+              - textbox "Find me candidates for a high-growth breakout..." [ref=e133]
+              - button "Generate Filters from Prompt" [disabled] [ref=e134]:
+                - img [ref=e135]
+                - text: Generate Filters from Prompt
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]: Scoring Split
+                  - generic [ref=e141]: 60% Base / 40% Filter
+                - slider [ref=e142] [cursor=pointer]: "60"
+                - generic [ref=e143]:
+                  - generic [ref=e144]: 0% — Pure filter match
+                  - generic [ref=e145]: 100% — Pure setup quality
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - img [ref=e84]
+              - generic [ref=e85]:
+                - text: Thresholds
+                - generic [ref=e146]: Dormant Giant only
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]:
+                  - generic [ref=e89]: Consolidation TightnessDays price stays within 3% of 20-day SMA
+                  - generic [ref=e90]: 15 days
+                - slider [disabled] [ref=e91]: "15"
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - generic [ref=e94]: MFI AccumulationMoney Flow Index threshold (volume-weighted RSI)
+                  - generic [ref=e95]: "55"
+                - slider [disabled] [ref=e96]: "55"
+              - generic [ref=e97]:
+                - generic [ref=e98]:
+                  - generic [ref=e99]: Volume ClusterDays with volume > 1.2x average (out of last 5)
+                  - generic [ref=e100]: 3 days
+                - slider [disabled] [ref=e101]: "3"
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - generic [ref=e104]: RS vs MarketMinimum relative strength ratio vs market (sector ETF proxy)
+                  - generic [ref=e105]: "0.80"
+                - slider [disabled] [ref=e106]: "0.8"
+              - generic [ref=e107]:
+                - generic [ref=e108]:
+                  - text: Sector Momentum Gate
+                  - generic [ref=e109]: Only scan stocks in sectors above their 50-day SMA
+                - button [disabled] [ref=e110]
+      - generic [ref=e112]:
+        - button "Scanning... 11%" [disabled] [ref=e147]:
+          - img [ref=e148]
+          - text: Scanning... 11%
+        - generic [ref=e153]: 11%
+        - button "Show Logs" [ref=e117] [cursor=pointer]:
+          - img [ref=e118]
+          - text: Show Logs
+      - generic [ref=e127]:
+        - generic [ref=e128]:
+          - generic [ref=e129]: System
+          - generic [ref=e130]: Ready
+        - generic [ref=e132]: 4:33:37 PM
