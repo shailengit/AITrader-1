@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge } from 'lucide-react'
+import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar } from 'lucide-react'
 import { ThemeToggle } from '../components/ui'
 import { useTheme } from '../context/ThemeContext'
 
@@ -23,6 +23,16 @@ const tools = [
     link: '/screener',
     stat: '1,500 stocks',
     detail: 'Two screening modes with Agno-powered multi-agent analysis',
+  },
+  {
+    id: 'earnings',
+    title: 'Earnings Calendar',
+    description: 'Track upcoming earnings dates, EPS estimates, and revenue surprises for your watchlist and the full S&P 1500.',
+    icon: Calendar,
+    accent: '#10B981',
+    link: '/earnings',
+    stat: 'S&P 1500',
+    detail: 'Earnings dates with EPS estimates and BMO/AMC timing',
   },
   {
     id: 'quantgen',

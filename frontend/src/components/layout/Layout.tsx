@@ -6,6 +6,7 @@ import { useTheme } from "../../context/ThemeContext";
 const pageTitles: Record<string, string> = {
   "/sectors": "Sector Rotation Scanner",
   "/screener": "AI Stock Screener",
+  "/earnings": "Earnings Calendar",
   "/quantgen": "QuantGen Strategy Builder",
 };
 

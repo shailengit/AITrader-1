@@ -25,7 +25,6 @@ import { StatusBadge } from '../components/ui/Badge'
 import { ProgressMetric } from '../components/ui/Metric'
 import { useTheme } from '../context/ThemeContext'
 import { CandleStickChart } from '../components/quantgen/CandleStickChart'
-import { VolumeChart } from '../components/quantgen/VolumeChart'
 
 interface Sector {
   ticker: string
@@ -70,7 +69,9 @@ export default function SectorRotation() {
   const [loading, setLoading] = useState(true)
   const [isDbConnected, setIsDbConnected] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString())
-  const [cutoffDate, setCutoffDate] = useState('')
+  const oneMonthAgo = new Date()
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+  const [cutoffDate, setCutoffDate] = useState(oneMonthAgo.toISOString().split('T')[0])
   const [holdingDays, setHoldingDays] = useState(30)
   const { isDarkMode } = useTheme()
 
@@ -854,19 +855,6 @@ export default function SectorRotation() {
                       ]}
                     />
 
-                    {/* Volume Chart */}
-                    <div className="mt-6 px-4">
-                      <p className="text-sm text-zinc-500 uppercase font-bold tracking-widest mb-2">Volume</p>
-                      <VolumeChart
-                        key={`${chartTicker}-vol`}
-                        height={180}
-                        data={chartData.map((d: any) => ({
-                          time: d.time,
-                          value: d.volume || 0,
-                          color: d.close >= d.open ? 'rgba(16, 185, 129, 0.7)' : 'rgba(244, 63, 94, 0.7)',
-                        }))}
-                      />
-                    </div>
 
                     <div className="mt-8 grid grid-cols-3 gap-6 px-4 pb-6">
                       <div className="bg-white/5 border border-white/5 rounded-3xl p-8">

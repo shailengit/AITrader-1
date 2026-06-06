@@ -50,6 +50,7 @@ class ScanRequest(BaseModel):
     prompt: Optional[str] = None  # Custom prompt for AI analysis
     max_results: int = 50
     filters: Optional[Dict[str, Any]] = None
+    base_weight: Optional[int] = 60  # 0-100, percent weight for base setup score in quant strategy
 
 
 class ScanResult(BaseModel):
@@ -64,6 +65,10 @@ class ScanResult(BaseModel):
     rsi: Optional[float] = None
     macd: Optional[float] = None
     volume: Optional[int] = None
+    next_earnings_date: Optional[str] = None
+    days_until_earnings: Optional[int] = None
+    eps_estimate: Optional[float] = None
+    time_of_day: Optional[str] = None
 
 
 class ScanStatus(BaseModel):
@@ -489,7 +494,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         logs_buffer=logs_buffer,
                         progress_callback=update_progress,
                         agent_log_callback=update_agent_log,
-                        filters=request.filters
+                        filters=request.filters,
+                        base_weight=request.base_weight
                     )
                 )
             else:
@@ -499,7 +505,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         cutoff_date=request.cutoff_date,
                         progress_callback=update_progress,
                         log_callback=update_logs,
-                        filters=request.filters
+                        filters=request.filters,
+                        base_weight=request.base_weight
                     )
                 )
         else:

@@ -38,6 +38,7 @@ interface ParamRange {
   start: number;
   stop: number;
   step: number;
+  sourceValue?: number; // The code value that last generated this range
 }
 
 interface WFOConfig {
@@ -55,6 +56,27 @@ interface OptimizationConfigData {
   mode: "simple" | "wfo" | "true_wfo";
   metric: "total_return" | "sharpe" | "sortino" | "max_dd";
   wfo: WFOConfig;
+}
+
+function roundToDecimals(value: number, decimals: number): number {
+  const factor = Math.pow(10, decimals);
+  return Math.round(value * factor) / factor;
+}
+
+function computeAutoRange(
+  value: number,
+  isInteger: boolean
+): { start: number; stop: number; step: number } {
+  if (isInteger) {
+    const start = Math.max(1, Math.round(value * 0.5));
+    const stop = Math.max(1, Math.round(value * 1.5));
+    const step = Math.max(1, Math.round(value * 0.1));
+    return { start, stop, step };
+  }
+  const start = Math.max(0.1, roundToDecimals(value * 0.5, 2));
+  const stop = Math.max(0.1, roundToDecimals(value * 1.5, 2));
+  const step = Math.max(0.1, roundToDecimals(value * 0.1, 2));
+  return { start, stop, step };
 }
 
 const makeDefaultOptConfig = (exportedStart?: string | null): OptimizationConfigData => ({
@@ -685,12 +707,12 @@ export default function Builder() {
     if (!isFirstLoad.current) saveState();
   }, [saveState]);
 
-  // Extract parameters from code
+  // Extract parameters from code and auto-compute ranges
   useEffect(() => {
     if (!code) return;
     const lines = code.split("\n");
     let inParamsSection = false;
-    const foundParams: { name: string; value: number }[] = [];
+    const foundParams: { name: string; value: number; isInteger: boolean }[] = [];
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -708,27 +730,32 @@ export default function Builder() {
           /^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([0-9.]+)(\s*#.*)?$/,
         );
         if (match) {
-          const val = parseFloat(match[2]);
-          foundParams.push({ name: match[1], value: isNaN(val) ? 10 : val });
+          const rawValue = match[2];
+          const val = parseFloat(rawValue);
+          const isInteger = !rawValue.includes(".");
+          foundParams.push({
+            name: match[1],
+            value: isNaN(val) ? 10 : val,
+            isInteger,
+          });
         } else break;
       }
     }
 
-    if (foundParams.length > 0) {
-      setOptParams((prev) => {
-        const existingMap = new Map(prev.map((p) => [p.name, p]));
-        const newParams = foundParams.map((p) => {
-          if (existingMap.has(p.name)) return existingMap.get(p.name)!;
-          const start = p.value;
-          const stop = p.value * 2 || 100;
-          const step = p.value >= 10 ? Math.floor(p.value / 10) : 1;
-          return { name: p.name, start, stop, step: step || 1 };
-        });
-        return JSON.stringify(newParams) === JSON.stringify(prev)
-          ? prev
-          : newParams;
+    setOptParams((prev) => {
+      const existingMap = new Map(prev.map((p) => [p.name, p]));
+      const newParams = foundParams.map((p) => {
+        const existing = existingMap.get(p.name);
+        if (existing && existing.sourceValue === p.value) {
+          return existing;
+        }
+        const { start, stop, step } = computeAutoRange(p.value, p.isInteger);
+        return { name: p.name, start, stop, step, sourceValue: p.value };
       });
-    }
+      return JSON.stringify(newParams) === JSON.stringify(prev)
+        ? prev
+        : newParams;
+    });
   }, [code]);
 
   const loadStrategies = async () => {

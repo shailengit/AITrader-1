@@ -22,6 +22,24 @@ from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
 
+# Earnings calendar enrichment
+from app.services.earnings_service import enrich_scan_results as _enrich_with_earnings
+
+
+def _apply_earnings_filter(results: List[Dict[str, Any]], filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Filter scan results by days_until_earnings if earnings_within_days is set."""
+    if not filters or not results:
+        return results
+    days = filters.get("earnings_within_days")
+    if days is None:
+        return results
+    if days == 0:
+        # Special case: exclude stocks with any upcoming earnings in the near future
+        # We approximate "near future" as 30 days for this exclusion
+        return [r for r in results if r.get("days_until_earnings") is None or r.get("days_until_earnings", 0) > 30]
+    return [r for r in results if r.get("days_until_earnings") is not None and r.get("days_until_earnings", 999) <= days]
+
+
 # Database configuration
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "sarina00")
@@ -43,6 +61,103 @@ ENGINE = create_engine(
     pool_pre_ping=True
 )
 
+ETF_TICKERS = ['xlb', 'xlc', 'xle', 'xlf', 'xli', 'xlk', 'xlp', 'xlre', 'xlu', 'xlv', 'xly']
+
+# Base indicators required for computing the hybrid quant score.
+# Always fetched in addition to user-requested indicators so setup quality can be scored.
+BASE_SCORING_INDICATORS = [
+    'trend_adx', 'trend_sma_fast', 'trend_sma_slow', 'trend_macd_diff',
+    'momentum_rsi', 'momentum_roc', 'momentum_stoch',
+    'volatility_atr', 'volatility_bbw',
+    'volume_mfi', 'volume_ratio'
+]
+
+# Indicator registry: maps ta column names to their recomputation functions and default params.
+# Used for dynamic indicator fetching and custom parameter override in Quant Strategy screener.
+INDICATOR_REGISTRY = {
+    # Volume
+    'volume_adi': {'module': 'ta.volume', 'class': 'AccDistIndexIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}},
+    'volume_obv': {'module': 'ta.volume', 'class': 'OnBalanceVolumeIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}},
+    'volume_cmf': {'module': 'ta.volume', 'class': 'ChaikinMoneyFlowIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, 'default_window': 20},
+    'volume_fi': {'module': 'ta.volume', 'class': 'ForceIndexIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}, 'default_window': 13},
+    'volume_em': {'module': 'ta.volume', 'class': 'EaseOfMovementIndicator', 'params': {'high': 'High', 'low': 'Low', 'volume': 'Volume'}},
+    'volume_mfi': {'module': 'ta.volume', 'class': 'MFIIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, 'default_window': 14},
+    'volume_vwap': {'module': 'ta.volume', 'class': 'VolumeWeightedAveragePrice', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}},
+    'volume_nvi': {'module': 'ta.volume', 'class': 'NegativeVolumeIndexIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}},
+    # Volatility
+    'volatility_bbm': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_mavg'},
+    'volatility_bbh': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_hband'},
+    'volatility_bbl': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_lband'},
+    'volatility_bbw': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_wband'},
+    'volatility_bbp': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_pband'},
+    'volatility_kcw': {'module': 'ta.volatility', 'class': 'KeltnerChannel', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 20, 'output': 'keltner_channel_wband'},
+    'volatility_atr': {'module': 'ta.volatility', 'class': 'AverageTrueRange', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14},
+    'volatility_ui': {'module': 'ta.volatility', 'class': 'UlcerIndex', 'params': {'close': 'Close'}, 'default_window': 14},
+    # Trend
+    'trend_sma_fast': {'module': 'ta.trend', 'class': 'SMAIndicator', 'params': {'close': 'Close'}, 'default_window': 20},
+    'trend_sma_slow': {'module': 'ta.trend', 'class': 'SMAIndicator', 'params': {'close': 'Close'}, 'default_window': 50},
+    'trend_ema_fast': {'module': 'ta.trend', 'class': 'EMAIndicator', 'params': {'close': 'Close'}, 'default_window': 12},
+    'trend_ema_slow': {'module': 'ta.trend', 'class': 'EMAIndicator', 'params': {'close': 'Close'}, 'default_window': 26},
+    'trend_macd': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9},
+    'trend_macd_signal': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9, 'output': 'macd_signal'},
+    'trend_macd_diff': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9, 'output': 'macd_diff'},
+    'trend_adx': {'module': 'ta.trend', 'class': 'ADXIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14},
+    'trend_cci': {'module': 'ta.trend', 'class': 'CCIIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 20},
+    'trend_trix': {'module': 'ta.trend', 'class': 'TRIXIndicator', 'params': {'close': 'Close'}, 'default_window': 15},
+    'trend_mass_index': {'module': 'ta.trend', 'class': 'MassIndex', 'params': {'high': 'High', 'low': 'Low'}},
+    'trend_aroon_up': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
+    'trend_aroon_down': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
+    'trend_aroon_ind': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
+    'trend_stc': {'module': 'ta.trend', 'class': 'STCIndicator', 'params': {'close': 'Close'}},
+    # Momentum
+    'momentum_rsi': {'module': 'ta.momentum', 'class': 'RSIIndicator', 'params': {'close': 'Close'}, 'default_window': 14},
+    'momentum_stoch': {'module': 'ta.momentum', 'class': 'StochasticOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14, 'default_smooth_window': 3},
+    'momentum_stoch_signal': {'module': 'ta.momentum', 'class': 'StochasticOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14, 'default_smooth_window': 3, 'output': 'stoch_signal'},
+    'momentum_wr': {'module': 'ta.momentum', 'class': 'WilliamsRIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_lbp': 14},
+    'momentum_ao': {'module': 'ta.momentum', 'class': 'AwesomeOscillatorIndicator', 'params': {'high': 'High', 'low': 'Low'}},
+    'momentum_roc': {'module': 'ta.momentum', 'class': 'ROCIndicator', 'params': {'close': 'Close'}, 'default_window': 12},
+    'momentum_tsi': {'module': 'ta.momentum', 'class': 'TSIIndicator', 'params': {'close': 'Close'}, 'default_window_slow': 25, 'default_window_fast': 13},
+    'momentum_uo': {'module': 'ta.momentum', 'class': 'UltimateOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}},
+    'momentum_kama': {'module': 'ta.momentum', 'class': 'KAMAIndicator', 'params': {'close': 'Close'}, 'default_window': 10, 'default_pow1': 2, 'default_pow2': 30},
+    'momentum_ppo': {'module': 'ta.momentum', 'class': 'PercentagePriceOscillator', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9},
+    # Others
+    'others_dr': {'module': 'ta.others', 'class': 'DailyReturnIndicator', 'params': {'close': 'Close'}},
+}
+
+# Friendly name mapping for common indicators (used in LLM prompts)
+INDICATOR_FRIENDLY_NAMES = {
+    'momentum_rsi': 'RSI (Relative Strength Index)',
+    'volatility_bbw': 'Bollinger Band Width',
+    'volatility_bbp': 'Bollinger Band Percentage',
+    'volatility_atr': 'Average True Range',
+    'trend_macd': 'MACD',
+    'trend_macd_signal': 'MACD Signal',
+    'trend_macd_diff': 'MACD Histogram',
+    'trend_sma_fast': 'SMA 20',
+    'trend_sma_slow': 'SMA 50',
+    'trend_ema_fast': 'EMA 12',
+    'trend_ema_slow': 'EMA 26',
+    'trend_adx': 'ADX (Average Directional Index)',
+    'trend_cci': 'CCI (Commodity Channel Index)',
+    'trend_aroon_ind': 'Aroon Indicator',
+    'momentum_stoch': 'Stochastic Oscillator',
+    'momentum_stoch_signal': 'Stochastic Signal',
+    'momentum_wr': 'Williams %R',
+    'momentum_ao': 'Awesome Oscillator',
+    'momentum_roc': 'Rate of Change',
+    'momentum_tsi': 'True Strength Index',
+    'momentum_uo': 'Ultimate Oscillator',
+    'momentum_kama': 'KAMA (Kaufman Adaptive Moving Average)',
+    'volume_mfi': 'MFI (Money Flow Index)',
+    'volume_cmf': 'CMF (Chaikin Money Flow)',
+    'volume_obv': 'OBV (On-Balance Volume)',
+    'volume_fi': 'Force Index',
+    'volume_vwap': 'VWAP',
+    'volume_adi': 'Accumulation/Distribution Index',
+    'volume_nvi': 'Negative Volume Index',
+    'custom_ema_pct_change': 'EMA Percentage Change',
+}
+
 
 # =============================================================================
 # DORMANT GIANT SCREENER (agnoMultiAgentTrader_3.py)
@@ -63,27 +178,43 @@ def get_active_tickers() -> List[str]:
     return [t for t in tickers if t.lower() not in skip_tables]
 
 
-def _fetch_spy_data(days: int = 200, cutoff_date: Optional[str] = None) -> pd.DataFrame:
-    """Fetch SPY OHLCV data for relative strength calculations."""
-    try:
-        if cutoff_date:
-            query = f'SELECT "Date", "Close" FROM "spy" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT {days}'
-        else:
-            query = f'SELECT "Date", "Close" FROM "spy" ORDER BY "Date" DESC LIMIT {days}'
-        df = pd.read_sql(query, ENGINE)
-        if df.empty or len(df) < 20:
-            return pd.DataFrame()
-        return df.sort_values('Date').reset_index(drop=True)
-    except Exception as e:
-        logger.warning("Failed to fetch SPY data: %s", e)
+def _fetch_market_proxy(days: int = 200, cutoff_date: Optional[str] = None) -> pd.DataFrame:
+    """Build equal-weighted market proxy from sector ETFs for relative strength."""
+    frames = []
+    for etf in ETF_TICKERS:
+        try:
+            if cutoff_date:
+                query = f'SELECT "Date", "Close" FROM "{etf}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT {days}'
+            else:
+                query = f'SELECT "Date", "Close" FROM "{etf}" ORDER BY "Date" DESC LIMIT {days}'
+            df = pd.read_sql(query, ENGINE)
+            if df.empty or len(df) < 20:
+                continue
+            df = df.sort_values('Date').set_index('Date')
+            df.rename(columns={'Close': etf}, inplace=True)
+            frames.append(df[[etf]])
+        except Exception as e:
+            logger.warning("Failed to fetch sector ETF %s for market proxy: %s", etf, e)
+            continue
+
+    if len(frames) < 3:
+        logger.warning("Only %d/11 sector ETFs available for market proxy", len(frames))
         return pd.DataFrame()
+
+    # Inner join on Date ensures we only average on dates where ALL ETFs trade
+    combined = pd.concat(frames, axis=1, join='inner')
+    if combined.empty or len(combined) < 20:
+        return pd.DataFrame()
+
+    # Equal-weighted composite close
+    combined['Close'] = combined.mean(axis=1)
+    return combined[['Close']].reset_index()
 
 
 def _fetch_sector_etfs(days: int = 200, cutoff_date: Optional[str] = None) -> Dict[str, bool]:
     """Fetch sector ETF data and compute whether each is above its 50-day SMA."""
     sector_above_sma = {}
-    etf_tickers = ['xlb', 'xlc', 'xle', 'xlf', 'xli', 'xlk', 'xlp', 'xlre', 'xlu', 'xlv', 'xly']
-    for etf in etf_tickers:
+    for etf in ETF_TICKERS:
         try:
             if cutoff_date:
                 query = f'SELECT "Date", "Close" FROM "{etf}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT {days}'
@@ -132,7 +263,7 @@ def _get_ticker_sector_mapping() -> Dict[str, str]:
 def analyze_single_ticker_dormant_giant(
     ticker: str,
     filters: Optional[Dict[str, Any]] = None,
-    spy_df: Optional[pd.DataFrame] = None,
+    market_proxy_df: Optional[pd.DataFrame] = None,
     sector_above_sma: Optional[Dict[str, bool]] = None,
     ticker_sector_map: Optional[Dict[str, str]] = None,
     cutoff_date: Optional[str] = None
@@ -205,16 +336,16 @@ def analyze_single_ticker_dormant_giant(
     vol_cluster_days = filters.get('volume_cluster_days', 3)
     has_volume_cluster = vol_spike_days >= vol_cluster_days
 
-    # --- 5. Relative Strength vs SPY ---
+    # --- 5. Relative Strength vs Market Proxy ---
     rs_minimum = filters.get('rs_minimum', 0.8)
     is_strong_rs = True
-    if spy_df is not None and not spy_df.empty and len(spy_df) >= 20:
+    if market_proxy_df is not None and not market_proxy_df.empty and len(market_proxy_df) >= 20:
         try:
             stock_20d_return = (close.iloc[-1] / close.iloc[-20]) - 1
-            spy_close = spy_df['Close']
-            spy_20d_return = (spy_close.iloc[-1] / spy_close.iloc[-20]) - 1
-            if spy_20d_return != 0:
-                rs_ratio = stock_20d_return / spy_20d_return
+            proxy_close = market_proxy_df['Close']
+            proxy_20d_return = (proxy_close.iloc[-1] / proxy_close.iloc[-20]) - 1
+            if proxy_20d_return != 0:
+                rs_ratio = stock_20d_return / proxy_20d_return
                 is_strong_rs = rs_ratio >= rs_minimum
             else:
                 rs_ratio = 1.0
@@ -237,7 +368,10 @@ def analyze_single_ticker_dormant_giant(
     is_breakout = (close.iloc[-1] > past_resistance) and (current_vol > (avg_vol_50 * 1.5))
 
     # --- Signal determination ---
-    if is_breakout:
+    # Breakouts still require MFI accumulation, market-relative strength,
+    # and sector momentum. They bypass consolidation tightness and volume
+    # cluster since breakout already enforces 1.5x average volume.
+    if is_breakout and has_mfi_accumulation and is_strong_rs and sector_ok:
         signal = "Active Breakout"
         passes = True
     elif is_squeezing and tight_consolidation and has_mfi_accumulation and has_volume_cluster and is_strong_rs and sector_ok:
@@ -314,12 +448,12 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
     logger.info("Starting Dormant Giant v2 scan for %d tickers", total)
 
     # Fetch market context once
-    spy_df = _fetch_spy_data(cutoff_date=cutoff_date)
+    market_proxy_df = _fetch_market_proxy(cutoff_date=cutoff_date)
     sector_above_sma = _fetch_sector_etfs(cutoff_date=cutoff_date)
     ticker_sector_map = _get_ticker_sector_mapping()
 
     if log_callback:
-        log_callback(f"Market context loaded — SPY data: {'yes' if not spy_df.empty else 'no'}, Sector ETFs: {len(sector_above_sma)}")
+        log_callback(f"Market context loaded — Market proxy: {'yes' if not market_proxy_df.empty else 'no'}, Sector ETFs: {len(sector_above_sma)}")
 
     with ProcessPoolExecutor(max_workers=8) as executor:
         futures = {
@@ -327,7 +461,7 @@ def tool_run_dormant_giant_scan(progress_callback=None, log_callback=None, filte
                 analyze_single_ticker_dormant_giant,
                 t,
                 filters,
-                spy_df,
+                market_proxy_df,
                 sector_above_sma,
                 ticker_sector_map,
                 cutoff_date
@@ -410,10 +544,332 @@ def tool_verify_eps_acceleration(tickers: List[Dict], log_callback=None) -> List
 
 
 # =============================================================================
+# INDICATOR RECOMPUTATION HELPERS
+# =============================================================================
+
+def _recompute_indicator(df: pd.DataFrame, column: str, custom_params: Optional[Dict[str, Any]] = None) -> Optional[pd.Series]:
+    """Recompute a single technical indicator with optional custom parameters.
+
+    Uses INDICATOR_REGISTRY to find the correct ta class and instantiate it
+    with merged default + custom parameters.
+
+    Returns the indicator Series or None if the column is unknown.
+    """
+    # Handle custom indicators not in INDICATOR_REGISTRY
+    if column == 'custom_ema_pct_change':
+        period = custom_params.get('period', 9) if custom_params else 9
+        ema = df['Close'].ewm(span=period, adjust=False).mean()
+        return (ema - ema.shift(1)) / ema.shift(1) * 100
+
+    registry = INDICATOR_REGISTRY.get(column)
+    if registry is None:
+        logger.debug("Unknown indicator for recomputation: %s", column)
+        return None
+
+    # Merge default params with custom overrides
+    params = {k: df[v] for k, v in registry['params'].items()}
+    defaults = {k: v for k, v in registry.items() if k.startswith('default_')}
+    # Map default_window -> window, etc.
+    param_map = {
+        'default_window': 'window',
+        'default_window_dev': 'window_dev',
+        'default_window_fast': 'window_fast',
+        'default_window_slow': 'window_slow',
+        'default_window_sign': 'window_sign',
+        'default_smooth_window': 'smooth_window',
+        'default_lbp': 'lbp',
+        'default_pow1': 'pow1',
+        'default_pow2': 'pow2',
+    }
+    for default_key, actual_key in param_map.items():
+        if default_key in defaults:
+            params[actual_key] = defaults[default_key]
+
+    # Apply custom overrides
+    if custom_params:
+        for k, v in custom_params.items():
+            if k in params:
+                params[k] = v
+
+    try:
+        # Dynamic import: e.g. ta.momentum.RSIIndicator
+        module_path = registry['module']
+        class_name = registry['class']
+        module = __import__(module_path, fromlist=[class_name])
+        cls = getattr(module, class_name)
+        instance = cls(**params)
+
+        # Extract the specific output if specified
+        output_attr = registry.get('output', column.split('_')[-1])
+        # Handle special cases where the output attr name differs
+        if hasattr(instance, output_attr):
+            return getattr(instance, output_attr)()
+        # Fallback: try common output names
+        for fallback in [column.split('_')[-1], 'rsi', 'macd', 'wband', 'pband', 'mavg', 'hband', 'lband', 'stoch', 'stoch_signal', 'keltner_channel_wband']:
+            if hasattr(instance, fallback):
+                return getattr(instance, fallback)()
+        return None
+    except Exception as e:
+        logger.debug("Failed to recompute %s: %s", column, e)
+        return None
+
+
+def _resolve_requested_indicators(filters: Optional[Dict[str, Any]]) -> tuple[List[str], Dict[str, Dict[str, Any]]]:
+    """Resolve which indicators to fetch and which need custom params.
+
+    Returns:
+        (indicator_list, custom_params_map) where custom_params_map maps
+        column_name -> {param_name: param_value} for indicators that need
+        recomputation with non-default parameters.
+    """
+    if not filters:
+        return ['trend_sma_fast', 'trend_sma_slow', 'momentum_rsi', 'trend_macd', 'Volume'], {}
+
+    indicators = set()
+    custom_params: Dict[str, Dict[str, Any]] = {}
+
+    # Legacy indicator filters
+    if filters.get('rsi_min') is not None or filters.get('rsi_max') is not None:
+        indicators.add('momentum_rsi')
+    if filters.get('sma_20_relation', 'any') != 'any':
+        indicators.add('trend_sma_fast')
+    if filters.get('sma_50_relation', 'any') != 'any':
+        indicators.add('trend_sma_slow')
+    if filters.get('volume_ratio_min') is not None:
+        indicators.add('Volume')
+
+    # Dynamic indicator_filters
+    for item in filters.get('indicator_filters', []):
+        col = item.get('column')
+        if not col:
+            continue
+        indicators.add(col)
+        params = item.get('params')
+        if params:
+            custom_params[col] = params
+        # Also add reference column for cross-indicator comparisons
+        ref_col = item.get('reference_column')
+        if ref_col:
+            indicators.add(ref_col)
+            ref_params = item.get('reference_params')
+            if ref_params:
+                custom_params[ref_col] = ref_params
+
+    # Always include core fields
+    indicators.update(['Volume'])
+    return list(indicators), custom_params
+
+
+# =============================================================================
+# QUANT STRATEGY SCORING ENGINE
+# =============================================================================
+
+def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
+    """Compute 0-100 sub-scores for each base-setup category.
+
+    Returns dict with:
+    - trend_score, momentum_score, volatility_score, volume_score, total
+    """
+    close = row.get('close', 0) or 1
+
+    # --- Trend Strength ---
+    adx = row.get('trend_adx', 0)
+    adx_score = min(100, adx * 2) if adx > 0 else 0
+    sma_fast = row.get('trend_sma_fast', 0)
+    sma_slow = row.get('trend_sma_slow', 0)
+    close_val = row.get('close', 0)
+    if close_val > sma_fast > sma_slow:
+        sma_score = 100
+    elif close_val > sma_fast:
+        sma_score = 70
+    elif close_val > sma_slow:
+        sma_score = 40
+    else:
+        sma_score = 0
+    macd_diff = row.get('trend_macd_diff', 0)
+    macd_score = 100 if macd_diff and macd_diff > 0 else 0
+    trend_score = round(adx_score * 0.40 + sma_score * 0.35 + macd_score * 0.25, 1)
+
+    # --- Momentum Quality ---
+    rsi = row.get('momentum_rsi', 50)
+    rsi_score = max(0, 100 - abs(rsi - 55) * 2.5)
+    roc = row.get('momentum_roc', 0)
+    roc_score = min(100, max(0, 50 + roc * 5)) if roc is not None else 50
+    stoch = row.get('momentum_stoch', 50)
+    stoch_score = max(0, 100 - abs(stoch - 50) * 2) if stoch is not None else 50
+    momentum_score = round(rsi_score * 0.45 + roc_score * 0.30 + stoch_score * 0.25, 1)
+
+    # --- Volatility Regime ---
+    atr = row.get('volatility_atr', 0)
+    atr_pct = (atr / close * 100) if close > 0 else 0
+    if 1.0 <= atr_pct <= 5.0:
+        atr_score = 100
+    elif atr_pct < 1.0:
+        atr_score = max(0, atr_pct * 100)
+    elif atr_pct <= 10.0:
+        atr_score = max(0, 100 - (atr_pct - 5.0) * 10)
+    else:
+        atr_score = max(0, 50 - (atr_pct - 10.0) * 5)
+    bbw = row.get('volatility_bbw', 15)
+    if 2.0 <= bbw <= 15.0:
+        bbw_score = 100
+    elif bbw < 2.0:
+        bbw_score = max(0, 50 + bbw * 25)
+    elif bbw <= 25.0:
+        bbw_score = max(0, 100 - (bbw - 15.0) * 5)
+    else:
+        bbw_score = max(0, 50 - (bbw - 25.0) * 3)
+    volatility_score = round(atr_score * 0.50 + bbw_score * 0.50, 1)
+
+    # --- Volume Confirmation ---
+    vol_ratio = row.get('volume_ratio', 1.0)
+    if vol_ratio < 0.5:
+        vol_ratio_score = 20
+    elif vol_ratio < 1.0:
+        vol_ratio_score = 60
+    elif vol_ratio < 2.0:
+        vol_ratio_score = 100
+    elif vol_ratio < 5.0:
+        vol_ratio_score = 80
+    else:
+        vol_ratio_score = 60
+    mfi = row.get('volume_mfi', 50)
+    mfi_score = min(mfi, 100) if mfi >= 50 else mfi * 2
+    volume_score = round(vol_ratio_score * 0.50 + mfi_score * 0.50, 1)
+
+    total = round(
+        trend_score * 0.30 +
+        momentum_score * 0.25 +
+        volatility_score * 0.20 +
+        volume_score * 0.25, 1
+    )
+
+    return {
+        'trend_score': trend_score,
+        'momentum_score': momentum_score,
+        'volatility_score': volatility_score,
+        'volume_score': volume_score,
+        'total': total,
+    }
+
+
+def compute_base_setup_score(row: pd.Series) -> float:
+    """Compute a 0-100 base setup score from technical indicators."""
+    return compute_base_setup_breakdown(row)['total']
+
+
+def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float:
+    """Compute 0-100 bonus for how strongly the stock satisfies user filters.
+
+    For each indicator filter:
+    - min filter: if actual >= min, score = 50 + (actual-min)/(max_possible-min)*50
+    - max filter: if actual <= max, score = 50 + (max-actual)/(max-min_possible)*50
+    - Average across all filters
+    """
+    bonuses = []
+    indicator_filters = filters.get('indicator_filters', [])
+
+    # Reference ranges for common indicators (used to scale the bonus)
+    ref_ranges = {
+        'momentum_rsi': (0, 100),
+        'momentum_stoch': (0, 100),
+        'momentum_wr': (-100, 0),
+        'momentum_roc': (-50, 50),
+        'momentum_tsi': (-100, 100),
+        'momentum_ao': (-10, 10),
+        'momentum_kama': (0, 1000),
+        'volatility_bbw': (0, 50),
+        'volatility_bbp': (0, 1),
+        'volatility_atr': (0, 50),
+        'volatility_ui': (0, 20),
+        'trend_adx': (0, 100),
+        'trend_cci': (-300, 300),
+        'trend_macd': (-10, 10),
+        'trend_macd_diff': (-5, 5),
+        'trend_aroon_ind': (-100, 100),
+        'volume_mfi': (0, 100),
+        'volume_cmf': (-0.5, 0.5),
+        'volume_fi': (-1000000, 1000000),
+    }
+
+    for item in indicator_filters:
+        col = item.get('column')
+        if not col or col not in row.index:
+            continue
+        actual = row[col]
+        if pd.isna(actual):
+            continue
+
+        min_val = item.get('min')
+        max_val = item.get('max')
+        ref_min, ref_max = ref_ranges.get(col, (0, 100))
+
+        if min_val is not None and actual >= min_val:
+            # How far above the minimum? Scale to ref_max.
+            if ref_max > min_val:
+                bonus = 50 + min(50, (actual - min_val) / (ref_max - min_val) * 50)
+            else:
+                bonus = 50
+            bonuses.append(bonus)
+        elif max_val is not None and actual <= max_val:
+            # How far below the maximum? Scale to ref_min.
+            if max_val > ref_min:
+                bonus = 50 + min(50, (max_val - actual) / (max_val - ref_min) * 50)
+            else:
+                bonus = 50
+            bonuses.append(bonus)
+        else:
+            # Filter not satisfied
+            bonuses.append(0)
+
+    # Legacy filters
+    if filters.get('rsi_min') is not None:
+        rsi = row.get('momentum_rsi')
+        if rsi is not None and rsi >= filters['rsi_min']:
+            bonuses.append(50 + min(50, (rsi - filters['rsi_min']) / (100 - filters['rsi_min']) * 50))
+        else:
+            bonuses.append(0)
+
+    if filters.get('rsi_max') is not None:
+        rsi = row.get('momentum_rsi')
+        if rsi is not None and rsi <= filters['rsi_max']:
+            bonuses.append(50 + min(50, (filters['rsi_max'] - rsi) / (filters['rsi_max'] - 0) * 50))
+        else:
+            bonuses.append(0)
+
+    if filters.get('volume_ratio_min') is not None:
+        vr = row.get('volume_ratio')
+        if vr is not None and vr >= filters['volume_ratio_min']:
+            bonuses.append(50 + min(50, (vr - filters['volume_ratio_min']) / (5.0 - filters['volume_ratio_min']) * 50))
+        else:
+            bonuses.append(0)
+
+    if filters.get('ath_proximity_min') is not None:
+        ath = row.get('ath_proximity')
+        if ath is not None and ath >= filters['ath_proximity_min']:
+            bonuses.append(50 + min(50, (ath - filters['ath_proximity_min']) / (1.0 - filters['ath_proximity_min']) * 50))
+        else:
+            bonuses.append(0)
+
+    if not bonuses:
+        return 50.0  # Neutral bonus when no filters applied
+
+    return round(sum(bonuses) / len(bonuses), 1)
+
+
+def compute_quant_score(row: pd.Series, filters: Dict[str, Any], base_weight: int = 60) -> float:
+    """Compute hybrid final score with adjustable base setup weight (0-100)."""
+    base = compute_base_setup_score(row)
+    bonus = compute_filter_match_bonus(row, filters)
+    bw = max(0, min(100, base_weight)) / 100.0
+    return round(base * bw + bonus * (1 - bw), 1)
+
+
+# =============================================================================
 # QUANT STRATEGY SCREENER (agnoMultiAgentTrader_2.py)
 # =============================================================================
 
-def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None) -> Optional[Dict]:
+def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> Optional[Dict]:
     """Worker for multiprocessing TA calculations using ta library (matching standalone)."""
     if not ticker or not isinstance(ticker, str):
         return None
@@ -423,10 +879,8 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
 
     try:
         if cutoff_date:
-            df = pd.read_sql(
-                f'SELECT * FROM {safe_ticker} WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 250',
-                worker_engine, params={"cutoff_date": cutoff_date}
-            )
+            query = f'SELECT * FROM {safe_ticker} WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT 250'
+            df = pd.read_sql(query, worker_engine)
         else:
             df = pd.read_sql(f'SELECT * FROM {safe_ticker} ORDER BY "Date" DESC LIMIT 250', worker_engine)
 
@@ -438,10 +892,24 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
         # Use ta library for all indicators (matching standalone)
         df = add_all_ta_features(df, "Open", "High", "Low", "Close", "Volume", fillna=True)
 
+        # Recompute indicators with custom parameters if needed
+        if custom_params:
+            for col, params in custom_params.items():
+                recomputed = _recompute_indicator(df, col, params)
+                if recomputed is not None:
+                    df[col] = recomputed
+
+        # Compute custom indicators not provided by ta library
+        for col in requested_indicators:
+            if col == 'custom_ema_pct_change':
+                period = (custom_params or {}).get(col, {}).get('period', 9)
+                ema = df['Close'].ewm(span=period, adjust=False).mean()
+                df[col] = (ema - ema.shift(1)) / ema.shift(1) * 100
+
         latest = df.iloc[-1]
         res = {'ticker': ticker.upper(), 'close': round(latest['Close'], 2)}
         for col in requested_indicators:
-            if col in latest:
+            if col in latest.index:
                 try:
                     res[col] = round(latest[col], 4)
                 except (TypeError, ValueError):
@@ -495,7 +963,8 @@ def _worker_ta_wrapper(args_tuple):
 def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                        cutoff_date: Optional[str] = None,
                        progress_callback=None, log_callback=None,
-                       filters: Optional[Dict[str, Any]] = None) -> str:
+                       filters: Optional[Dict[str, Any]] = None,
+                       custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
     """Screen S&P 1500 using parallel processing with ta library (matching standalone)."""
     # Source tickers from information_schema.tables (matching standalone)
     with ENGINE.connect() as conn:
@@ -505,11 +974,14 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
         tickers = [row[0] for row in res if row[0] not in
                    ['stock_metadata', 'stock_financials_quarterly', 'stock_financials_yearly']]
 
+    # Ensure base scoring indicators are always fetched so every stock can be scored
+    merged_indicators = list(set(requested_indicators + BASE_SCORING_INDICATORS))
+
     total = len(tickers)
     if log_callback:
-        log_callback(f"Scanning {total} stocks for {requested_indicators}...")
+        log_callback(f"Scanning {total} stocks for {merged_indicators}...")
 
-    args = [(ticker, requested_indicators, cutoff_date) for ticker in tickers]
+    args = [(ticker, merged_indicators, cutoff_date, custom_params) for ticker in tickers]
     results = []
     completed = 0
 
@@ -537,7 +1009,7 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
             if log_callback:
                 log_callback(f"Applied filters: {len(df)} stocks remain after filtering.")
         elif sort_by in df.columns:
-            df = df.sort_values(by=sort_by).head(50)
+            df = df.sort_values(by=sort_by)
 
     return df.to_csv(index=False) if not df.empty else "No results found."
 
@@ -669,8 +1141,54 @@ QUANT_FILTER_SCHEMA = {
     "revenue_growth_min": "float|null  // decimal, e.g. 0.10 = 10%",
     "sort_by": "'ticker'|'ath_proximity'|'rsi'|'volume_ratio'|'close'",
     "sort_order": "'asc'|'desc'",
-    "max_results": "int  // default 20"
+    "max_results": "int  // default 20",
+    "earnings_within_days": "int|null  // e.g. 10 = next earnings within 10 days. null means ignore.",
+    "indicator_filters": "[{column: string, params?: {window?: int, ...}, min?: float, max?: float, condition?: 'above'|'below'|'equals', reference_column?: string, reference_params?: {window?: int, ...}}]  // dynamic indicator filters. Use condition+reference_column for cross-indicator comparisons (e.g. EMA above SMA). Use min/max for threshold-based filters."
 }
+
+# Catalog of available technical indicators for the LLM parser
+INDICATOR_CATALOG = """
+Available technical indicators (use exact column names):
+  momentum_rsi — RSI (Relative Strength Index), default window=14
+  momentum_stoch — Stochastic Oscillator, default window=14
+  momentum_stoch_signal — Stochastic Signal, default window=14
+  momentum_wr — Williams %R, default lbp=14
+  momentum_ao — Awesome Oscillator
+  momentum_roc — Rate of Change, default window=12
+  momentum_tsi — True Strength Index, default window_slow=25, window_fast=13
+  momentum_uo — Ultimate Oscillator
+  momentum_kama — KAMA (Kaufman Adaptive Moving Average), default window=10
+  volatility_bbw — Bollinger Band Width, default window=20, window_dev=2
+  volatility_bbp — Bollinger Band Percentage, default window=20, window_dev=2
+  volatility_bbh — Bollinger Band High, default window=20, window_dev=2
+  volatility_bbl — Bollinger Band Low, default window=20, window_dev=2
+  volatility_atr — Average True Range, default window=14
+  volatility_ui — Ulcer Index, default window=14
+  trend_sma_fast — SMA 20
+  trend_sma_slow — SMA 50
+  trend_ema_fast — EMA 12
+  trend_ema_slow — EMA 26
+  trend_macd — MACD line, default window_slow=26, window_fast=12, window_sign=9
+  trend_macd_signal — MACD Signal line
+  trend_macd_diff — MACD Histogram
+  trend_adx — ADX (Average Directional Index), default window=14
+  trend_cci — CCI (Commodity Channel Index), default window=20
+  trend_trix — TRIX, default window=15
+  trend_mass_index — Mass Index
+  trend_aroon_up — Aroon Up, default window=25
+  trend_aroon_down — Aroon Down, default window=25
+  trend_aroon_ind — Aroon Indicator, default window=25
+  trend_stc — Schaff Trend Cycle
+  volume_mfi — MFI (Money Flow Index), default window=14
+  volume_cmf — CMF (Chaikin Money Flow), default window=20
+  volume_obv — OBV (On-Balance Volume)
+  volume_fi — Force Index, default window=13
+  volume_vwap — VWAP (Volume Weighted Average Price)
+  volume_adi — Accumulation/Distribution Index
+  volume_nvi — Negative Volume Index
+
+  custom_ema_pct_change — EMA Percentage Change (day-over-day % change of EMA). Parameter: period (default 9). Scale: percentage (can be positive or negative).
+"""
 
 FILTER_PARSER_PROMPT = """You are a stock screener filter parser.
 Convert the user's request into a JSON object matching this schema exactly.
@@ -679,6 +1197,49 @@ Only include non-null fields. Return ONLY valid JSON, no markdown, no explanatio
 Schema fields:
 {schema}
 
+Available indicators:
+{indicators}
+
+Indicator scales (CRITICAL — these determine what min/max values to use):
+- momentum_rsi: 0–100 scale. 70+ = overbought, 30- = oversold.
+- volatility_bbw: Percentage scale (e.g., 5.0 = 5%). Squeeze = under 6.0–10.0. Wide bands = 20+.
+- volatility_bbp: 0–1 scale (percentage of band position).
+- volatility_atr: Raw price scale (dollar amount of average true range).
+- trend_macd: Raw price scale (can be positive or negative).
+- trend_adx: 0–100 scale. 25+ = trending, 50+ = strong trend.
+- trend_cci: Unbounded scale. +100/-100 are common thresholds.
+- momentum_stoch: 0–100 scale. 80+ = overbought.
+- momentum_wr: -100–0 scale. -20 = overbought, -80 = oversold.
+- momentum_roc: Percentage scale (e.g., 5.0 = 5% change).
+- volume_mfi: 0–100 scale. 80+ = overbought on volume.
+- volume_cmf: Unbounded scale. +0.05/-0.05 are common thresholds.
+- custom_ema_pct_change: Percentage scale (can be positive or negative). Measures day-over-day % change of EMA. Use min > 0 for accelerating EMA, max < 0 for decelerating EMA.
+
+Parameter customization:
+- Any indicator can include a "params" object to override default parameters.
+- Example: RSI with window=7: {{"column": "momentum_rsi", "params": {{"window": 7}}, "min": 0, "max": 30}}
+- Example: Bollinger Band Width squeeze: {{"column": "volatility_bbw", "max": 6.0}}
+- Example: MACD above signal: {{"column": "trend_macd", "min": 0}}
+- Example: Strong trend (ADX > 25): {{"column": "trend_adx", "min": 25}}
+- Example: EMA(20) percentage change accelerating: {{"column": "custom_ema_pct_change", "params": {{"period": 20}}, "min": 1.0}}
+
+Cross-indicator comparisons (CRITICAL — use this for EMA vs SMA, MACD vs Signal, etc.):
+- When the user asks for one indicator relative to another (e.g. "EMA(9) above SMA(20)", "MACD above signal", "price above SMA"), DO NOT use min/max.
+- Instead, use "condition" + "reference_column" (+ optional "reference_params"):
+  - Example: EMA(9) above SMA(20): {{"column": "trend_ema_fast", "params": {{"window": 9}}, "condition": "above", "reference_column": "trend_sma_fast", "reference_params": {{"window": 20}}}}
+  - Example: MACD above signal: {{"column": "trend_macd", "condition": "above", "reference_column": "trend_macd_signal"}}
+  - Example: Price above SMA 50: {{"column": "close", "condition": "above", "reference_column": "trend_sma_slow"}}
+  - Example: SMA(20) below SMA(50): {{"column": "trend_sma_fast", "params": {{"window": 20}}, "condition": "below", "reference_column": "trend_sma_slow", "reference_params": {{"window": 50}}}}
+- Valid conditions: "above", "below", "equals".
+- Both "column" and "reference_column" must be exact names from the indicator catalog.
+- If the user specifies custom windows (e.g. "EMA(9)" vs default EMA 12), include "params" and "reference_params".
+
+Logic guidance:
+- If the user combines contradictory conditions (e.g., "high RSI AND volatility squeeze"), both must be true simultaneously. A stock in a squeeze has low recent movement, so RSI is unlikely to be > 70. Expect 0 results.
+- Use the indicator_filters array for ALL indicator-based conditions. Reserve the legacy rsi_min/max fields only for simple RSI-only prompts.
+- If an indicator reference is ambiguous (e.g., "RSI"), default to "momentum_rsi".
+- When the user says "X above Y" or "X below Y", ALWAYS use condition+reference_column. Never approximate with min/max.
+
 Default rules:
 - If user asks for stocks "close to all time high", set ath_proximity_min to 0.90-0.98 depending on wording (very close = 0.98, close = 0.95, near = 0.90).
 - If user specifies a count (e.g. "top 20", "find 50"), set max_results to that number.
@@ -686,7 +1247,21 @@ Default rules:
 - sort_order defaults to "desc" for proximity-based sorts, "asc" for ticker.
 - sma_20_relation and sma_50_relation default to "any".
 - sector_whitelist should be exact sector names as they appear in stock_metadata (e.g. "Technology", "Healthcare", "Financials").
-""".format(schema="\n".join(f'  "{k}": {v}' for k, v in QUANT_FILTER_SCHEMA.items()))
+- When the user references an indicator not in the catalog, map it to the closest available indicator by name.
+- Use "indicator_filters" for any indicator-based condition beyond the legacy rsi_min/max fields.
+
+Earnings calendar filter:
+- When the user mentions earnings (e.g., "earnings tomorrow", "reports next week", "upcoming earnings"), set earnings_within_days accordingly.
+- "earnings tomorrow" -> earnings_within_days: 1
+- "earnings this week" -> earnings_within_days: 7
+- "earnings next week" -> earnings_within_days: 14
+- "earnings in 10 days" -> earnings_within_days: 10
+- "no earnings soon" or "avoid earnings" -> earnings_within_days: 0 (only stocks with NO earnings in the immediate future)
+- If the user doesn't mention earnings, leave earnings_within_days as null.
+""".format(
+    schema="\n".join(f'  "{k}": {v}' for k, v in QUANT_FILTER_SCHEMA.items()),
+    indicators=INDICATOR_CATALOG
+)
 
 
 def parse_quant_filters(prompt: str) -> Dict[str, Any]:
@@ -735,6 +1310,8 @@ def parse_quant_filters(prompt: str) -> Dict[str, Any]:
         "sort_by": filters.get("sort_by", "ticker"),
         "sort_order": filters.get("sort_order", "asc"),
         "max_results": filters.get("max_results", 20),
+        "earnings_within_days": filters.get("earnings_within_days"),
+        "indicator_filters": filters.get("indicator_filters", []),
     }
     return normalized
 
@@ -768,17 +1345,51 @@ def apply_quant_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFra
     # SMA relations
     sma20_rel = filters.get("sma_20_relation", "any")
     if sma20_rel == "above" and "trend_sma_fast" in df.columns:
-        df = df[df["Close"] > df["trend_sma_fast"]]
+        df = df[df["close"] > df["trend_sma_fast"]]
     elif sma20_rel == "below" and "trend_sma_fast" in df.columns:
-        df = df[df["Close"] < df["trend_sma_fast"]]
+        df = df[df["close"] < df["trend_sma_fast"]]
 
     sma50_rel = filters.get("sma_50_relation", "any")
     if sma50_rel == "above" and "trend_sma_slow" in df.columns:
-        df = df[df["Close"] > df["trend_sma_slow"]]
+        df = df[df["close"] > df["trend_sma_slow"]]
     elif sma50_rel == "below" and "trend_sma_slow" in df.columns:
-        df = df[df["Close"] < df["trend_sma_slow"]]
+        df = df[df["close"] < df["trend_sma_slow"]]
 
-    # Sort and limit
+    # Dynamic indicator_filters (new format: any indicator with min/max and optional params)
+    for item in filters.get("indicator_filters", []):
+        col = item.get("column")
+        if not col or col not in df.columns:
+            logger.warning("Filter references missing column: %s", col)
+            continue
+        try:
+            condition = item.get("condition")
+            ref_col = item.get("reference_column")
+            if condition and ref_col and ref_col in df.columns:
+                # Cross-indicator comparison (e.g. EMA above SMA)
+                if condition == "above":
+                    df = df[df[col] > df[ref_col]]
+                elif condition == "below":
+                    df = df[df[col] < df[ref_col]]
+                elif condition == "equals":
+                    # Use percentage-based tolerance if provided (default 1%)
+                    # Formula: |A - B| <= |B| * tolerance
+                    tol = item.get("tolerance", 0.01)
+                    if tol > 0:
+                        df = df[np.abs(df[col] - df[ref_col]) <= (df[ref_col].abs() * tol)]
+                    else:
+                        df = df[df[col] == df[ref_col]]
+            else:
+                # Threshold-based filter (min/max)
+                min_val = item.get("min")
+                max_val = item.get("max")
+                if min_val is not None:
+                    df = df[df[col] >= min_val]
+                if max_val is not None:
+                    df = df[df[col] <= max_val]
+        except Exception as e:
+            logger.warning("Failed to apply indicator filter on %s: %s", col, e)
+
+    # Sort (limit removed — scoring will rank and cap downstream)
     sort_by = filters.get("sort_by", "ticker")
     sort_order = filters.get("sort_order", "asc")
     ascending = sort_order != "desc"
@@ -787,9 +1398,6 @@ def apply_quant_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFra
         df = df.sort_values(by=sort_by, ascending=ascending)
     elif sort_by == "ticker" and "ticker" in df.columns:
         df = df.sort_values(by="ticker", ascending=ascending)
-
-    max_results = filters.get("max_results", 50)
-    df = df.head(max_results)
 
     return df
 
@@ -837,6 +1445,12 @@ def create_dormant_giant_team():
         2. Pass the results to the Fundamental Specialist for fundamental verification (EPS acceleration OR revenue growth).
         3. Pass the surviving candidates to the Risk Manager for final trade parameters.
         4. Output a comprehensive final report summarizing the viable 'Dormant Giant' candidates.
+
+        Each candidate result includes:
+        - days_until_earnings: number of days until the next earnings announcement
+        - eps_estimate: analyst consensus EPS estimate for the next quarter
+        - time_of_day: when the report is scheduled (bmo = before market open, amc = after market close)
+        Consider earnings proximity as both a catalyst opportunity (short-term volatility play) and a risk factor (avoiding positions through uncertain events).
         """,
         debug_mode=True,
         markdown=True
@@ -901,7 +1515,8 @@ def create_quant_strategy_team():
             "3. Have the Risk Manager use 'tool_query_metadata' on the final list.",
             "4. Have the Performance Analyst calculate historical performance from cutoff_date to today using 'tool_get_historical_performance'.",
             "5. Synthesize everything into a final Markdown table with Technical, Fundamental, Risk, and Performance columns.",
-            "CRITICAL: Complete the task in ONE cycle. If no stocks pass all filters, explain WHY instead of searching again."
+            "CRITICAL: Complete the task in ONE cycle. If no stocks pass all filters, explain WHY instead of searching again.",
+            "Each candidate result includes: days_until_earnings (days until next earnings), eps_estimate (analyst consensus), and time_of_day (bmo/amc/dmh/tns). Factor earnings proximity into your risk assessment and catalyst timing."
         ],
         markdown=True,
         debug_mode=True
@@ -1034,6 +1649,12 @@ def run_dormant_giant_screener(prompt: Optional[str] = None, progress_callback=N
 
     # Enrich with metadata, fundamentals, and price stats
     verified_results = enrich_results(verified_results)
+
+    # Enrich with next earnings calendar data
+    _enrich_with_earnings(verified_results)
+
+    # Apply earnings calendar filter if specified
+    verified_results = _apply_earnings_filter(verified_results, filters)
 
     return {
         "technical_candidates": len(technical_results),
@@ -1262,7 +1883,8 @@ def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_ca
 
 
 def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, progress_callback=None,
-                                log_callback=None, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                log_callback=None, filters: Optional[Dict[str, Any]] = None,
+                                base_weight: int = 60) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
     Uses ta library column names and maps to frontend-friendly keys.
@@ -1273,8 +1895,10 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
     if progress_callback:
         progress_callback(5)
 
+    # Resolve dynamic indicators from filters
+    requested_indicators, custom_params = _resolve_requested_indicators(filters)
+
     # Use ta-compatible column names, then map to frontend-friendly keys
-    ta_indicators = ['trend_sma_fast', 'trend_sma_slow', 'momentum_rsi', 'trend_macd', 'Volume']
     ta_to_friendly = {
         'trend_sma_fast': 'sma_20',
         'trend_sma_slow': 'sma_50',
@@ -1285,11 +1909,12 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
 
     # Technical scan with progress and optional filters
     tech_csv = technical_screener(
-        ta_indicators,
+        requested_indicators,
         cutoff_date=cutoff_date,
         progress_callback=progress_callback,
         log_callback=log_callback,
-        filters=filters
+        filters=filters,
+        custom_params=custom_params
     )
     tech_df = pd.read_csv(pd.io.common.StringIO(tech_csv)) if tech_csv != "No results found." else pd.DataFrame()
 
@@ -1305,23 +1930,40 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
             "summary": "No stocks matched the technical criteria."
         }
 
+    # Compute hybrid score (60% base setup + 40% filter match) and sort descending
+    tech_df['score'] = tech_df.apply(lambda row: compute_quant_score(row, filters or {}, base_weight), axis=1)
+    tech_df = tech_df.sort_values(by='score', ascending=False)
+
     # Map ta column names to frontend-friendly names
     results_records = []
     for _, row in tech_df.iterrows():
-        record = {'ticker': row.get('ticker', ''), 'close': row.get('close', None)}
+        record = {
+            'ticker': row.get('ticker', ''),
+            'close': row.get('close', None),
+            'score': round(float(row.get('score', 0)), 1)
+        }
+        # Include base-setup breakdown scores
+        breakdown = compute_base_setup_breakdown(row)
+        record['trend_score'] = breakdown['trend_score']
+        record['momentum_score'] = breakdown['momentum_score']
+        record['volatility_score'] = breakdown['volatility_score']
+        record['volume_score'] = breakdown['volume_score']
+        # Map known indicators to friendly names
         for ta_col, friendly_col in ta_to_friendly.items():
             if ta_col in tech_df.columns and pd.notna(row.get(ta_col)):
                 record[friendly_col] = round(row[ta_col], 4) if isinstance(row[ta_col], (int, float)) else row[ta_col]
-        # Include additional price stats computed in _worker_ta_analysis
-        for extra in ['ema_9', 'high_52w', 'low_52w', 'all_time_high', 'all_time_low', 'ath_proximity', 'volume', 'volume_ma_50', 'volume_ratio']:
-            if extra in tech_df.columns and pd.notna(row.get(extra)):
-                record[extra] = round(row[extra], 4) if isinstance(row[extra], (int, float)) else row[extra]
+        # Include ALL indicator columns (dynamic indicators from user prompt)
+        for col in tech_df.columns:
+            if col not in record and col not in ['ticker', 'close', 'score'] and pd.notna(row.get(col)):
+                val = row[col]
+                record[col] = round(val, 4) if isinstance(val, (int, float)) else val
         results_records.append(record)
 
     max_results = filters.get("max_results", 20) if filters else 20
-    tickers = [r['ticker'] for r in results_records if r.get('ticker')][:max_results]
+    top_records = results_records[:max_results]
+    tickers = [r['ticker'] for r in top_records if r.get('ticker')]
 
-    # Fundamental check
+    # Fundamental check (only top N to limit DB load)
     if log_callback:
         log_callback("Running fundamental health check...")
     fund_csv = query_fundamental_health(tickers, cutoff_date=cutoff_date)
@@ -1347,22 +1989,29 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
     if progress_callback:
         progress_callback(95)
 
-    # Enrich with metadata, fundamentals, and price stats
-    results_records = enrich_results(results_records)
+    # Enrich top records with metadata, fundamentals, and price stats
+    top_records = enrich_results(top_records)
+
+    # Enrich with next earnings calendar data
+    _enrich_with_earnings(top_records)
+
+    # Apply earnings calendar filter if specified
+    top_records = _apply_earnings_filter(top_records, filters)
 
     return {
         "technical_candidates": len(results_records),
-        "results": results_records[:max_results],
+        "results": top_records,
         "fundamental_data": fund_csv,
         "metadata": meta_csv,
         "performance": perf_csv,
-        "summary": f"Found {len(results_records)} technical candidates. Fundamental and risk analysis complete."
+        "summary": f"Found {len(results_records)} technical candidates. Top {len(top_records)} by score returned."
     }
 
 
 def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: Optional[str] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None,
                                         progress_callback=None, agent_log_callback=None,
-                                        filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                        filters: Optional[Dict[str, Any]] = None,
+                                        base_weight: int = 60) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
     Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
@@ -1399,7 +2048,8 @@ Screening criteria applied:
             prompt, cutoff_date,
             progress_callback=progress_callback,
             log_callback=None,
-            filters=filters
+            filters=filters,
+            base_weight=base_weight
         )
 
         log_capture.log_system(f"Technical screen complete: {structured['technical_candidates']} candidates found")
@@ -1433,4 +2083,4 @@ Screening criteria applied:
         logger.error("AI screener failed: %s", e)
         log_capture.log_system(f"Error in AI analysis: {str(e)[:100]}... Falling back to non-AI mode.")
         logger.info("Falling back to non-AI screener...")
-        return run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback)
+        return run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback, base_weight=base_weight)

@@ -6,6 +6,7 @@ interface ParamRange {
   start: number;
   stop: number;
   step: number;
+  sourceValue?: number; // The code value that last generated this range
 }
 
 interface WFOConfig {

@@ -52,6 +52,86 @@ interface CandleStickChartProps {
   trades?: TradeMarker[];
   indicators?: Indicator[];
   height?: number;
+  cutoffDate?: string; // mm/dd/yyyy or yyyy-mm-dd dashed vertical line
+}
+
+/** Parse mm/dd/yyyy or yyyy-mm-dd to UTC timestamp in seconds. */
+function parseDateToTimestamp(dateStr: string): number | null {
+  // Try mm/dd/yyyy
+  const slashParts = dateStr.split('/');
+  if (slashParts.length === 3) {
+    const month = parseInt(slashParts[0], 10);
+    const day = parseInt(slashParts[1], 10);
+    const year = parseInt(slashParts[2], 10);
+    if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+      return Math.floor(Date.UTC(year, month - 1, day) / 1000);
+    }
+  }
+  // Try yyyy-mm-dd
+  const dashParts = dateStr.split('-');
+  if (dashParts.length === 3) {
+    const year = parseInt(dashParts[0], 10);
+    const month = parseInt(dashParts[1], 10);
+    const day = parseInt(dashParts[2], 10);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return Math.floor(Date.UTC(year, month - 1, day) / 1000);
+    }
+  }
+  return null;
+}
+
+/** Custom primitive to draw a dashed vertical line at a specific time. */
+class VerticalLinePrimitive {
+  private _chart: IChartApi | null = null;
+  private _cutoffTime: Time;
+
+  constructor(cutoffTime: Time) {
+    this._cutoffTime = cutoffTime;
+  }
+
+  attached(param: any): void {
+    this._chart = param.chart;
+  }
+
+  detached(): void {
+    this._chart = null;
+  }
+
+  paneViews(): any[] {
+    return [this._createPaneView()];
+  }
+
+  private _createPaneView(): any {
+    const primitive = this;
+    return {
+      renderer() {
+        return {
+          draw(target: any) {
+            if (!primitive._chart) return;
+            const x = primitive._chart.timeScale().timeToCoordinate(primitive._cutoffTime);
+            if (x === null) return;
+
+            target.useBitmapCoordinateSpace((scope: any) => {
+              const ctx = scope.context;
+              const bitmapX = x * scope.horizontalPixelRatio;
+              ctx.save();
+              ctx.beginPath();
+              ctx.setLineDash([6 * scope.horizontalPixelRatio, 4 * scope.horizontalPixelRatio]);
+              ctx.strokeStyle = '#10B981';
+              ctx.lineWidth = 2 * scope.horizontalPixelRatio;
+              ctx.moveTo(bitmapX, 0);
+              ctx.lineTo(bitmapX, scope.bitmapSize.height);
+              ctx.stroke();
+              ctx.restore();
+            });
+          },
+        };
+      },
+      zOrder() {
+        return 'top';
+      },
+    };
+  }
 }
 
 export function CandleStickChart({
@@ -59,12 +139,14 @@ export function CandleStickChart({
   trades = [],
   indicators = [],
   height = 400,
+  cutoffDate,
 }: CandleStickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>>>({});
+  const cutoffLineRef = useRef<VerticalLinePrimitive | null>(null);
 
   // Initialize chart
   useEffect(() => {
@@ -103,6 +185,7 @@ export function CandleStickChart({
       borderVisible: false,
       wickUpColor: '#10b981',
       wickDownColor: '#f43f5e',
+      priceLineVisible: false,
     });
 
     candleSeriesRef.current = candleSeries;
@@ -121,6 +204,7 @@ export function CandleStickChart({
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      cutoffLineRef.current = null;
     };
   }, [height]);
 
@@ -268,6 +352,44 @@ export function CandleStickChart({
 
     chartRef.current?.timeScale().fitContent();
   }, [indicators]);
+
+  // Draw dashed green vertical line at cutoff date using custom primitive
+  useEffect(() => {
+    if (!chartRef.current || !candleSeriesRef.current || !cutoffDate || !data.length) {
+      if (cutoffLineRef.current && candleSeriesRef.current) {
+        try {
+          candleSeriesRef.current.detachPrimitive(cutoffLineRef.current);
+        } catch { /* ignore */ }
+        cutoffLineRef.current = null;
+      }
+      return;
+    }
+
+    const cutoffTs = parseDateToTimestamp(cutoffDate);
+    if (cutoffTs === null) return;
+
+    // Find the nearest data point time to the cutoff for exact timeToCoordinate match
+    let nearestTime = data[0].time;
+    let minDiff = Math.abs(data[0].time - cutoffTs);
+    for (const d of data) {
+      const diff = Math.abs(d.time - cutoffTs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearestTime = d.time;
+      }
+    }
+
+    try {
+      if (cutoffLineRef.current && candleSeriesRef.current) {
+        candleSeriesRef.current.detachPrimitive(cutoffLineRef.current);
+      }
+      const primitive = new VerticalLinePrimitive(Math.floor(nearestTime) as Time);
+      candleSeriesRef.current.attachPrimitive(primitive);
+      cutoffLineRef.current = primitive;
+    } catch (err) {
+      console.error('Failed to draw cutoff line:', err);
+    }
+  }, [cutoffDate, data]);
 
   return (
     <div

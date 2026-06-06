@@ -59,23 +59,25 @@ async def add_security_headers(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    """Check database connection on startup."""
+    """Check database connection on startup and ensure schema is up to date."""
     connected = database.test_connection()
     database.set_db_connected(connected)
     if connected:
         logger.info("Database connected: %s:%s/%s", database.DB_HOST, database.DB_PORT, database.DB_NAME)
+        database.create_earnings_calendar_table()
     else:
         logger.warning("Database connection failed - some features will use fallback data")
 
 
 # Import routers
-from app.routers import sectors, screener, quantgen, health
+from app.routers import sectors, screener, quantgen, health, earnings
 
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(sectors.router, prefix="/api", tags=["Sector Rotation"])
 app.include_router(screener.router, prefix="/api/screener", tags=["AI Screener"])
 app.include_router(quantgen.router, prefix="/api", tags=["QuantGen"])
+app.include_router(earnings.router, prefix="/api", tags=["Earnings"])
 
 
 # Root endpoint
@@ -91,6 +93,8 @@ async def root():
             "sectors": "/api/sectors",
             "stocks": "/api/stocks/{sector}",
             "screener": "/api/screener/scan",
+            "earnings_calendar": "/api/earnings/calendar",
+            "earnings_next": "/api/earnings/next/{ticker}",
             "generate": "/api/generate",
             "run": "/api/run",
             "optimize": "/api/optimize",

@@ -32,6 +32,7 @@ from app.services.true_wfo_implementation import (
     modify_code_dates,
     modify_code_dates_and_params
 )
+from app.services.wfo_metrics import compute_benchmark_from_prices
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,28 @@ def run_wfo_historical(
             result["output"] += f"Drawdown calculated: {len(drawdown_dict)} points\n"
         except Exception as e:
             result["output"] += f"Warning: Could not calculate drawdown: {e}\n"
+
+        # --- Benchmark buy-and-hold over full date range ---
+        try:
+            initial_val = all_equity_curves[0]["value"]
+            bench_equity, bench_stats, bench_dd = compute_benchmark_from_prices(
+                ticker=ticker,
+                start_date=start_date,
+                end_date=end_date,
+                initial_value=initial_val,
+            )
+            if bench_equity:
+                result["benchmark_equity"] = bench_equity
+                result["output"] += f"Benchmark equity: {len(bench_equity)} points\n"
+            if bench_stats:
+                if "stats" not in result:
+                    result["stats"] = {}
+                result["stats"].update(bench_stats)
+            if bench_dd:
+                result["benchmark_drawdown"] = bench_dd
+                result["output"] += f"Benchmark drawdown: {len(bench_dd)} points\n"
+        except Exception as bench_err:
+            result["output"] += f"Warning: Could not compute benchmark: {bench_err}\n"
 
     if all_trades:
         result["trades"] = all_trades

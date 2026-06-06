@@ -4,6 +4,7 @@ import Landing from './pages/Landing'
 import SectorRotation from './pages/SectorRotation'
 import StockScreener from './pages/StockScreener'
 import QuantGen from './pages/QuantGen'
+import EarningsCalendar from './pages/EarningsCalendar'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route element={<Layout />}>
           <Route path="sectors" element={<SectorRotation />} />
           <Route path="screener" element={<StockScreener />} />
+          <Route path="earnings" element={<EarningsCalendar />} />
           <Route path="quantgen/*" element={<QuantGen />} />
         </Route>
       </Routes>
