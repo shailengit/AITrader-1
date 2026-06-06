@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import database
+from app.dependencies import register_exception_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +55,8 @@ app.add_middleware(
     max_age=86400,
 )
 
+
+register_exception_handlers(app)
 
 # Security headers middleware
 @app.middleware("http")
