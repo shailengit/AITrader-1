@@ -11,12 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import database
 from app.dependencies import register_exception_handlers
+from app.services.structured_logging import configure_logging
+from app.services.rate_limiter import add_rate_limit_middleware
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure structured logging
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app
@@ -57,6 +56,7 @@ app.add_middleware(
 
 
 register_exception_handlers(app)
+add_rate_limit_middleware(app)
 
 # Security headers middleware
 @app.middleware("http")
