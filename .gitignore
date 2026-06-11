@@ -49,3 +49,4 @@ frontend/dist/
 
 # Superpowers
 .superpowers/
+*.backup

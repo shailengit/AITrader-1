@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.db.database import engine, SECTOR_ETFS, SECTOR_NAME_MAP
 from sqlalchemy import text
 
-from app.utils.security import sanitize_ticker, get_safe_table_name
+from app.utils.security import get_safe_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +238,7 @@ async def get_sector_stocks(
             name = stock[1]
 
             try:
+                safe_table = get_safe_table_name(ticker)
                 # Build latest CTE with optional cutoff
                 if cutoff_date:
                     latest_cte = f'''

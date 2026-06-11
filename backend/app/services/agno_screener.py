@@ -282,6 +282,7 @@ def analyze_single_ticker_dormant_giant(
         filters = {}
 
     worker_engine = create_engine(DB_URL, poolclass=QueuePool, pool_size=1)
+    safe_table = get_safe_table_name(ticker)
     try:
         if cutoff_date:
             query = f'SELECT "Date", "Open", "High", "Low", "Close", "Volume" FROM "{safe_table}" WHERE "Date" <= \'{cutoff_date}\' ORDER BY "Date" DESC LIMIT 200'

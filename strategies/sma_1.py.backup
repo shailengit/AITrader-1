@@ -9,8 +9,8 @@ slow_window = 20
 # Download data
 data = vbt.YFData.download(
     'CIEN',
-    start='2025-01-01',
-    end='2026-01-01'
+    start='2026-01-01',
+    end='2026-05-01'
 )
 
 # Get close price

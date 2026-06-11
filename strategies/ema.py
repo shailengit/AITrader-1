@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 5
+fast_ema_window = 2
 slow_ema_window = 20
 
 # Download data
-ticker = 'NEU'
-start = '2025-05-08'
-end = '2026-05-06'
+ticker = 'CEG'
+start = '2025-05-09'
+end = '2026-06-08'
 data = DataService.get_ohlcv_data(ticker, start, end)
 if data is None:
     raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")

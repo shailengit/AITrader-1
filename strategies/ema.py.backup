@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 
 # Parameters
-fast_ema_window = 5
-slow_ema_window = 150
+fast_ema_window = 2
+slow_ema_window = 20
 
 # Download data
-ticker = 'CRK'
-start = '2025-01-01'
-end = '2026-05-06'
+ticker = 'CEG'
+start = '2026-05-09'
+end = '2026-06-08'
 data = DataService.get_ohlcv_data(ticker, start, end)
 if data is None:
     raise ValueError(f"No data found for ticker '{ticker}' from {start} to {end}")
@@ -25,7 +25,7 @@ slow_ema = vbt.MA.run(close, window=slow_ema_window, ewm=True)
 entries = fast_ema.ma_crossed_above(slow_ema.ma)
 exits = fast_ema.ma_crossed_below(slow_ema.ma)
 
-# Create portfolio with OHLC data
+# Create portfolio with OHLC data, trailing SL and TP
 pf = vbt.Portfolio.from_signals(
     close,
     entries=entries,
@@ -33,7 +33,10 @@ pf = vbt.Portfolio.from_signals(
     open=data.get('Open'),
     high=data.get('High'),
     low=data.get('Low'),
-    freq='1d'
+    freq='1d',
+    sl_stop=0.05,      # 5% trailing stop loss
+    tp_stop=0.20,      # 20% take profit
+    sl_trail=True      # Enable trailing stop
 )
 
 # Print stats

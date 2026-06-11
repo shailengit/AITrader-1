@@ -5,6 +5,20 @@ FastAPI application combining Sector Rotation, Stock Screener, and QuantGen.
 
 import os
 import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env — check backend/ first, then project root
+_env_backend = Path(__file__).resolve().parent.parent / ".env"
+_env_root = _env_backend.parent / ".env"
+for p in (_env_backend, _env_root):
+    if p.exists():
+        load_dotenv(dotenv_path=p, override=True)
+        logging.info("Loaded environment from: %s", p)
+        break
+else:
+    logging.warning("No .env file found at %s or %s", _env_backend, _env_root)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
