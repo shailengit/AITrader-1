@@ -66,3 +66,37 @@ def test_xgboost_batch_predict():
     assert len(result) == 100
     assert all(s in ('BUY', 'HOLD', 'SELL') for s in result['signal'])
     assert all(0 <= c <= 1 for c in result['conviction'])
+
+
+def test_lstm_initial_state():
+    from app.services.markov.pattern_recognizer import LSTMRecognizer
+    rec = LSTMRecognizer('AAPL')
+    assert rec.ticker == 'AAPL'
+    assert not rec.is_trained
+    pred = rec.predict(pd.Series([0.01] * 5))
+    assert pred['signal'] == 'HOLD'
+
+
+def test_lstm_train_and_predict():
+    from app.services.markov.pattern_recognizer import LSTMRecognizer
+    np.random.seed(42)
+    n = 200
+    features = pd.DataFrame({
+        'f1': np.random.randn(n),
+        'f2': np.random.randn(n),
+        'f3': np.random.randn(n),
+    })
+    labels = pd.Series(np.where(
+        features['f1'] + features['f2'] > 0.5, 2,
+        np.where(features['f1'] + features['f2'] < -0.5, 0, 1)
+    ))
+
+    rec = LSTMRecognizer('LSTMTEST')
+    success = rec.train(features, labels, seq_length=10)
+    assert success
+    assert rec.is_trained
+
+    pred = rec.predict(features.iloc[0])
+    assert pred['signal'] in ('BUY', 'HOLD', 'SELL')
+    assert 0 <= pred['conviction'] <= 1
+    assert len(pred['probabilities']) == 3

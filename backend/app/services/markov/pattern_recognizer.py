@@ -14,6 +14,9 @@ from typing import Dict, Any, Optional, List
 
 import pandas as pd
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 logger = logging.getLogger(__name__)
 
@@ -272,8 +275,6 @@ class LSTMRecognizer:
         Returns:
             True if training succeeded.
         """
-        import torch
-        import torch.nn as nn
         import torch.optim as optim
         from torch.utils.data import DataLoader, TensorDataset
 
@@ -371,22 +372,15 @@ class LSTMRecognizer:
                 "probabilities": [1 / 3] * 3,
             }
 
-        import torch
-        import torch.nn.functional as F
-
         try:
             self._model.eval()
-            seq_length = self._config.get("seq_length", 10)
-            # Pad/truncate to seq_length
-            vals = features.values[-seq_length:]
-            if len(vals) < seq_length:
-                pad = np.zeros(seq_length - len(vals))
-                vals = np.concatenate([pad, vals])
-            x = torch.tensor(vals, dtype=torch.float32).view(1, seq_length, -1)
-
             with torch.no_grad():
-                logits = self._model(x)
-                probs = F.softmax(logits, dim=1).numpy()[0]
+                # features is a single row (pd.Series) -> shape (n_features,)
+                vals = features.values.astype(np.float32)
+                # Reshape to (1, 1, n_features) -- batch=1, seq_len=1, features=n
+                x = torch.tensor(vals, dtype=torch.float32).view(1, 1, -1)
+                outputs = self._model(x)
+                probs = F.softmax(outputs, dim=1)[0].numpy()
 
             pred_class = int(np.argmax(probs))
             conviction = float(probs[pred_class])
@@ -438,8 +432,6 @@ class LSTMRecognizer:
             logger.warning(f"No saved LSTM model found for {self.ticker} at {path}")
             return False
 
-        import torch
-
         try:
             with open(path, "rb") as f:
                 payload = pickle.load(f)
@@ -478,7 +470,7 @@ class LSTMRecognizer:
 # Internal PyTorch module
 # ---------------------------------------------------------------------------
 
-class _LSTMClassifier:
+class _LSTMClassifier(nn.Module):
     """Minimal single-layer LSTM with a linear classification head."""
 
     def __init__(
@@ -488,9 +480,7 @@ class _LSTMClassifier:
         num_layers: int = 1,
         dropout: float = 0.2,
     ):
-        import torch
-        import torch.nn as nn
-
+        super().__init__()
         self.lstm = nn.LSTM(
             input_size=n_features,
             hidden_size=hidden_size,
@@ -501,30 +491,7 @@ class _LSTMClassifier:
         self.classifier = nn.Linear(hidden_size, 3)
         self.dropout = nn.Dropout(dropout)
 
-    def train(self, mode: bool = True):
-        import torch.nn as nn
-        self.lstm.train(mode)
-        self.classifier.train(mode)
-        self.dropout.train(mode)
-
-    def eval(self):
-        self.train(False)
-
-    def parameters(self):
-        return list(self.lstm.parameters()) + list(self.classifier.parameters())
-
-    def state_dict(self):
-        return {
-            "lstm": self.lstm.state_dict(),
-            "classifier": self.classifier.state_dict(),
-        }
-
-    def load_state_dict(self, state_dict: dict):
-        self.lstm.load_state_dict(state_dict["lstm"])
-        self.classifier.load_state_dict(state_dict["classifier"])
-
-    def __call__(self, x):
-        import torch.nn.functional as F
+    def forward(self, x):
         lstm_out, _ = self.lstm(x)
         last_out = lstm_out[:, -1, :]
         dropped = self.dropout(last_out)
