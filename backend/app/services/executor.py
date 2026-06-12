@@ -35,6 +35,9 @@ import numpy as np
 from app.services.indicator_detector import detect_indicators
 from app.services.indicator_extractor import extract_indicators
 
+# Import Markov signal provider for regime-aware backtesting
+from app.services.markov.signal_provider import MarkovSignalProvider
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -306,6 +309,7 @@ class CodeExecutor:
             "plt": plt,
             "DataService": SafeDataService,
             "get_data": safe_get_data,
+            "MarkovSignalProvider": MarkovSignalProvider,
             "__builtins__": {
                 # Restrict builtins for security
                 "abs": abs, "all": all, "any": any, "bool": bool,
