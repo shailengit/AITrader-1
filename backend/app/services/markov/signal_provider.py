@@ -6,15 +6,9 @@ No 1-day delay applied (the True WFO pipeline handles temporal separation).
 """
 import logging
 import os
-import pickle
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 
-import pandas as pd
-import numpy as np
-
-from app.db.database import SECTOR_ETFS
-from app.services.markov.regime_model import SectorRegimeManager
+from app.services.markov.regime_model import SectorRegimeManager, VOL_GATE_THRESHOLD
 from app.services.markov.feature_engineering import (
     compute_ticker_features,
     DEFAULT_BUY_THRESHOLD,
@@ -42,9 +36,12 @@ class MarkovSignalProvider:
         conviction = markov.get_conviction('AAPL', '2024-01-15')
     """
 
-    def __init__(self, model: str = "xgboost", threshold: float = DEFAULT_BUY_THRESHOLD):
+    def __init__(self, model: str = "xgboost", threshold: float = DEFAULT_BUY_THRESHOLD,
+                 min_conviction: float = 0.6, strict: bool = False):
         self.model = model
         self.threshold = threshold
+        self.min_conviction = min_conviction
+        self.strict = strict
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._regime_manager: Optional[SectorRegimeManager] = None
 
@@ -69,6 +66,11 @@ class MarkovSignalProvider:
         if feat_data is None:
             return False
 
+        features = feat_data['features']
+        if len(features) == 0:
+            logger.warning(f"Empty feature DataFrame for {ticker}")
+            return False
+
         # Get or create recognizer
         if self.model == "xgboost":
             rec = XGBoostRecognizer(ticker)
@@ -77,11 +79,11 @@ class MarkovSignalProvider:
 
         if not rec.load():
             # Train if not cached
-            rec.train(feat_data['features'], feat_data['labels'])
+            rec.train(features, feat_data['labels'])
             rec.save()
 
         # Predict for all dates
-        predictions = rec.predict_batch(feat_data['features'])
+        predictions = rec.predict_batch(features)
 
         # Get regime history
         if self._regime_manager is None:
@@ -97,10 +99,10 @@ class MarkovSignalProvider:
             pred = predictions.loc[date]
 
             is_bull = regime_info['regime'] == 'BULL'
-            is_low_vol = regime_info['vol_probability'] < 0.5
-            is_buy = pred['signal'] == 'BUY' and pred['conviction'] >= 0.6
+            is_low_vol = regime_info['vol_probability'] < VOL_GATE_THRESHOLD
+            is_high_conviction = pred['signal'] == 'BUY' and pred['conviction'] >= self.min_conviction
 
-            if is_bull and is_low_vol and is_buy:
+            if is_bull and is_low_vol and is_high_conviction:
                 signal = 'BUY'
             elif not is_bull or not is_low_vol:
                 signal = 'SELL'
@@ -120,29 +122,38 @@ class MarkovSignalProvider:
         self._cache[key] = cache
         return True
 
-    def get_signal(self, ticker: str, date: str) -> str:
-        """Get signal for a ticker on a specific date."""
+    def _get_entry(self, ticker: str, date: str) -> Optional[Dict[str, Any]]:
+        """Get cached entry for a ticker/date, with fallback to last known date."""
         key = self._cache_key(ticker)
         cache = self._cache.get(key, {})
-        entry = cache.get(date, cache.get(list(cache.keys())[-1] if cache else ''))
+        if date in cache:
+            return cache[date]
+        if cache:
+            fallback_date = list(cache.keys())[-1]
+            if self.strict:
+                logger.error(f"Date {date} not in cache for {ticker} (strict=True)")
+                return None
+            logger.warning(f"Date {date} not in cache for {ticker}, using fallback {fallback_date}")
+            return cache[fallback_date]
+        return None
+
+    def get_signal(self, ticker: str, date: str) -> str:
+        """Get signal for a ticker on a specific date."""
+        entry = self._get_entry(ticker, date)
         if entry is None:
             return 'HOLD'
         return entry['signal']
 
     def get_conviction(self, ticker: str, date: str) -> float:
         """Get conviction score for a ticker on a specific date."""
-        key = self._cache_key(ticker)
-        cache = self._cache.get(key, {})
-        entry = cache.get(date, cache.get(list(cache.keys())[-1] if cache else ''))
+        entry = self._get_entry(ticker, date)
         if entry is None:
             return 0.0
         return entry['conviction']
 
     def get_regime(self, ticker: str, date: str) -> Dict[str, Any]:
         """Get sector regime context for a ticker on a date."""
-        key = self._cache_key(ticker)
-        cache = self._cache.get(key, {})
-        entry = cache.get(date, cache.get(list(cache.keys())[-1] if cache else ''))
+        entry = self._get_entry(ticker, date)
         if entry is None:
             return {'regime': 'UNKNOWN', 'bull_probability': 0.5, 'vol_regime': 'UNKNOWN', 'vol_probability': 0.0}
         return {
