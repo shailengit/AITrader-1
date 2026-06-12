@@ -7,25 +7,15 @@ Manages scheduled retraining:
   - Monthly: Jump Model lambda tuning
 """
 import logging
-import os
-import pickle
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
-import pandas as pd
-import numpy as np
-
-from app.db.database import SECTOR_ETFS
 from app.services.markov.regime_model import SectorRegimeManager
 from app.services.markov.feature_engineering import compute_ticker_features
 from app.services.markov.pattern_recognizer import XGBoostRecognizer, LSTMRecognizer
 from app.services.markov.signal_generator import SignalGenerator
 
 logger = logging.getLogger(__name__)
-
-# Cache directory
-MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), '../../../models/markov')
-os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 
 
 class MarkovTrainer:
