@@ -2,20 +2,43 @@
 Data service for TradeCraft.
 Replaces yfinance with PostgreSQL database queries for historical OHLCV data.
 Provides vectorbt-compatible DataFrames for backtesting.
+
+Supports dual-database access:
+  - sp1500_1d: Daily OHLCV data (1999-present)
+  - sp1500_1m: 1-minute OHLCV data (2026-04-21 to present)
+  Candle resampling (5m, 15m, 30m, 1h) is available from the minute database.
 """
 
 import logging
-from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
 import pandas as pd
-import numpy as np
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
-from app.db.database import engine
+from app.db.database import engine, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
 from app.utils.security import get_safe_table_name
 
 logger = logging.getLogger(__name__)
+
+# Second engine for 1-minute database
+_engine_1m = create_engine(
+    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/sp1500_1m",
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+)
+
+# Supported intervals for candle resampling
+SUPPORTED_INTERVALS = {"1m", "5m", "15m", "30m", "1h"}
+
+# Mapping to pandas resample rules (newer pandas deprecates 'm' for minutes)
+RESAMPLE_RULE_MAP = {
+    "1m": "1min",
+    "5m": "5min",
+    "15m": "15min",
+    "30m": "30min",
+    "1h": "1h",
+}
 
 
 class DataService:
@@ -47,11 +70,19 @@ class DataService:
             return []
 
     @staticmethod
+    def _get_engine(frequency: str = "daily"):
+        """Select the right database engine based on frequency."""
+        if frequency == "minute":
+            return _engine_1m
+        return engine  # daily is default
+
+    @staticmethod
     def get_ohlcv_data(
         ticker: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        frequency: str = "daily"
     ) -> Optional[pd.DataFrame]:
         """
         Fetch OHLCV data for a ticker from PostgreSQL.
@@ -61,12 +92,14 @@ class DataService:
             start_date: Start date in 'YYYY-MM-DD' format (optional)
             end_date: End date in 'YYYY-MM-DD' format (optional)
             limit: Maximum number of rows to return (optional)
+            frequency: 'daily' for sp1500_1d (default) or 'minute' for sp1500_1m
 
         Returns:
             pandas DataFrame with columns: Date, Open, High, Low, Close, Volume
             Returns None if ticker not found or error occurs.
         """
         table_name = get_safe_table_name(ticker)
+        target_engine = DataService._get_engine(frequency)
 
         try:
             # Build query with optional date filters
@@ -96,11 +129,11 @@ class DataService:
 
             query = text(base_query)
 
-            with engine.connect() as conn:
+            with target_engine.connect() as conn:
                 df = pd.read_sql(query, conn, params=params)
 
             if df.empty:
-                logger.warning(f"No data found for ticker {ticker}")
+                logger.warning(f"No data found for ticker {ticker} ({frequency})")
                 return None
 
             # Ensure Date column is datetime
@@ -112,18 +145,74 @@ class DataService:
             # Sort by date
             df.sort_index(inplace=True)
 
-            logger.info(f"Fetched {len(df)} rows for {ticker} from {df.index[0]} to {df.index[-1]}")
+            logger.info(f"Fetched {len(df)} rows for {ticker} ({frequency}) from {df.index[0]} to {df.index[-1]}")
             return df
 
         except Exception as e:
-            logger.error(f"Error fetching OHLCV data for {ticker}: {e}")
+            logger.error(f"Error fetching OHLCV data for {ticker} ({frequency}): {e}")
             return None
+
+    @staticmethod
+    def get_candles(
+        ticker: str,
+        start_date: str,
+        end_date: str,
+        interval: str = "15m"
+    ) -> Optional[pd.DataFrame]:
+        """
+        Get OHLCV data resampled to the requested candle interval.
+
+        Uses sp1500_1m for sub-daily intervals (1m, 5m, 15m, 30m, 1h).
+        Raw 1-minute data is resampled using pandas resample().
+
+        Args:
+            ticker: Stock ticker symbol (e.g., 'AAPL')
+            start_date: Start date in 'YYYY-MM-DD' format
+            end_date: End date in 'YYYY-MM-DD' format
+            interval: Candle interval ('1m', '5m', '15m', '30m', '1h')
+
+        Returns:
+            pandas DataFrame resampled to the requested interval,
+            or None if data not found.
+        """
+        if interval not in SUPPORTED_INTERVALS:
+            raise ValueError(
+                f"Unsupported interval '{interval}'. "
+                f"Supported intervals: {', '.join(sorted(SUPPORTED_INTERVALS))}"
+            )
+
+        # Fetch raw 1-minute data
+        df = DataService.get_ohlcv_data(ticker, start_date, end_date, frequency="minute")
+        if df is None:
+            return None
+
+        # Pandas resample rule (use canonical form to avoid 'm' month vs minute ambiguity)
+        resample_rule = RESAMPLE_RULE_MAP[interval]
+
+        # OHLC aggregation dict
+        ohlc_dict = {
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
+        }
+
+        # Resample
+        df_resampled = df.resample(resample_rule).agg(ohlc_dict).dropna()
+
+        logger.info(
+            f"Resampled {ticker} 1m->{interval}: {len(df)} -> {len(df_resampled)} candles "
+            f"({df_resampled.index[0]} to {df_resampled.index[-1]})"
+        )
+        return df_resampled
 
     @staticmethod
     def get_multi_ticker_data(
         tickers: List[str],
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        frequency: str = "daily"
     ) -> Dict[str, pd.DataFrame]:
         """
         Fetch OHLCV data for multiple tickers.
@@ -132,31 +221,33 @@ class DataService:
             tickers: List of ticker symbols
             start_date: Start date in 'YYYY-MM-DD' format
             end_date: End date in 'YYYY-MM-DD' format
+            frequency: 'daily' (default) or 'minute'
 
         Returns:
             Dictionary mapping ticker to DataFrame
         """
         result = {}
         for ticker in tickers:
-            df = DataService.get_ohlcv_data(ticker, start_date, end_date)
+            df = DataService.get_ohlcv_data(ticker, start_date, end_date, frequency=frequency)
             if df is not None:
                 result[ticker] = df
         return result
 
     @staticmethod
-    def get_latest_price(ticker: str) -> Optional[float]:
+    def get_latest_price(ticker: str, frequency: str = "daily") -> Optional[float]:
         """Get the latest closing price for a ticker."""
         table_name = get_safe_table_name(ticker)
+        target_engine = DataService._get_engine(frequency)
 
         try:
             query = text(f'SELECT "Close" FROM "{table_name}" ORDER BY "Date" DESC LIMIT 1')
-            with engine.connect() as conn:
+            with target_engine.connect() as conn:
                 result = conn.execute(query).fetchone()
                 if result:
                     return float(result[0])
             return None
         except Exception as e:
-            logger.error(f"Error getting latest price for {ticker}: {e}")
+            logger.error(f"Error getting latest price for {ticker} ({frequency}): {e}")
             return None
 
     @staticmethod
@@ -188,7 +279,8 @@ class DataService:
     def prepare_vectorbt_data(
         ticker: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        frequency: str = "daily"
     ) -> Optional[pd.DataFrame]:
         """
         Prepare data in vectorbt-compatible format.
@@ -198,7 +290,7 @@ class DataService:
 
         This matches the format returned by yfinance for vectorbt.
         """
-        df = DataService.get_ohlcv_data(ticker, start_date, end_date)
+        df = DataService.get_ohlcv_data(ticker, start_date, end_date, frequency=frequency)
 
         if df is None:
             return None
@@ -247,27 +339,47 @@ class SafeDataService:
         ticker: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        limit: Optional[int] = None
+        limit: Optional[int] = None,
+        frequency: str = "daily"
     ) -> pd.DataFrame:
-        result = DataService.get_ohlcv_data(ticker, start_date, end_date, limit)
+        result = DataService.get_ohlcv_data(ticker, start_date, end_date, limit, frequency=frequency)
         return _guard_dataframe(result, ticker, start_date, end_date)
 
     @staticmethod
     def prepare_vectorbt_data(
         ticker: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        frequency: str = "daily"
     ) -> pd.DataFrame:
-        result = DataService.prepare_vectorbt_data(ticker, start_date, end_date)
+        result = DataService.prepare_vectorbt_data(ticker, start_date, end_date, frequency=frequency)
         return _guard_dataframe(result, ticker, start_date, end_date)
 
     @staticmethod
     def get_multi_ticker_data(
         tickers: List[str],
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        frequency: str = "daily"
     ) -> Dict[str, pd.DataFrame]:
-        return DataService.get_multi_ticker_data(tickers, start_date, end_date)
+        return DataService.get_multi_ticker_data(tickers, start_date, end_date, frequency=frequency)
+
+    @staticmethod
+    def get_candles(
+        ticker: str,
+        start_date: str,
+        end_date: str,
+        interval: str = "15m"
+    ) -> pd.DataFrame:
+        result = DataService.get_candles(ticker, start_date, end_date, interval)
+        date_range = f" from {start_date} to {end_date}"
+        if result is not None:
+            return result
+        raise ValueError(
+            f"No data found for ticker '{ticker}'{date_range} at interval '{interval}'. "
+            f"Minute data is only available from 2026-04-21 onwards. "
+            f"Check that the ticker exists in the sp1500_1m database."
+        )
 
     @staticmethod
     def get_ticker_table_name(ticker: str) -> str:
@@ -278,22 +390,22 @@ class SafeDataService:
         return DataService.get_available_tickers()
 
     @staticmethod
-    def get_latest_price(ticker: str) -> Optional[float]:
-        return DataService.get_latest_price(ticker)
+    def get_latest_price(ticker: str, frequency: str = "daily") -> Optional[float]:
+        return DataService.get_latest_price(ticker, frequency=frequency)
 
     @staticmethod
     def get_ticker_metadata(ticker: str) -> Optional[Dict[str, Any]]:
         return DataService.get_ticker_metadata(ticker)
 
 
-def safe_get_data(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
+def safe_get_data(ticker: str, start_date: str, end_date: str, frequency: str = "daily") -> pd.DataFrame:
     """Convenience function that raises on missing data."""
-    result = get_data(ticker, start_date, end_date)
+    result = get_data(ticker, start_date, end_date, frequency=frequency)
     return _guard_dataframe(result, ticker, start_date, end_date)
 
 
 # Convenience function for use in strategy code
-def get_data(ticker: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+def get_data(ticker: str, start_date: str, end_date: str, frequency: str = "daily") -> Optional[pd.DataFrame]:
     """
     Convenience function to get data for strategy execution.
     Drop-in replacement for yfinance.download().
@@ -302,11 +414,11 @@ def get_data(ticker: str, start_date: str, end_date: str) -> Optional[pd.DataFra
         # Instead of: yf.download('AAPL', start='2023-01-01', end='2024-01-01')
         # Use: data = get_data('AAPL', '2023-01-01', '2024-01-01')
     """
-    return DataService.prepare_vectorbt_data(ticker, start_date, end_date)
+    return DataService.prepare_vectorbt_data(ticker, start_date, end_date, frequency=frequency)
 
 
-def get_multi_data(tickers: List[str], start_date: str, end_date: str) -> Dict[str, pd.DataFrame]:
+def get_multi_data(tickers: List[str], start_date: str, end_date: str, frequency: str = "daily") -> Dict[str, pd.DataFrame]:
     """
     Convenience function to get data for multiple tickers.
     """
-    return DataService.get_multi_ticker_data(tickers, start_date, end_date)
+    return DataService.get_multi_ticker_data(tickers, start_date, end_date, frequency=frequency)

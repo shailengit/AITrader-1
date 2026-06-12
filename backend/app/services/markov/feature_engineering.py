@@ -22,6 +22,7 @@ DEFAULT_SELL_THRESHOLD = -0.02
 # Minimum data requirements
 MIN_DAILY_DAYS = 252  # 1 trading year
 MIN_1M_DAYS = 20      # 20 trading days of 1m data for microstructure
+MIN_ETF_DAYS = 60     # Minimum trading days for ETF feature computation
 
 
 def compute_log_returns(close: pd.Series, window: int = 20) -> pd.Series:
@@ -133,7 +134,7 @@ def compute_etf_features(etf_ticker: str, start_date: str, end_date: str) -> Opt
     sortino_20, sortino_60
     """
     df = DataService.get_ohlcv_data(etf_ticker, start_date, end_date, frequency="daily")
-    if df is None or len(df) < 60:
+    if df is None or len(df) < MIN_ETF_DAYS:
         logger.warning(f"Insufficient data for ETF {etf_ticker}: {len(df) if df is not None else 0} rows")
         return None
 
@@ -195,9 +196,9 @@ def compute_ticker_features(ticker: str, start_date: str, end_date: str,
     sjv = compute_signed_jump_variation(close_1m)
 
     # Align microstructure to daily index
-    features['realized_variance'] = rv.reindex(features.index).fillna(method='ffill')
-    features['realized_quarticity'] = rq.reindex(features.index).fillna(method='ffill')
-    features['signed_jump_variation'] = sjv.reindex(features.index).fillna(method='ffill')
+    features['realized_variance'] = rv.reindex(features.index).ffill()
+    features['realized_quarticity'] = rq.reindex(features.index).ffill()
+    features['signed_jump_variation'] = sjv.reindex(features.index).ffill()
 
     # Feature C: Technical
     features['rsi_14'] = compute_rsi(close, 14)

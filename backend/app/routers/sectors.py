@@ -5,6 +5,7 @@ Ported from Sector-Rotation-Scanner Express.js server.
 """
 
 import logging
+from datetime import datetime, timedelta
 from typing import List, Optional, cast, Any
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -390,12 +391,45 @@ async def get_sector_stocks(
 
 
 @router.get("/ohlcv/{ticker}", response_model=List[OHLCV])
-async def get_ohlcv(ticker: str):
+async def get_ohlcv(ticker: str, interval: str = "daily"):
     """
     Get OHLCV data for a ticker.
-    Used for charting in the Sector Rotation Scanner.
+    Used for charting in the Sector Rotation Scanner and Stock Screener.
+
+    Args:
+        ticker: Stock ticker symbol
+        interval: Candle interval - 'daily' (default), '1m', '5m', '15m', '30m', '1h'
     """
     try:
+        # Sub-daily intervals: route to sp1500_1m with resampling
+        sub_daily_intervals = {"1m", "5m", "15m", "30m", "1h"}
+        if interval in sub_daily_intervals:
+            from app.services.data_service import DataService
+            # Last 30 days of minute data (ample for charting)
+            end = datetime.now().strftime("%Y-%m-%d")
+            start = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
+            if interval == "1m":
+                df = DataService.get_ohlcv_data(ticker, start, end, frequency="minute")
+            else:
+                df = DataService.get_candles(ticker, start, end, interval=interval)
+
+            if df is None or df.empty:
+                return []
+
+            ohlcv_data = []
+            for idx, row in df.iterrows():
+                ohlcv_data.append({
+                    'time': idx.timestamp(),
+                    'open': float(row['Open']),
+                    'high': float(row['High']),
+                    'low': float(row['Low']),
+                    'close': float(row['Close']),
+                    'volume': float(row['Volume'])
+                })
+            return ohlcv_data
+
+        # Default: daily data from sp1500_1d (existing behavior)
         safe_table = get_safe_table_name(ticker)
         # Get last 150 days of data for technical indicator calculations (Bollinger Bands etc)
         query = text(f'''
@@ -415,10 +449,9 @@ async def get_ohlcv(ticker: str):
         for row in result:
             # Convert Date to Unix timestamp (seconds)
             # Row structure: [Date, Open, High, Low, Close, Volume]
-            import datetime
             dt = row[0]
             if isinstance(dt, str):
-                ts = datetime.datetime.fromisoformat(dt.replace('Z', '')).timestamp()
+                ts = datetime.fromisoformat(dt.replace('Z', '')).timestamp()
             else:
                 ts = dt.timestamp()
 

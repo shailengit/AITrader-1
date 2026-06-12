@@ -6,6 +6,9 @@ from app.services.markov.feature_engineering import (
     compute_log_returns,
     compute_downside_deviation,
     compute_sortino_ratio,
+    compute_realized_variance,
+    compute_realized_quarticity,
+    compute_signed_jump_variation,
     compute_rsi,
     compute_macd,
     compute_bollinger_position,
@@ -84,3 +87,39 @@ def test_label_forward_return_custom_threshold():
     assert labels.iloc[1] == 1  # HOLD (1% < 2%)
     assert labels.iloc[2] == 1  # HOLD (-1% > -2%)
     assert labels.iloc[3] == 0  # SELL (-3% < -2%)
+
+
+def test_compute_downside_deviation():
+    """Downside deviation only penalizes negative returns."""
+    returns = pd.Series([0.01, -0.02, 0.01, -0.03, 0.01])
+    dd = compute_downside_deviation(returns, half_life=2)
+    assert dd.iloc[-1] > 0  # Should be positive due to negative returns
+    assert not dd.isna().all()
+
+
+def test_compute_sortino_ratio():
+    """Sortino ratio is positive for positive mean returns."""
+    returns = pd.Series([0.01] * 50 + [-0.005] * 10)
+    sr = compute_sortino_ratio(returns, half_life=20)
+    assert sr.iloc[-1] > 0  # Positive mean return → positive Sortino
+
+
+def test_compute_realized_variance():
+    """Realized variance is positive with non-zero returns."""
+    close = pd.Series(range(100, 200), index=pd.date_range('2024-01-01', periods=100, freq='1min'))
+    rv = compute_realized_variance(close, periods_per_day=390)
+    assert rv.iloc[-1] >= 0
+
+
+def test_compute_realized_quarticity():
+    """Realized quarticity is positive with non-zero returns."""
+    close = pd.Series(range(100, 200), index=pd.date_range('2024-01-01', periods=100, freq='1min'))
+    rq = compute_realized_quarticity(close, periods_per_day=390)
+    assert rq.iloc[-1] >= 0
+
+
+def test_compute_signed_jump_variation():
+    """Signed jump variation can be positive or negative."""
+    close = pd.Series(range(100, 200), index=pd.date_range('2024-01-01', periods=100, freq='1min'))
+    sjv = compute_signed_jump_variation(close)
+    assert not sjv.isna().all()
