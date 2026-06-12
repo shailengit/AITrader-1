@@ -41,3 +41,10 @@ psutil>=5.9.0
 
 # PDF generation
 fpdf2>=2.8.0
+
+# Markov Chain Trader
+statsmodels>=0.14.0
+arch>=6.0.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+torch>=2.0.0
