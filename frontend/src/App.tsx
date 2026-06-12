@@ -7,6 +7,7 @@ import SectorRotation from './pages/SectorRotation'
 import StockScreener from './pages/StockScreener'
 import QuantGen from './pages/QuantGen'
 import EarningsCalendar from './pages/EarningsCalendar'
+import Markov from './pages/Markov'
 
 function App() {
   return (
@@ -37,6 +38,11 @@ function App() {
             <Route path="quantgen/*" element={
               <ErrorBoundary>
                 <QuantGen />
+              </ErrorBoundary>
+            } />
+            <Route path="markov" element={
+              <ErrorBoundary>
+                <Markov />
               </ErrorBoundary>
             } />
           </Route>

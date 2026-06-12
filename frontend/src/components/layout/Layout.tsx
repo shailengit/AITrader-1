@@ -8,6 +8,7 @@ const pageTitles: Record<string, string> = {
   "/screener": "AI Stock Screener",
   "/earnings": "Earnings Calendar",
   "/quantgen": "QuantGen Strategy Builder",
+  "/markov": "Markov Chain Trader",
 };
 
 export default function Layout() {
