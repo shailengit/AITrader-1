@@ -16,14 +16,21 @@ interface SignalsTableProps {
   totalScanned: number;
   loading: boolean;
   isDarkMode: boolean;
+  minConviction?: number;  // from the scan params slider, so Actionable uses the same threshold
+  asOfDate?: string;
 }
 
-export default function SignalsTable({ signals, totalScanned, loading, isDarkMode }: SignalsTableProps) {
+export default function SignalsTable({ signals, totalScanned, loading, isDarkMode, minConviction = 0.6, asOfDate }: SignalsTableProps) {
   const [showAll, setShowAll] = useState(false);
-  // Use a reasonable default for the actionable filter threshold
-  const actionableThreshold = 0.6;
-  const actionable = signals.filter((s) => s.signal === "BUY" && s.conviction >= actionableThreshold);
+  // Use the same minConviction from the scan params slider so the
+  // Actionable filter matches what the user configured.
+  const actionable = signals.filter((s) => s.signal === "BUY" && s.conviction >= minConviction);
   const display = showAll ? signals : actionable;
+
+  const buyTickers = signals.filter((s) => s.signal === "BUY").map((s) => s.ticker);
+  const exportUrl = buyTickers.length > 0
+    ? `/quantgen/builder?tickers=${buyTickers.join(",")}&from_date=${asOfDate || new Date().toISOString().split("T")[0]}`
+    : null;
 
   const muted = isDarkMode ? "rgba(255,255,255,0.7)" : "#6e6e73";
   const border = isDarkMode ? "rgba(255,255,255,0.12)" : "#d2d2d7";
@@ -59,8 +66,9 @@ export default function SignalsTable({ signals, totalScanned, loading, isDarkMod
             fontSize: 13,
             color: "inherit",
           }}
+          title={`Only BUY signals with conviction ≥ ${minConviction}`}
         >
-          Actionable
+          Actionable ({actionable.length})
         </button>
         <button
           onClick={() => setShowAll(true)}
@@ -73,9 +81,28 @@ export default function SignalsTable({ signals, totalScanned, loading, isDarkMod
             fontSize: 13,
             color: "inherit",
           }}
+          title="All signals: BUY, HOLD, and SELL"
         >
-          Full List
+          Full List ({signals.length})
         </button>
+        {exportUrl && (
+          <button
+            onClick={() => window.open(exportUrl, "_blank")}
+            style={{
+              marginLeft: "auto",
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: `1px solid #10B981`,
+              background: "rgba(16, 185, 129, 0.1)",
+              cursor: "pointer",
+              fontSize: 13,
+              color: "inherit",
+            }}
+            title="Open these BUY signals in QuantGen Builder for backtesting"
+          >
+            Export {buyTickers.length} BUY → QuantGen
+          </button>
+        )}
       </div>
 
       <div style={{ overflowX: "auto" }}>
