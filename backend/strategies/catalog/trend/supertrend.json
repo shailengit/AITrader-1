@@ -1,0 +1,21 @@
+{
+  "name": "Supertrend Strategy",
+  "slug": "supertrend",
+  "category": "trend",
+  "description": "ATR-based trailing stop trend following. Enters long when Supertrend flips to uptrend, exits when it flips to downtrend. Uses ATR-period and multiplier for sensitivity control.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/trend/Supertrend.pine",
+  "parameters": {
+    "period": {"type": "int", "default": 10, "min": 5, "max": 50, "description": "ATR period"},
+    "multiplier": {"type": "float", "default": 3.7, "min": 1.0, "max": 10.0, "step": 0.1, "description": "ATR multiplier"}
+  },
+  "indicators_used": ["Supertrend", "ATR"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Supertrend flips from -1 (downtrend) to +1 (uptrend)",
+    "exit_long": "Supertrend flips from +1 to -1",
+    "entry_short": "Not supported (long-only)",
+    "exit_short": "Not supported (long-only)"
+  }
+}
