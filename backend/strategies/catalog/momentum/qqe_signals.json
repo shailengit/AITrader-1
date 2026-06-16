@@ -1,0 +1,21 @@
+{
+  "name": "QQE Signals",
+  "slug": "qqe_signals",
+  "category": "momentum",
+  "description": "RSI-based Quantitative Qualitative Estimation with adaptive volatility thresholds. Enters when smoothed RSI crosses above adaptive upper band.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/momentum/QQE signals.pine",
+  "parameters": {
+    "rsi_length": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "RSI period"},
+    "smooth_length": {"type": "int", "default": 5, "min": 2, "max": 20, "description": "RSI smoothing period"},
+    "fast_factor": {"type": "float", "default": 2.0, "min": 0.5, "max": 5.0, "step": 0.1, "description": "Fast threshold multiplier"},
+    "slow_factor": {"type": "float", "default": 4.0, "min": 0.5, "max": 10.0, "step": 0.1, "description": "Slow threshold multiplier"}
+  },
+  "indicators_used": ["RSI"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Smoothed RSI crosses above adaptive upper threshold",
+    "exit_long": "Smoothed RSI crosses below adaptive lower threshold"
+  }
+}

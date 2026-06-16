@@ -1,0 +1,24 @@
+{
+  "name": "StochRSI + Supertrend",
+  "slug": "stochrsi_supertrend",
+  "category": "momentum",
+  "description": "StochRSI crossover with Supertrend confirmation. Enters when StochRSI crosses above oversold while Supertrend is up.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/momentum/StochRSI + Supertrend Strategy.pine",
+  "parameters": {
+    "stochrsi_period": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "StochRSI period"},
+    "stochrsi_k": {"type": "int", "default": 3, "min": 1, "max": 10, "description": "%K smoothing"},
+    "stochrsi_d": {"type": "int", "default": 3, "min": 1, "max": 10, "description": "%D smoothing"},
+    "oversold": {"type": "int", "default": 20, "min": 5, "max": 40, "description": "Oversold level"},
+    "overbought": {"type": "int", "default": 80, "min": 60, "max": 95, "description": "Overbought level"},
+    "st_period": {"type": "int", "default": 10, "min": 5, "max": 50, "description": "Supertrend ATR period"},
+    "st_mult": {"type": "float", "default": 3.0, "min": 1.0, "max": 5.0, "step": 0.1, "description": "Supertrend multiplier"}
+  },
+  "indicators_used": ["StochRSI", "Supertrend"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "StochRSI %K crosses above oversold AND Supertrend is uptrend",
+    "exit_long": "StochRSI %K crosses below overbought OR Supertrend flips downtrend"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "TTM Squeeze",
+  "slug": "ttm_squeeze",
+  "category": "momentum",
+  "description": "TTM Squeeze volatility breakout. Enters long when Bollinger Bands expand outside Keltner Channels (squeeze fires) with upward momentum.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/momentum/TTM Squeeze.pine",
+  "parameters": {
+    "bb_length": {"type": "int", "default": 20, "min": 5, "max": 50, "description": "BB/KC period"},
+    "bb_mult": {"type": "float", "default": 2.0, "min": 0.5, "max": 5.0, "step": 0.1, "description": "BB std dev multiplier"},
+    "kc_mult": {"type": "float", "default": 1.5, "min": 0.5, "max": 5.0, "step": 0.1, "description": "KC ATR multiplier"}
+  },
+  "indicators_used": ["Bollinger Bands", "ATR", "Keltner Channels"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "BB expands outside KC (squeeze fires) with close above mid-BB",
+    "exit_long": "BB expands outside KC with close below mid-BB"
+  }
+}
