@@ -5,7 +5,9 @@ Ported from QuantGen FastAPI backend with database integration.
 """
 
 import os
+import json
 import logging
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -36,6 +38,8 @@ from app.services.research_agents import run_research_agents
 from app.services.indicator_registry import get_indicator_catalog, get_indicator_categories
 
 logger = logging.getLogger(__name__)
+
+STRATEGY_CATALOG_DIR = Path(__file__).resolve().parent.parent.parent / "strategies" / "catalog"
 
 router = APIRouter()
 
@@ -799,6 +803,84 @@ async def list_indicator_catalog(
             "error": str(e),
             "data": {"indicators": [], "count": 0}
         }
+
+
+@router.get("/strategy-catalog")
+async def list_strategy_catalog():
+    """
+    List all built-in strategies from the catalog, grouped by category.
+    """
+    try:
+        catalog_dir = STRATEGY_CATALOG_DIR
+        if not catalog_dir.exists():
+            return {
+                "success": True,
+                "data": {"categories": [], "strategies": [], "count": 0},
+                "message": "No strategies in catalog"
+            }
+
+        strategies = []
+        for category_dir in sorted(catalog_dir.iterdir()):
+            if not category_dir.is_dir():
+                continue
+            for json_file in sorted(category_dir.glob("*.json")):
+                with open(json_file) as f:
+                    meta = json.load(f)
+                strategies.append(meta)
+
+        # Group by category
+        categories = {}
+        for s in strategies:
+            cat = s.get("category", "other")
+            if cat not in categories:
+                categories[cat] = []
+            # Return metadata without the full code
+            categories[cat].append({k: v for k, v in s.items() if k != "code"})
+
+        return {
+            "success": True,
+            "data": {
+                "categories": list(categories.keys()),
+                "strategies_by_category": categories,
+                "count": len(strategies),
+            },
+            "message": f"Found {len(strategies)} strategies"
+        }
+    except Exception as e:
+        logger.error("Error listing strategy catalog: %s", e)
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/strategy-catalog/{slug}")
+async def get_strategy_code(slug: str):
+    """
+    Get a specific strategy's Python code and metadata.
+    """
+    try:
+        catalog_dir = STRATEGY_CATALOG_DIR
+        for json_file in catalog_dir.rglob(f"{slug}.json"):
+            py_file = json_file.with_suffix(".py")
+            if not py_file.exists():
+                return {"success": False, "error": "Strategy code file not found"}
+
+            with open(json_file) as f:
+                metadata = json.load(f)
+            with open(py_file) as f:
+                code = f.read()
+
+            return {
+                "success": True,
+                "data": {
+                    "metadata": metadata,
+                    "code": code,
+                },
+                "message": f"Loaded strategy: {metadata.get('name', slug)}"
+            }
+
+        return {"success": False, "error": f"Strategy '{slug}' not found"}
+    except Exception as e:
+        logger.error("Error loading strategy %s: %s", slug, e)
+        return {"success": False, "error": str(e)}
 
 
 @router.get("/latest-date")
