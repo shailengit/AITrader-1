@@ -91,13 +91,13 @@ def test_connection():
 SECTOR_ETFS = [
     {'ticker': 'XLK', 'name': 'Technology'},
     {'ticker': 'XLE', 'name': 'Energy'},
-    {'ticker': 'XLF', 'name': 'Financials'},
-    {'ticker': 'XLV', 'name': 'Health Care'},
-    {'ticker': 'XLY', 'name': 'Consumer Discretionary'},
+    {'ticker': 'XLF', 'name': 'Financial Services'},
+    {'ticker': 'XLV', 'name': 'Healthcare'},
+    {'ticker': 'XLY', 'name': 'Consumer Cyclical'},
     {'ticker': 'XLI', 'name': 'Industrials'},
     {'ticker': 'XLC', 'name': 'Communication Services'},
-    {'ticker': 'XLP', 'name': 'Consumer Staples'},
-    {'ticker': 'XLB', 'name': 'Materials'},
+    {'ticker': 'XLP', 'name': 'Consumer Defensive'},
+    {'ticker': 'XLB', 'name': 'Basic Materials'},
     {'ticker': 'XLRE', 'name': 'Real Estate'},
     {'ticker': 'XLU', 'name': 'Utilities'},
 ]
