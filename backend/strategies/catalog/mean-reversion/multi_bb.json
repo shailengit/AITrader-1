@@ -1,0 +1,21 @@
+{
+  "name": "Multi BB",
+  "slug": "multi_bb",
+  "category": "mean-reversion",
+  "description": "Multiple Bollinger Bands confluence. Enters when price is below the lower band of 20, 50, and 100-period BB simultaneously. Exits when price returns above the 20-period middle band.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/mean-reversion/Multi BB.pine",
+  "parameters": {
+    "bb_period_short": {"type": "int", "default": 20, "min": 5, "max": 50, "description": "Short BB period"},
+    "bb_period_mid": {"type": "int", "default": 50, "min": 10, "max": 100, "description": "Mid BB period"},
+    "bb_period_long": {"type": "int", "default": 100, "min": 20, "max": 200, "description": "Long BB period"},
+    "bb_std": {"type": "float", "default": 2.0, "min": 0.5, "max": 5.0, "step": 0.1, "description": "BB std dev multiplier"}
+  },
+  "indicators_used": ["Bollinger Bands"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Price below lower band of 20, 50, and 100-period BB",
+    "exit_long": "Price returns above 20-period BB middle band"
+  }
+}

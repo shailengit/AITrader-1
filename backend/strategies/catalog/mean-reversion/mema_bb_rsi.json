@@ -1,0 +1,22 @@
+{
+  "name": "MEMA + BB + RSI",
+  "slug": "mema_bb_rsi",
+  "category": "mean-reversion",
+  "description": "Multiple EMA alignment with Bollinger Band touch and RSI confirmation. Enters when price touches lower BB, RSI is oversold, and EMAs are aligned upward.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/mean-reversion/MEMA + BB + RSI [Alorse].pine",
+  "parameters": {
+    "ema_fast": {"type": "int", "default": 10, "min": 3, "max": 50, "description": "Fast EMA period"},
+    "ema_mid": {"type": "int", "default": 30, "min": 5, "max": 100, "description": "Mid EMA period"},
+    "ema_slow": {"type": "int", "default": 50, "min": 10, "max": 200, "description": "Slow EMA period"},
+    "bb_length": {"type": "int", "default": 20, "min": 5, "max": 100, "description": "Bollinger Bands period"},
+    "rsi_length": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "RSI period"}
+  },
+  "indicators_used": ["EMA", "Bollinger Bands", "RSI"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Price near lower BB, RSI < 30, EMAs aligned (10 > 30 > 50)",
+    "exit_long": "Price reaches upper BB or RSI > 70"
+  }
+}
