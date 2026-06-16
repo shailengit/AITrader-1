@@ -110,6 +110,7 @@ class SignalGenerator:
                     min_conviction: float = 0.6,
                     max_results: int = 50,
                     max_tickers: int = 50,
+                    end_date: Optional[str] = None,
                     progress_callback=None) -> Dict[str, Any]:
         """Scan multiple tickers and return ranked signals.
 
@@ -121,6 +122,7 @@ class SignalGenerator:
             max_results: Max results to return
             max_tickers: Max tickers to process (capped to keep first-scan
                          response time reasonable when training on the fly).
+            end_date: Optional scan end date (YYYY-MM-DD). Defaults to today.
             progress_callback: Optional callable(pct, ticker, action, completed, total, elapsed, eta)
 
         Returns:
@@ -152,7 +154,7 @@ class SignalGenerator:
                         elapsed=elapsed,
                         eta=eta,
                     )
-                end = datetime.now().strftime('%Y-%m-%d')
+                end = end_date if end_date else datetime.now().strftime('%Y-%m-%d')
                 start = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
 
                 feat_data = compute_ticker_features(
