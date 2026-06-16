@@ -5,7 +5,8 @@ Combines regime state + pattern recognizer output into BUY/HOLD/SELL
 with conviction score. Applies 1-day trading delay for live signals.
 """
 import logging
-from typing import Optional, Dict, Any, List
+import time
+from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -80,14 +81,13 @@ class SignalGenerator:
 
         pred = rec.predict(features)
 
-        # Convergence rules
-        is_bull = regime_info['regime'] == 'BULL'
+        # Convergence rules — Option A: sector regime no longer blocks BUY
         is_low_vol = regime_info['vol_probability'] < VOL_GATE_THRESHOLD
         is_high_conviction = pred['conviction'] >= min_conviction
 
-        if is_bull and is_low_vol and pred['signal'] == 'BUY' and is_high_conviction:
+        if is_low_vol and pred['signal'] == 'BUY' and is_high_conviction:
             signal = 'BUY'
-        elif not is_bull or not is_low_vol:
+        elif not is_low_vol:
             signal = 'SELL'
         else:
             signal = pred['signal']
@@ -108,7 +108,9 @@ class SignalGenerator:
     def scan_tickers(self, tickers: List[Dict[str, str]], model: str = "xgboost",
                     threshold: float = DEFAULT_BUY_THRESHOLD,
                     min_conviction: float = 0.6,
-                    max_results: int = 50) -> Dict[str, Any]:
+                    max_results: int = 50,
+                    max_tickers: int = 50,
+                    progress_callback=None) -> Dict[str, Any]:
         """Scan multiple tickers and return ranked signals.
 
         Args:
@@ -117,6 +119,9 @@ class SignalGenerator:
             threshold: BUY/SELL threshold for label generation
             min_conviction: Minimum conviction to act
             max_results: Max results to return
+            max_tickers: Max tickers to process (capped to keep first-scan
+                         response time reasonable when training on the fly).
+            progress_callback: Optional callable(pct, ticker, action, completed, total, elapsed, eta)
 
         Returns:
             Dict with signals list and metadata
@@ -124,17 +129,49 @@ class SignalGenerator:
         results = []
         errors = 0
 
-        for item in tickers:
+        # Cap tickers to keep first-scan response time manageable
+        tickers = tickers[:max_tickers]
+        total = len(tickers)
+        start_time = time.time()
+
+        for idx, item in enumerate(tickers):
             try:
+                # Report progress
+                if progress_callback:
+                    elapsed = time.time() - start_time
+                    pct = (idx / total) * 100 if total > 0 else 0
+                    # Estimate: use average time per completed ticker
+                    avg_per_ticker = elapsed / max(idx, 1)
+                    eta = avg_per_ticker * (total - idx)
+                    progress_callback(
+                        pct=pct,
+                        ticker=item['ticker'],
+                        action="Computing features & training model..." if model == "lstm" else "Computing features...",
+                        completed=idx,
+                        total=total,
+                        elapsed=elapsed,
+                        eta=eta,
+                    )
                 end = datetime.now().strftime('%Y-%m-%d')
-                start = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+                start = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
 
                 feat_data = compute_ticker_features(
-                    item['ticker'], start, end, threshold, -threshold
+                    item['ticker'], start, end, threshold, -threshold,
+                    min_rows=1  # Scanning only needs the latest feature row
                 )
                 if feat_data is None:
                     errors += 1
                     continue
+
+                # Train recognizer on the fly if no cached model exists
+                rec = self._get_recognizer(item['ticker'], model)
+                if not rec.is_trained and feat_data['labels'] is not None:
+                    try:
+                        train_success = rec.train(feat_data['features'], feat_data['labels'])
+                        if train_success:
+                            rec.save()
+                    except Exception as train_err:
+                        logger.debug(f"On-the-fly training failed for {item['ticker']}: {train_err}")
 
                 latest_features = feat_data['features'].iloc[-1]
                 signal = self.generate_signal(
@@ -151,6 +188,19 @@ class SignalGenerator:
             except Exception as e:
                 logger.warning(f"Signal generation failed for {item['ticker']}: {e}")
                 errors += 1
+
+        # Final progress: 100% complete
+        if progress_callback:
+            elapsed = time.time() - start_time
+            progress_callback(
+                pct=100.0,
+                ticker="",
+                action="Complete",
+                completed=total,
+                total=total,
+                elapsed=elapsed,
+                eta=0.0,
+            )
 
         # Sort by conviction descending (BUY signals first)
         results.sort(key=lambda x: (x['signal'] == 'BUY', x['conviction']), reverse=True)
