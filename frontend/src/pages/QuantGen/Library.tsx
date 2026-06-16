@@ -14,7 +14,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  Library,
+  Library as LibraryIcon,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -159,7 +159,7 @@ export default function Library() {
                 display: 'flex', alignItems: 'center', gap: '6px',
               }}
             >
-              <Library size={14} />
+              <LibraryIcon size={14} />
               Built-in
             </button>
             <button
