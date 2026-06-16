@@ -18,6 +18,7 @@ yfinance>=0.2.0  # Still needed for some features, but will use DB for historica
 
 # Technical analysis indicators
 ta>=0.10.2
+pandas_ta>=0.3.14b0
 
 # AI/Agent framework
 agno>=0.0.1
