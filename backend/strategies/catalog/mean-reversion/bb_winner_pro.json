@@ -1,0 +1,31 @@
+{
+  "name": "BB Winner PRO",
+  "slug": "bb_winner_pro",
+  "category": "mean-reversion",
+  "description": "Advanced multi-filter mean reversion strategy combining Bollinger Bands penetration, RSI filter, and MA trend filter. Version 2.0.8 from Alorse.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/mean-reversion/BB Winner PRO.pine",
+  "parameters": {
+    "bb_length": {"type": "int", "default": 20, "min": 5, "max": 100, "description": "Bollinger Bands period"},
+    "bb_mult": {"type": "float", "default": 2.0, "min": 0.5, "max": 5.0, "step": 0.1, "description": "Bollinger Bands std dev multiplier"},
+    "use_rsi": {"type": "bool", "default": true, "description": "Enable RSI filter"},
+    "rsi_above": {"type": "int", "default": 45, "min": 20, "max": 60, "description": "RSI threshold for long entries"},
+    "rsi_length": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "RSI period"},
+    "use_ma": {"type": "bool", "default": true, "description": "Enable MA trend filter"},
+    "ma_type": {"type": "string", "default": "EMA", "description": "MA type (EMA or SMA)"},
+    "ma_length": {"type": "int", "default": 200, "min": 20, "max": 500, "description": "MA period"},
+    "candle_pct": {"type": "float", "default": 0.30, "min": 0.05, "max": 1.0, "step": 0.05, "description": "Candle penetration percentage"},
+    "close_early": {"type": "bool", "default": true, "description": "Close position early on opposite band touch"},
+    "use_stop_loss": {"type": "bool", "default": true, "description": "Enable stop loss"},
+    "sl_percent": {"type": "float", "default": 0.07, "min": 0.01, "max": 0.20, "step": 0.01, "description": "Stop loss percentage"}
+  },
+  "indicators_used": ["Bollinger Bands", "RSI", "EMA", "SMA"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Bearish candle body penetrates below lower BB with RSI < threshold and close > MA",
+    "exit_long": "Price touches upper BB (early close) or stop loss",
+    "entry_short": "Bullish candle body penetrates above upper BB with RSI > threshold and close < MA",
+    "exit_short": "Price touches lower BB (early close) or stop loss"
+  }
+}
