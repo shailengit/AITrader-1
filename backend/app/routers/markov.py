@@ -202,7 +202,7 @@ def _do_scan(request: ScanRequest):
         min_conviction=request.min_conviction,
         max_results=request.max_results,
         max_tickers=request.max_results,
-        end_date=request.end_date,
+        end_date=end,
         progress_callback=_progress,
     )
 

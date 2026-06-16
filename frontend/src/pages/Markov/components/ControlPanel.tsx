@@ -130,6 +130,7 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
         <input
           type="date"
           value={asOfDate}
+          max={new Date().toISOString().split("T")[0]}
           onChange={(e) => setAsOfDate(e.target.value)}
           style={{
             padding: "8px 12px",
