@@ -21,8 +21,10 @@ import {
   Code2,
   Lightbulb,
   FileCode,
+  Box,
 } from "lucide-react";
 import { OptimizationConfig } from "@/components/quantgen";
+import { IndicatorBrowser } from '@/components/quantgen/IndicatorBrowser';
 
 import { useTheme } from "../../context/ThemeContext";
 
@@ -108,6 +110,7 @@ export default function Builder() {
   const [output, setOutput] = useState("");
   const [currentFilename, setCurrentFilename] = useState<string | null>(null);
   const isFirstLoad = useRef(true);
+  const editorRef = useRef<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [strategies, setStrategies] = useState<string[]>([]);
@@ -119,6 +122,7 @@ export default function Builder() {
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isIndicatorBrowserOpen, setIsIndicatorBrowserOpen] = useState(false);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -165,6 +169,28 @@ export default function Builder() {
       `$1end = '${newEnd}'`
     );
     return updated;
+  }, []);
+
+  const handleInsertSnippet = useCallback((snippet: string) => {
+    const editor = editorRef.current;
+    if (editor) {
+      const position = editor.getPosition();
+      editor.executeEdits('indicator-browser', [
+        {
+          range: {
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          },
+          text: snippet + '\n',
+        },
+      ]);
+      editor.focus();
+    } else {
+      // Fallback: append to code
+      setCode(prev => prev + '\n' + snippet + '\n');
+    }
   }, []);
 
   /** Extract python code block from AI response text */
@@ -1466,6 +1492,7 @@ export default function Builder() {
                   theme={isDarkMode ? "vs-dark" : "vs"}
                   value={code}
                   onChange={(val) => setCode(val || "")}
+                  onMount={(editor) => { editorRef.current = editor; }}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 16,
@@ -1473,6 +1500,47 @@ export default function Builder() {
                   }}
                 />
               </div>
+            </div>
+
+            {/* Indicator Browser */}
+            <div style={{ marginBottom: '12px' }}>
+              <button
+                onClick={() => setIsIndicatorBrowserOpen(!isIndicatorBrowserOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'var(--surface)',
+                  color: 'var(--foreground)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <Box size={14} />
+                Indicator Browser
+                <span style={{ marginLeft: 'auto' }}>
+                  {isIndicatorBrowserOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </span>
+              </button>
+              {isIndicatorBrowserOpen && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                }}>
+                  <IndicatorBrowser onInsertSnippet={handleInsertSnippet} />
+                </div>
+              )}
             </div>
 
             {/* Chat Assistant */}
