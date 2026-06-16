@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import ControlPanel, { ScanParams } from "./components/ControlPanel";
 import SectorRegimeGrid from "./components/SectorRegimeGrid";
@@ -22,6 +22,19 @@ interface Signal {
   etf: string;
 }
 
+interface ScanProgress {
+  running: boolean;
+  progress_pct: number;
+  current_ticker: string;
+  current_action: string;
+  tickers_completed: number;
+  tickers_total: number;
+  elapsed_seconds: number;
+  estimated_remaining_seconds: number;
+  started_at: number | null;
+  stale?: boolean;
+}
+
 export default function MarkovPage() {
   const { isDarkMode } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -29,16 +42,80 @@ export default function MarkovPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [totalScanned, setTotalScanned] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const [lastMinConviction, setLastMinConviction] = useState(0.6);
+  const [lastAsOfDate, setLastAsOfDate] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressRef = useRef<ScanProgress | null>(null);
+  // Keep the ref in sync so the interval callback can read the latest progress
+  // without re-creating the interval on every progress update.
+  useEffect(() => { progressRef.current = progress; }, [progress]);
 
   // Theme-aware colors
   const colors = {
     error: "#EF4444",
     muted: isDarkMode ? "rgba(255,255,255,0.7)" : "#6e6e73",
+    surface: isDarkMode ? "#1A1D21" : "#f5f5f7",
+    border: isDarkMode ? "rgba(255,255,255,0.12)" : "#d2d2d7",
+    accent: "#10B981",
+    accentMuted: isDarkMode ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.1)",
   };
+
+  // Poll scan progress while loading
+  useEffect(() => {
+    if (loading) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch("/api/markov/scan-status");
+          if (res.ok) {
+            const data: ScanProgress = await res.json();
+            setProgress(data);
+            // Stale detection: if the backend stopped responding or
+            // the process crashed (SIGSEGV in PyTorch LSTM kernels),
+            // the status is frozen at running=true with zero progress.
+            // Reset so the user gets an actionable error.
+            if (data.stale) {
+              setLoading(false);
+              setError(
+                "The scan process stopped responding — " +
+                "LSTM training crashed the backend (OpenMP / PyTorch segfault). " +
+                "Please try again; the server should have auto-restarted."
+              );
+            }
+          }
+        } catch {
+          // Connection refused / server restarting — check if we went idle
+          // but the progress never completed (e.g. server segfaulted)
+          const p = progressRef.current;
+          if (p && p.running && p.elapsed_seconds > 300) {
+            setLoading(false);
+            setError(
+              "The backend server appears to have crashed during the scan. " +
+              "Please refresh the page and try again with XGBoost instead of LSTM."
+            );
+          }
+        }
+      }, 2000);  // Poll every 2s (less aggressive than 1s for production)
+    } else {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setProgress(null);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [loading]);
 
   const handleScan = useCallback(async (params: ScanParams) => {
     setLoading(true);
     setError(null);
+    setSignals([]);
+    setSectors([]);
+    setProgress(null);
+    setLastMinConviction(params.minConviction);
+    setLastAsOfDate(params.asOfDate);
     try {
       const res = await fetch("/api/markov/scan", {
         method: "POST",
@@ -48,6 +125,7 @@ export default function MarkovPage() {
           threshold: params.threshold,
           min_conviction: params.minConviction,
           max_results: params.maxResults,
+          end_date: params.asOfDate || undefined,
         }),
       });
       if (!res.ok) {
@@ -64,6 +142,14 @@ export default function MarkovPage() {
     }
   }, []);
 
+  // Format elapsed time
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return `${m}m ${s}s`;
+  };
+
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>
       <ControlPanel onScan={handleScan} loading={loading} />
@@ -74,8 +160,111 @@ export default function MarkovPage() {
         </div>
       )}
 
+      {/* Progress Bar — shown during scan */}
+      {loading && progress && (
+        <div style={{ padding: "16px 24px" }}>
+          <div style={{
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 12,
+            padding: "20px 24px",
+          }}>
+            {/* Status header */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* Pulsing dot */}
+                <div style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  backgroundColor: colors.accent,
+                  animation: "pulse-dot 1.2s ease-in-out infinite",
+                }} />
+                <span style={{ fontWeight: 600, fontSize: 15 }}>
+                  {progress.current_action || "Scanning..."}
+                </span>
+              </div>
+              <div style={{ textAlign: "right", fontSize: 13, color: colors.muted }}>
+                <div>{formatTime(progress.elapsed_seconds)} elapsed</div>
+                {progress.estimated_remaining_seconds > 0 && (
+                  <div>~{formatTime(progress.estimated_remaining_seconds)} remaining</div>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{
+              width: "100%",
+              height: 8,
+              borderRadius: 4,
+              background: isDarkMode ? "rgba(255,255,255,0.1)" : "#e5e7eb",
+              overflow: "hidden",
+              marginBottom: 8,
+            }}>
+              <div style={{
+                width: `${Math.max(progress.progress_pct, 2)}%`,
+                height: "100%",
+                borderRadius: 4,
+                background: `linear-gradient(90deg, ${colors.accent}, #34D399, ${colors.accent})`,
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s ease-in-out infinite",
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+
+            {/* Ticker count and current ticker */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 13,
+              color: colors.muted,
+            }}>
+              <span>
+                {progress.current_ticker ? (
+                  <>Processing <strong style={{ color: colors.accent }}>{progress.current_ticker}</strong> ({progress.tickers_completed}/{progress.tickers_total})</>
+                ) : (
+                  <>{progress.tickers_completed}/{progress.tickers_total} tickers</>
+                )}
+              </span>
+              <span>{progress.progress_pct.toFixed(0)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading skeleton for signals table */}
+      {loading && !progress && (
+        <div style={{ padding: "24px", textAlign: "center" }}>
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "16px 24px",
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
+          }}>
+            <div style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              backgroundColor: colors.accent,
+              animation: "pulse-dot 1.2s ease-in-out infinite",
+            }} />
+            <span style={{ color: colors.muted, fontSize: 14 }}>
+              Initializing scan...
+            </span>
+          </div>
+        </div>
+      )}
+
       {sectors.length > 0 && <SectorRegimeGrid sectors={sectors} isDarkMode={isDarkMode} />}
-      <SignalsTable signals={signals} totalScanned={totalScanned} loading={loading} isDarkMode={isDarkMode} />
+      <SignalsTable signals={signals} totalScanned={totalScanned} loading={loading} isDarkMode={isDarkMode} minConviction={lastMinConviction} asOfDate={lastAsOfDate} />
     </div>
   );
 }
