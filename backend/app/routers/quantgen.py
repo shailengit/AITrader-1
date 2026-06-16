@@ -7,7 +7,7 @@ Ported from QuantGen FastAPI backend with database integration.
 import os
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.llm_engine import (
@@ -33,6 +33,7 @@ from app.db.database import engine
 from sqlalchemy import text
 from app.services.fundamentals_service import get_ticker_fundamentals
 from app.services.research_agents import run_research_agents
+from app.services.indicator_registry import get_indicator_catalog, get_indicator_categories
 
 logger = logging.getLogger(__name__)
 
@@ -762,6 +763,42 @@ async def list_indicators():
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error("Error listing indicators: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/indicators/catalog")
+async def list_indicator_catalog(
+    category: Optional[str] = Query(None, description="Filter by category: momentum, trend, volatility, volume"),
+    search: Optional[str] = Query(None, description="Search by name or description"),
+):
+    """
+    List all available indicators with metadata from all sources.
+    Sources: ta library, VectorBT, pandas-ta.
+    """
+    try:
+        indicators = get_indicator_catalog(category=category, search=search)
+        categories = get_indicator_categories()
+
+        # Build a source count summary
+        from collections import Counter
+        source_counts = Counter(i["source"] for i in indicators)
+
+        return {
+            "success": True,
+            "data": {
+                "indicators": indicators,
+                "count": len(indicators),
+                "categories": categories,
+                "source_counts": dict(source_counts),
+            },
+            "message": f"Found {len(indicators)} indicators"
+        }
+    except Exception as e:
+        logger.error("Error listing indicator catalog: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "data": {"indicators": [], "count": 0}
+        }
 
 
 @router.get("/latest-date")
