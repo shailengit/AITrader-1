@@ -5,6 +5,7 @@ export interface ScanParams {
   threshold: number;
   minConviction: number;
   maxResults: number;
+  asOfDate: string;  // YYYY-MM-DD, empty string = today
 }
 
 interface ControlPanelProps {
@@ -17,6 +18,7 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
   const [threshold, setThreshold] = useState(2.0);
   const [minConviction, setMinConviction] = useState(0.6);
   const [maxResults, setMaxResults] = useState(50);
+  const [asOfDate, setAsOfDate] = useState("");
 
   return (
     <div style={{ maxWidth: 480, padding: "24px" }}>
@@ -73,6 +75,9 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
           onChange={(e) => setThreshold(parseFloat(e.target.value))}
           style={{ width: "100%" }}
         />
+        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+          Affects LSTM (trained on-the-fly). For XGBoost, use Retrain to apply a new threshold.
+        </div>
       </div>
 
       {/* Min Conviction Slider */}
@@ -89,19 +94,22 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
           onChange={(e) => setMinConviction(parseFloat(e.target.value))}
           style={{ width: "100%" }}
         />
+        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+          Minimum confidence for a BUY signal. Also used by the Actionable filter.
+        </div>
       </div>
 
       {/* Max Results */}
       <div style={{ marginBottom: 24 }}>
         <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 8 }}>
-          Max Results
+          Max Tickers to Scan
         </label>
         <input
           type="number"
           value={maxResults}
           onChange={(e) => setMaxResults(parseInt(e.target.value) || 50)}
           min={5}
-          max={200}
+          max={500}
           style={{
             padding: "8px 12px",
             borderRadius: 8,
@@ -109,11 +117,35 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
             width: 100,
           }}
         />
+        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+          Number of tickers to scan (5–500). Results are capped at this value.
+        </div>
+      </div>
+
+      {/* As of Date */}
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 8 }}>
+          As of Date
+        </label>
+        <input
+          type="date"
+          value={asOfDate}
+          onChange={(e) => setAsOfDate(e.target.value)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #d2d2d7",
+            width: 180,
+          }}
+        />
+        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+          Scan as of this date (leave empty for today). Affects regime model, features, and labels.
+        </div>
       </div>
 
       {/* Scan Button */}
       <button
-        onClick={() => onScan({ model, threshold: threshold / 100, minConviction, maxResults })}
+        onClick={() => onScan({ model, threshold: threshold / 100, minConviction, maxResults, asOfDate })}
         disabled={loading}
         style={{
           padding: "12px 32px",
