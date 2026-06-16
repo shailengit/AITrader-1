@@ -99,6 +99,7 @@ const makeDefaultOptConfig = (exportedStart?: string | null): OptimizationConfig
 export default function Builder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const loadSlug = searchParams.get('load');
   const fromScreenerTickers = searchParams.get("tickers");
   const fromScreenerDate = searchParams.get("from_date");
   const importedTickers = fromScreenerTickers
@@ -118,6 +119,8 @@ export default function Builder() {
   const [optConfig, setOptConfig] =
     useState<OptimizationConfigData>(() => makeDefaultOptConfig(fromScreenerDate));
   const [optParams, setOptParams] = useState<ParamRange[]>([]);
+  const [strategyMetadata, setStrategyMetadata] = useState<any>(null);
+  const [isLoadingStrategy, setIsLoadingStrategy] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -783,6 +786,34 @@ export default function Builder() {
         : newParams;
     });
   }, [code]);
+
+  // Auto-load strategy from ?load=<slug>
+  useEffect(() => {
+    if (!loadSlug) return;
+    setIsLoadingStrategy(true);
+    fetch(`/api/quantgen/strategy-catalog/${loadSlug}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setCode(data.data.code);
+          setStrategyMetadata(data.data.metadata);
+          // Pre-fill optimization params from metadata
+          if (data.data.metadata?.parameters) {
+            const params = data.data.metadata.parameters;
+            const ranges: ParamRange[] = Object.entries(params).map(([name, conf]: [string, any]) => ({
+              name,
+              start: conf.min ?? Math.max(1, Math.round(Number(conf.default) * 0.5)),
+              stop: conf.max ?? Math.max(2, Math.round(Number(conf.default) * 1.5)),
+              step: conf.step ?? (conf.type === 'int' ? 1 : 0.5),
+              sourceValue: Number(conf.default),
+            }));
+            setOptParams(ranges);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingStrategy(false));
+  }, [loadSlug]);
 
   const loadStrategies = async () => {
     try {
@@ -1486,19 +1517,25 @@ export default function Builder() {
                 )}
               </div>
               <div style={{ flex: 1, minHeight: 0 }}>
-                <Editor
-                  height="100%"
-                  defaultLanguage="python"
-                  theme={isDarkMode ? "vs-dark" : "vs"}
-                  value={code}
-                  onChange={(val) => setCode(val || "")}
-                  onMount={(editor) => { editorRef.current = editor; }}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 16,
-                    scrollBeyondLastLine: false,
-                  }}
-                />
+                {isLoadingStrategy ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontSize: '14px' }}>
+                    Loading strategy...
+                  </div>
+                ) : (
+                  <Editor
+                    height="100%"
+                    defaultLanguage="python"
+                    theme={isDarkMode ? "vs-dark" : "vs"}
+                    value={code}
+                    onChange={(val) => setCode(val || "")}
+                    onMount={(editor) => { editorRef.current = editor; }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 16,
+                      scrollBeyondLastLine: false,
+                    }}
+                  />
+                )}
               </div>
             </div>
 
