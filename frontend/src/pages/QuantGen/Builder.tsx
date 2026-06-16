@@ -791,7 +791,7 @@ export default function Builder() {
   useEffect(() => {
     if (!loadSlug) return;
     setIsLoadingStrategy(true);
-    fetch(`/api/quantgen/strategy-catalog/${loadSlug}`)
+    fetch(`/api/strategy-catalog/${loadSlug}`)
       .then(r => r.json())
       .then(data => {
         if (data.success && data.data) {

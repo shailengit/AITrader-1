@@ -47,7 +47,7 @@ export function IndicatorBrowser({ onInsertSnippet }: IndicatorBrowserProps) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    fetch('/api/quantgen/indicators/catalog')
+    fetch('/api/indicators/catalog')
       .then(r => r.json())
       .then(data => {
         if (data.success && data.data?.indicators) {

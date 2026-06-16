@@ -74,7 +74,7 @@ export default function Library() {
   useEffect(() => {
     if (activeTab !== 'builtin') return;
     setIsLoadingBuiltin(true);
-    fetch('/api/quantgen/strategy-catalog')
+    fetch('/api/strategy-catalog')
       .then(r => r.json())
       .then(data => {
         if (data.success && data.data) {
