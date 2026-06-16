@@ -1,0 +1,21 @@
+{
+  "name": "MA Cross + DMI",
+  "slug": "ma_cross_dmi",
+  "category": "trend",
+  "description": "Moving average crossover with ADX trend strength filter. Enters when 20 EMA crosses above 50 EMA with ADX > 25.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/trend/MA Cross + DMI.pine",
+  "parameters": {
+    "fast_ma": {"type": "int", "default": 20, "min": 5, "max": 100, "description": "Fast MA period"},
+    "slow_ma": {"type": "int", "default": 50, "min": 10, "max": 200, "description": "Slow MA period"},
+    "adx_period": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "ADX period"},
+    "adx_threshold": {"type": "int", "default": 25, "min": 10, "max": 50, "description": "ADX threshold for trend strength"}
+  },
+  "indicators_used": ["EMA", "ADX"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Fast EMA crosses above slow EMA with ADX > threshold",
+    "exit_long": "Fast EMA crosses below slow EMA"
+  }
+}

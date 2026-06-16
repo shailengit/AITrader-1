@@ -1,0 +1,21 @@
+{
+  "name": "Supertrend + RSI",
+  "slug": "supertrend_rsi",
+  "category": "trend",
+  "description": "Supertrend with RSI confirmation. Enters long when Supertrend flips to uptrend and RSI is above threshold.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/trend/Supertrend + RSI.pine",
+  "parameters": {
+    "period": {"type": "int", "default": 10, "min": 5, "max": 50, "description": "ATR period"},
+    "multiplier": {"type": "float", "default": 3.0, "min": 1.0, "max": 10.0, "step": 0.1, "description": "ATR multiplier"},
+    "rsi_length": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "RSI period"},
+    "rsi_threshold": {"type": "int", "default": 50, "min": 20, "max": 80, "description": "RSI threshold for entry"}
+  },
+  "indicators_used": ["Supertrend", "RSI"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "Supertrend flips to uptrend AND RSI > threshold",
+    "exit_long": "Supertrend flips to downtrend"
+  }
+}
