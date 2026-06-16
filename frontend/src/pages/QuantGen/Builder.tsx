@@ -119,7 +119,7 @@ export default function Builder() {
   const [optConfig, setOptConfig] =
     useState<OptimizationConfigData>(() => makeDefaultOptConfig(fromScreenerDate));
   const [optParams, setOptParams] = useState<ParamRange[]>([]);
-  const [strategyMetadata, setStrategyMetadata] = useState<any>(null);
+  const [_strategyMetadata, setStrategyMetadata] = useState<any>(null);
   const [isLoadingStrategy, setIsLoadingStrategy] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");

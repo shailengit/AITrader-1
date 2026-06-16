@@ -193,7 +193,7 @@ export default function Library() {
                         onClick={() => setCategoryFilter(cat)}
                         style={{
                           padding: '6px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
-                          border: 'none', cursor: 'pointer',
+                          cursor: 'pointer',
                           backgroundColor: categoryFilter === cat ? 'var(--accent)' : 'var(--surface)',
                           color: categoryFilter === cat ? '#000000' : 'var(--subtle)',
                           textTransform: 'capitalize',
