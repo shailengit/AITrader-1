@@ -1,0 +1,27 @@
+{
+  "name": "MACD + RSI Strategy",
+  "slug": "macd_rsi",
+  "category": "momentum",
+  "description": "MACD crossover with RSI oversold/overbought confirmation. Enters long when MACD crosses above signal line after RSI was recently oversold. Exits on bearish MACD cross.",
+  "version": "1.0.0",
+  "source": "Alorse/pinescript-strategies",
+  "original_file": "strategies/momentum/MACD+RSI.pine",
+  "parameters": {
+    "fast_length": {"type": "int", "default": 12, "min": 5, "max": 50, "description": "MACD fast EMA period"},
+    "slow_length": {"type": "int", "default": 26, "min": 10, "max": 100, "description": "MACD slow EMA period"},
+    "signal_length": {"type": "int", "default": 9, "min": 3, "max": 30, "description": "MACD signal line period"},
+    "rsi_length": {"type": "int", "default": 14, "min": 5, "max": 50, "description": "RSI period"},
+    "rsi_oversold": {"type": "int", "default": 30, "min": 10, "max": 50, "description": "RSI oversold level"},
+    "rsi_overbought": {"type": "int", "default": 70, "min": 50, "max": 90, "description": "RSI overbought level"},
+    "rsi_lookback": {"type": "int", "default": 5, "min": 1, "max": 20, "description": "Candles to check RSI condition"},
+    "stop_loss_pct": {"type": "float", "default": 0.01, "min": 0.001, "max": 0.10, "description": "Stop loss as fraction of entry price"}
+  },
+  "indicators_used": ["MACD", "RSI"],
+  "timeframes": ["1d", "4h", "1h"],
+  "signals": {
+    "entry_long": "MACD crosses above signal line AND RSI was < oversold level in last N candles",
+    "exit_long": "MACD crosses below signal line OR stop loss hit",
+    "entry_short": "Not supported (long-only)",
+    "exit_short": "Not supported (long-only)"
+  }
+}
