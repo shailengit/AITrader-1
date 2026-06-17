@@ -117,6 +117,7 @@ class ScanRequest(BaseModel):
 
 class RetrainRequest(BaseModel):
     model: str = "xgboost"  # 'xgboost', 'lstm', or 'all'
+    threshold: float = DEFAULT_BUY_THRESHOLD  # BUY/SELL threshold for label generation
 
 
 @router.get("/status")
@@ -235,12 +236,20 @@ async def retrain_models(request: RetrainRequest):
             if request.model in ("xgboost", "all"):
                 all_tickers = DataService.get_available_tickers()
                 logger.info(f"Background retrain: training XGBoost for {min(500, len(all_tickers))} tickers...")
-                tr.train_xgboost(all_tickers[:500])
+                tr.train_xgboost(
+                    all_tickers[:500],
+                    buy_threshold=request.threshold,
+                    sell_threshold=-request.threshold,
+                )
 
             if request.model in ("lstm", "all") and date.today().month in (1, 4, 7, 10):
                 all_tickers = DataService.get_available_tickers()
                 logger.info(f"Background retrain: training LSTM for {min(200, len(all_tickers))} tickers...")
-                tr.train_lstm(all_tickers[:200])
+                tr.train_lstm(
+                    all_tickers[:200],
+                    buy_threshold=request.threshold,
+                    sell_threshold=-request.threshold,
+                )
 
             logger.info("Background retrain complete.")
         except Exception as e:

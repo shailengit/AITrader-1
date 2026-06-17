@@ -31,12 +31,14 @@ class MarkovTrainer:
     def _date_range(years: int) -> tuple[str, str]:
         """Compute (start, end) date strings for a lookback window."""
         end = datetime.now().strftime('%Y-%m-%d')
-        start = (datetime.now() - timedelta(days=365 * years)).strftime('%Y-%m-%d')
+        start = (datetime.now() - timedelta(days=int(365.25 * years + 35))).strftime('%Y-%m-%d')
         return start, end
 
     def _train_recognizer(self, tickers: List[str], years: int,
                           recognizer_cls: Type[Union[XGBoostRecognizer, LSTMRecognizer]],
-                          label: str) -> Dict[str, bool]:
+                          label: str, min_rows: int = 10,
+                          buy_threshold: float = 0.02,
+                          sell_threshold: float = -0.02) -> Dict[str, bool]:
         """Train recognizers for a batch of tickers.
 
         Args:
@@ -44,6 +46,9 @@ class MarkovTrainer:
             years: Number of years of lookback data.
             recognizer_cls: Recognizer class (XGBoostRecognizer or LSTMRecognizer).
             label: Human-readable label for logging (e.g., "XGBoost").
+            min_rows: Minimum feature rows required (default 10).
+            buy_threshold: Forward return threshold for BUY label.
+            sell_threshold: Forward return threshold for SELL label.
 
         Returns:
             Dict mapping ticker to training success boolean.
@@ -53,7 +58,11 @@ class MarkovTrainer:
 
         for i, ticker in enumerate(tickers):
             try:
-                feat_data = compute_ticker_features(ticker, start, end)
+                feat_data = compute_ticker_features(
+                    ticker, start, end,
+                    buy_threshold=buy_threshold, sell_threshold=sell_threshold,
+                    min_rows=min_rows,
+                )
                 if feat_data is None:
                     results[ticker] = False
                     continue
@@ -78,15 +87,39 @@ class MarkovTrainer:
         start, end = self._date_range(years)
         return self.regime_manager.train_all(start, end)
 
-    def train_xgboost(self, tickers: List[str], years: int = 1) -> Dict[str, bool]:
-        """Retrain XGBoost for all tickers (daily schedule)."""
-        results = self._train_recognizer(tickers, years, XGBoostRecognizer, "XGBoost")
+    def train_xgboost(self, tickers: List[str], years: int = 1,
+                       buy_threshold: float = 0.02,
+                       sell_threshold: float = -0.02) -> Dict[str, bool]:
+        """Retrain XGBoost for all tickers (daily schedule).
+
+        Args:
+            tickers: List of ticker symbols to train.
+            years: Number of years of lookback data.
+            buy_threshold: Forward return threshold for BUY label.
+            sell_threshold: Forward return threshold for SELL label.
+        """
+        results = self._train_recognizer(
+            tickers, years, XGBoostRecognizer, "XGBoost",
+            buy_threshold=buy_threshold, sell_threshold=sell_threshold,
+        )
         self._last_daily_train = datetime.now().strftime('%Y-%m-%d')
         return results
 
-    def train_lstm(self, tickers: List[str], years: int = 3) -> Dict[str, bool]:
-        """Retrain LSTM for all tickers (quarterly schedule)."""
-        results = self._train_recognizer(tickers, years, LSTMRecognizer, "LSTM")
+    def train_lstm(self, tickers: List[str], years: int = 3,
+                    buy_threshold: float = 0.02,
+                    sell_threshold: float = -0.02) -> Dict[str, bool]:
+        """Retrain LSTM for all tickers (quarterly schedule).
+
+        Args:
+            tickers: List of ticker symbols to train.
+            years: Number of years of lookback data.
+            buy_threshold: Forward return threshold for BUY label.
+            sell_threshold: Forward return threshold for SELL label.
+        """
+        results = self._train_recognizer(
+            tickers, years, LSTMRecognizer, "LSTM",
+            buy_threshold=buy_threshold, sell_threshold=sell_threshold,
+        )
         self._last_quarterly_train = datetime.now().strftime('%Y-%m-%d')
         return results
 

@@ -19,6 +19,31 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
   const [minConviction, setMinConviction] = useState(0.6);
   const [maxResults, setMaxResults] = useState(50);
   const [asOfDate, setAsOfDate] = useState("");
+  const [retraining, setRetraining] = useState(false);
+  const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
+
+  const handleRetrain = async (retrainModel: "xgboost" | "lstm") => {
+    setRetraining(true);
+    setRetrainMsg(null);
+    try {
+      const res = await fetch("/api/markov/retrain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: retrainModel,
+          threshold: threshold / 100,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Retrain request failed: ${res.status} ${res.statusText}`);
+      }
+      setRetrainMsg(`${retrainModel === "xgboost" ? "XGBoost" : "LSTM"} retraining started in background.`);
+    } catch (e) {
+      setRetrainMsg(e instanceof Error ? e.message : "Retrain failed");
+    } finally {
+      setRetraining(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 480, padding: "24px" }}>
@@ -142,6 +167,52 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
         <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
           Scan as of this date (leave empty for today). Affects regime model, features, and labels.
         </div>
+      </div>
+
+      {/* Retrain Models */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 8 }}>
+          Retrain Models
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => handleRetrain("xgboost")}
+            disabled={retraining || loading}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "1px solid #F59E0B",
+              background: retraining || loading ? "rgba(156,163,175,0.2)" : "rgba(245,158,11,0.1)",
+              cursor: retraining || loading ? "not-allowed" : "pointer",
+              fontSize: 13,
+              color: "inherit",
+            }}
+            title="Retrain all XGBoost models with current threshold"
+          >
+            {retraining ? "Retraining..." : "Retrain XGBoost"}
+          </button>
+          <button
+            onClick={() => handleRetrain("lstm")}
+            disabled={retraining || loading}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "1px solid #8B5CF6",
+              background: retraining || loading ? "rgba(156,163,175,0.2)" : "rgba(139,92,246,0.1)",
+              cursor: retraining || loading ? "not-allowed" : "pointer",
+              fontSize: 13,
+              color: "inherit",
+            }}
+            title="Retrain all LSTM models with current threshold"
+          >
+            {retraining ? "Retraining..." : "Retrain LSTM"}
+          </button>
+        </div>
+        {retrainMsg && (
+          <div style={{ fontSize: 11, marginTop: 6, color: retrainMsg.includes("failed") ? "#EF4444" : "#10B981" }}>
+            {retrainMsg}
+          </div>
+        )}
       </div>
 
       {/* Scan Button */}

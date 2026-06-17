@@ -29,7 +29,7 @@ export default function SignalsTable({ signals, totalScanned, loading, isDarkMod
 
   const buyTickers = signals.filter((s) => s.signal === "BUY").map((s) => s.ticker);
   const exportUrl = buyTickers.length > 0
-    ? `/quantgen/builder?tickers=${buyTickers.join(",")}&from_date=${asOfDate || new Date().toISOString().split("T")[0]}`
+    ? `/quantgen/build?tickers=${encodeURIComponent(buyTickers.join(","))}&from_date=${asOfDate || new Date().toISOString().split("T")[0]}`
     : null;
 
   const muted = isDarkMode ? "rgba(255,255,255,0.7)" : "#6e6e73";

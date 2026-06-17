@@ -155,7 +155,11 @@ class SignalGenerator:
                         eta=eta,
                     )
                 end = end_date if end_date else datetime.now().strftime('%Y-%m-%d')
-                start = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%d')
+                # Compute start relative to end_date so the data window always
+                # spans ~400 calendar days (~252 trading days).  When end_date
+                # is in the past this ensures the lookback has enough data.
+                end_dt = datetime.strptime(end, '%Y-%m-%d')
+                start = (end_dt - timedelta(days=400)).strftime('%Y-%m-%d')
 
                 feat_data = compute_ticker_features(
                     item['ticker'], start, end, threshold, -threshold,
