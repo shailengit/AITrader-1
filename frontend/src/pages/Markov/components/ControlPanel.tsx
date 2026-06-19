@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface ScanParams {
   model: "xgboost" | "lstm";
@@ -6,6 +6,19 @@ export interface ScanParams {
   minConviction: number;
   maxResults: number;
   asOfDate: string;  // YYYY-MM-DD, empty string = today
+}
+
+interface RetrainProgress {
+  running: boolean;
+  progress_pct: number;
+  current_ticker: string;
+  current_action: string;
+  tickers_completed: number;
+  tickers_total: number;
+  elapsed_seconds: number;
+  estimated_remaining_seconds: number;
+  model: string;
+  stale?: boolean;
 }
 
 interface ControlPanelProps {
@@ -21,10 +34,48 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
   const [asOfDate, setAsOfDate] = useState("");
   const [retraining, setRetraining] = useState(false);
   const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
+  const [retrainProgress, setRetrainProgress] = useState<RetrainProgress | null>(null);
+  const retrainMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Poll retrain progress while retraining
+  useEffect(() => {
+    if (!retraining) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/markov/retrain-status");
+        if (res.ok) {
+          const data: RetrainProgress = await res.json();
+          setRetrainProgress(data);
+          if (!data.running) {
+            clearInterval(interval);
+            setRetraining(false);
+            setRetrainMsg("Retraining complete!");
+            // Clear completion message after 5s
+            if (retrainMsgTimer.current) clearTimeout(retrainMsgTimer.current);
+            retrainMsgTimer.current = setTimeout(() => setRetrainMsg(null), 5000);
+          }
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [retraining]);
+
+  // Format elapsed time
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return `${m}m ${s}s`;
+  };
 
   const handleRetrain = async (retrainModel: "xgboost" | "lstm") => {
     setRetraining(true);
     setRetrainMsg(null);
+    setRetrainProgress(null);
     try {
       const res = await fetch("/api/markov/retrain", {
         method: "POST",
@@ -208,9 +259,84 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
             {retraining ? "Retraining..." : "Retrain LSTM"}
           </button>
         </div>
-        {retrainMsg && (
+        {retrainMsg && !retrainProgress?.running && (
           <div style={{ fontSize: 11, marginTop: 6, color: retrainMsg.includes("failed") ? "#EF4444" : "#10B981" }}>
             {retrainMsg}
+          </div>
+        )}
+
+        {/* Retrain progress bar */}
+        {retrainProgress?.running && (
+          <div style={{
+            marginTop: 12,
+            padding: "14px 16px",
+            borderRadius: 10,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}>
+            {/* Status header */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 10,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: "#10B981",
+                  animation: "pulse-dot 1.2s ease-in-out infinite",
+                }} />
+                <span style={{ fontWeight: 600, fontSize: 13 }}>
+                  {retrainProgress.current_action || "Retraining..."}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+                {formatTime(retrainProgress.elapsed_seconds)} elapsed
+                {retrainProgress.estimated_remaining_seconds > 0 && (
+                  <> · ~{formatTime(retrainProgress.estimated_remaining_seconds)} remaining</>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{
+              width: "100%",
+              height: 6,
+              borderRadius: 3,
+              background: "rgba(255,255,255,0.1)",
+              overflow: "hidden",
+              marginBottom: 6,
+            }}>
+              <div style={{
+                width: `${Math.max(retrainProgress.progress_pct, 2)}%`,
+                height: "100%",
+                borderRadius: 3,
+                background: "linear-gradient(90deg, #10B981, #34D399, #10B981)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s ease-in-out infinite",
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+
+            {/* Ticker count */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.6)",
+            }}>
+              <span>
+                {retrainProgress.current_ticker ? (
+                  <>Processing <strong style={{ color: "#10B981" }}>{retrainProgress.current_ticker}</strong> ({retrainProgress.tickers_completed}/{retrainProgress.tickers_total})</>
+                ) : (
+                  <>{retrainProgress.tickers_completed}/{retrainProgress.tickers_total} tickers</>
+                )}
+              </span>
+              <span>{retrainProgress.progress_pct.toFixed(0)}%</span>
+            </div>
           </div>
         )}
       </div>

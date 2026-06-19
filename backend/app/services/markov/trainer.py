@@ -38,7 +38,8 @@ class MarkovTrainer:
                           recognizer_cls: Type[Union[XGBoostRecognizer, LSTMRecognizer]],
                           label: str, min_rows: int = 10,
                           buy_threshold: float = 0.02,
-                          sell_threshold: float = -0.02) -> Dict[str, bool]:
+                          sell_threshold: float = -0.02,
+                          progress_callback=None) -> Dict[str, bool]:
         """Train recognizers for a batch of tickers.
 
         Args:
@@ -49,12 +50,17 @@ class MarkovTrainer:
             min_rows: Minimum feature rows required (default 10).
             buy_threshold: Forward return threshold for BUY label.
             sell_threshold: Forward return threshold for SELL label.
+            progress_callback: Optional callable(completed, total, current_ticker)
+                               for progress reporting.
 
         Returns:
             Dict mapping ticker to training success boolean.
         """
         results = {}
         start, end = self._date_range(years)
+
+        if progress_callback:
+            progress_callback(0, len(tickers), "")
 
         for i, ticker in enumerate(tickers):
             try:
@@ -76,6 +82,9 @@ class MarkovTrainer:
                 if (i + 1) % self.LOG_INTERVAL == 0:
                     logger.info(f"{label} training: {i + 1}/{len(tickers)} tickers done")
 
+                if progress_callback:
+                    progress_callback(i + 1, len(tickers), ticker)
+
             except Exception as e:
                 logger.error(f"{label} training failed for {ticker}: {e}")
                 results[ticker] = False
@@ -89,7 +98,8 @@ class MarkovTrainer:
 
     def train_xgboost(self, tickers: List[str], years: int = 1,
                        buy_threshold: float = 0.02,
-                       sell_threshold: float = -0.02) -> Dict[str, bool]:
+                       sell_threshold: float = -0.02,
+                       progress_callback=None) -> Dict[str, bool]:
         """Retrain XGBoost for all tickers (daily schedule).
 
         Args:
@@ -97,17 +107,20 @@ class MarkovTrainer:
             years: Number of years of lookback data.
             buy_threshold: Forward return threshold for BUY label.
             sell_threshold: Forward return threshold for SELL label.
+            progress_callback: Optional callable(completed, total, current_ticker)
         """
         results = self._train_recognizer(
             tickers, years, XGBoostRecognizer, "XGBoost",
             buy_threshold=buy_threshold, sell_threshold=sell_threshold,
+            progress_callback=progress_callback,
         )
         self._last_daily_train = datetime.now().strftime('%Y-%m-%d')
         return results
 
     def train_lstm(self, tickers: List[str], years: int = 3,
                     buy_threshold: float = 0.02,
-                    sell_threshold: float = -0.02) -> Dict[str, bool]:
+                    sell_threshold: float = -0.02,
+                    progress_callback=None) -> Dict[str, bool]:
         """Retrain LSTM for all tickers (quarterly schedule).
 
         Args:
@@ -115,10 +128,12 @@ class MarkovTrainer:
             years: Number of years of lookback data.
             buy_threshold: Forward return threshold for BUY label.
             sell_threshold: Forward return threshold for SELL label.
+            progress_callback: Optional callable(completed, total, current_ticker)
         """
         results = self._train_recognizer(
             tickers, years, LSTMRecognizer, "LSTM",
             buy_threshold=buy_threshold, sell_threshold=sell_threshold,
+            progress_callback=progress_callback,
         )
         self._last_quarterly_train = datetime.now().strftime('%Y-%m-%d')
         return results

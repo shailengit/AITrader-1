@@ -23,6 +23,21 @@ _signal_generator: Optional[SignalGenerator] = None
 _trainer: Optional[MarkovTrainer] = None
 _retraining = threading.Event()
 
+# Retrain progress tracking
+_retrain_progress: Dict[str, Any] = {
+    "running": False,
+    "progress_pct": 0.0,
+    "current_ticker": "",
+    "current_action": "",
+    "tickers_completed": 0,
+    "tickers_total": 0,
+    "elapsed_seconds": 0.0,
+    "estimated_remaining_seconds": 0.0,
+    "started_at": None,
+    "model": "",
+}
+_retrain_progress_lock = threading.Lock()
+
 # Scan progress tracking
 _scan_progress: Dict[str, Any] = {
     "running": False,
@@ -101,6 +116,50 @@ def _reset_scan_progress():
         _scan_progress["started_at"] = None
 
 
+def _update_retrain_progress(
+    pct: float,
+    ticker: str = "",
+    action: str = "",
+    completed: int = 0,
+    total: int = 0,
+    elapsed: float = 0.0,
+    eta: float = 0.0,
+):
+    """Thread-safe update of retrain progress."""
+    global _retrain_progress
+    with _retrain_progress_lock:
+        _retrain_progress["running"] = True
+        _retrain_progress["progress_pct"] = pct
+        if ticker:
+            _retrain_progress["current_ticker"] = ticker
+        if action:
+            _retrain_progress["current_action"] = action
+        if completed:
+            _retrain_progress["tickers_completed"] = completed
+        if total:
+            _retrain_progress["tickers_total"] = total
+        if elapsed:
+            _retrain_progress["elapsed_seconds"] = elapsed
+        if eta:
+            _retrain_progress["estimated_remaining_seconds"] = eta
+
+
+def _reset_retrain_progress():
+    """Reset retrain progress to idle."""
+    global _retrain_progress
+    with _retrain_progress_lock:
+        _retrain_progress["running"] = False
+        _retrain_progress["progress_pct"] = 0.0
+        _retrain_progress["current_ticker"] = ""
+        _retrain_progress["current_action"] = ""
+        _retrain_progress["tickers_completed"] = 0
+        _retrain_progress["tickers_total"] = 0
+        _retrain_progress["elapsed_seconds"] = 0.0
+        _retrain_progress["estimated_remaining_seconds"] = 0.0
+        _retrain_progress["started_at"] = None
+        _retrain_progress["model"] = ""
+
+
 def _end_date() -> str:
     """Return the latest available trading day as YYYY-MM-DD."""
     return (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -150,6 +209,20 @@ async def scan_status():
             if elapsed > 300 and _scan_progress["tickers_completed"] == 0:
                 stale = True
         result = dict(_scan_progress)
+        result["stale"] = stale
+        return result
+
+
+@router.get("/retrain-status")
+async def retrain_status():
+    """Return current retrain progress for real-time frontend feedback."""
+    with _retrain_progress_lock:
+        stale = False
+        if _retrain_progress["running"] and _retrain_progress["started_at"] is not None:
+            elapsed = time.time() - _retrain_progress["started_at"]
+            if elapsed > 600 and _retrain_progress["tickers_completed"] == 0:
+                stale = True
+        result = dict(_retrain_progress)
         result["stale"] = stale
         return result
 
@@ -230,25 +303,54 @@ async def retrain_models(request: RetrainRequest):
     def _run():
         try:
             threading.current_thread().name = "markov-retrain"
+            started = time.time()
+            _reset_retrain_progress()
+            _retrain_progress["started_at"] = started
+            _retrain_progress["running"] = True
+            _retrain_progress["model"] = request.model
+
+            # Progress callback for trainer
+            def _progress(completed: int, total: int, ticker: str):
+                pct = (completed / total * 100) if total > 0 else 0
+                elapsed = time.time() - started
+                eta = (elapsed / completed * (total - completed)) if completed > 0 else 0
+                label = "XGBoost" if _retrain_progress["model"] in ("xgboost", "all") else "LSTM"
+                _update_retrain_progress(
+                    pct=pct,
+                    ticker=ticker,
+                    action=f"Training {label} model...",
+                    completed=completed,
+                    total=total,
+                    elapsed=elapsed,
+                    eta=eta,
+                )
+
             logger.info("Background retrain: training regimes...")
+            _update_retrain_progress(0, action="Training regime models...")
             rm.train_all(start_3y, end)
 
             if request.model in ("xgboost", "all"):
                 all_tickers = DataService.get_available_tickers()
-                logger.info(f"Background retrain: training XGBoost for {min(500, len(all_tickers))} tickers...")
+                n_tickers = min(500, len(all_tickers))
+                logger.info(f"Background retrain: training XGBoost for {n_tickers} tickers...")
+                _update_retrain_progress(0, ticker="", action=f"Training XGBoost for {n_tickers} tickers...")
                 tr.train_xgboost(
                     all_tickers[:500],
                     buy_threshold=request.threshold,
                     sell_threshold=-request.threshold,
+                    progress_callback=_progress,
                 )
 
             if request.model in ("lstm", "all") and date.today().month in (1, 4, 7, 10):
                 all_tickers = DataService.get_available_tickers()
-                logger.info(f"Background retrain: training LSTM for {min(200, len(all_tickers))} tickers...")
+                n_tickers = min(200, len(all_tickers))
+                logger.info(f"Background retrain: training LSTM for {n_tickers} tickers...")
+                _update_retrain_progress(0, ticker="", action=f"Training LSTM for {n_tickers} tickers...")
                 tr.train_lstm(
                     all_tickers[:200],
                     buy_threshold=request.threshold,
                     sell_threshold=-request.threshold,
+                    progress_callback=_progress,
                 )
 
             logger.info("Background retrain complete.")
@@ -256,6 +358,7 @@ async def retrain_models(request: RetrainRequest):
             logger.error(f"Background retrain failed: {e}", exc_info=True)
         finally:
             _retraining.clear()
+            _reset_retrain_progress()
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
