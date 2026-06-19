@@ -53,6 +53,10 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
             // Clear completion message after 5s
             if (retrainMsgTimer.current) clearTimeout(retrainMsgTimer.current);
             retrainMsgTimer.current = setTimeout(() => setRetrainMsg(null), 5000);
+          } else if (data.stale) {
+            clearInterval(interval);
+            setRetraining(false);
+            setRetrainMsg("Retrain process stopped responding. Please try again.");
           }
         }
       } catch {
@@ -90,9 +94,8 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
       }
       setRetrainMsg(`${retrainModel === "xgboost" ? "XGBoost" : "LSTM"} retraining started in background.`);
     } catch (e) {
-      setRetrainMsg(e instanceof Error ? e.message : "Retrain failed");
-    } finally {
       setRetraining(false);
+      setRetrainMsg(e instanceof Error ? e.message : "Retrain failed");
     }
   };
 
