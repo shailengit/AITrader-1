@@ -177,6 +177,7 @@ class ScanRequest(BaseModel):
 class RetrainRequest(BaseModel):
     model: str = "xgboost"  # 'xgboost', 'lstm', or 'all'
     threshold: float = DEFAULT_BUY_THRESHOLD  # BUY/SELL threshold for label generation
+    max_tickers: int = 500  # Max tickers to train (matches scan max_results)
 
 
 @router.get("/status")
@@ -331,11 +332,11 @@ async def retrain_models(request: RetrainRequest):
 
             if request.model in ("xgboost", "all"):
                 all_tickers = DataService.get_available_tickers()
-                n_tickers = min(500, len(all_tickers))
+                n_tickers = min(request.max_tickers, len(all_tickers))
                 logger.info(f"Background retrain: training XGBoost for {n_tickers} tickers...")
                 _update_retrain_progress(0, ticker="", action=f"Training XGBoost for {n_tickers} tickers...")
                 tr.train_xgboost(
-                    all_tickers[:500],
+                    all_tickers[:n_tickers],
                     buy_threshold=request.threshold,
                     sell_threshold=-request.threshold,
                     progress_callback=_progress,
@@ -343,11 +344,11 @@ async def retrain_models(request: RetrainRequest):
 
             if request.model in ("lstm", "all") and date.today().month in (1, 4, 7, 10):
                 all_tickers = DataService.get_available_tickers()
-                n_tickers = min(200, len(all_tickers))
+                n_tickers = min(request.max_tickers, len(all_tickers))
                 logger.info(f"Background retrain: training LSTM for {n_tickers} tickers...")
                 _update_retrain_progress(0, ticker="", action=f"Training LSTM for {n_tickers} tickers...")
                 tr.train_lstm(
-                    all_tickers[:200],
+                    all_tickers[:n_tickers],
                     buy_threshold=request.threshold,
                     sell_threshold=-request.threshold,
                     progress_callback=_progress,

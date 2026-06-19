@@ -87,6 +87,7 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
         body: JSON.stringify({
           model: retrainModel,
           threshold: threshold / 100,
+          max_tickers: maxResults,
         }),
       });
       if (!res.ok) {
