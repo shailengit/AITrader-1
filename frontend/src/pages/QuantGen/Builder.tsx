@@ -108,9 +108,6 @@ export default function Builder() {
   const [showAllTickers, setShowAllTickers] = useState(false);
   const tickerCount = importedTickers.length;
   const shouldCollapse = tickerCount > 8;
-  const visibleTickers = shouldCollapse
-    ? importedTickers.slice(0, 8)
-    : importedTickers;
   const [strategyPrompt, setStrategyPrompt] = useState("");
   const [tickers, setTickers] = useState(() => importedTickers[0] || "AAPL");
   const [code, setCode] = useState("");
@@ -1233,33 +1230,104 @@ export default function Builder() {
                   Tickers
                 </label>
                 {importedTickers.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                    {importedTickers.map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => {
-                          setTickers(t);
-                          if (code) {
-                            let updated = replaceTickerInCode(code, t);
-                            updated = replaceDatesInCode(updated, optConfig.wfo.start_date, optConfig.wfo.end_date);
-                            setCode(updated);
-                          }
-                        }}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          border: '1px solid var(--border)',
-                          cursor: 'pointer',
-                          backgroundColor: tickers === t ? 'var(--accent)' : 'var(--canvas)',
-                          color: tickers === t ? '#000000' : 'var(--foreground)',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                  <div style={{ marginBottom: '8px' }}>
+                    {/* Summary badge when collapsed */}
+                    {shouldCollapse && !showAllTickers && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--accent)',
+                            color: '#000000',
+                          }}
+                        >
+                          {tickerCount} ticker{tickerCount !== 1 ? 's' : ''} imported
+                        </span>
+                        <button
+                          onClick={() => setShowAllTickers(true)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            border: '1px solid var(--border)',
+                            cursor: 'pointer',
+                            backgroundColor: 'var(--canvas)',
+                            color: 'var(--foreground)',
+                          }}
+                        >
+                          ▼ Show All
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Pill list: expanded or always-visible for small counts */}
+                    {(showAllTickers || !shouldCollapse) && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '6px',
+                            maxHeight: shouldCollapse ? '200px' : undefined,
+                            overflowY: shouldCollapse ? 'auto' : undefined,
+                            paddingBottom: '4px',
+                          }}
+                        >
+                          {importedTickers.map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => {
+                                setTickers(t);
+                                if (code) {
+                                  let updated = replaceTickerInCode(code, t);
+                                  updated = replaceDatesInCode(updated, optConfig.wfo.start_date, optConfig.wfo.end_date);
+                                  setCode(updated);
+                                }
+                              }}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                border: '1px solid var(--border)',
+                                cursor: 'pointer',
+                                backgroundColor: tickers === t ? 'var(--accent)' : 'var(--canvas)',
+                                color: tickers === t ? '#000000' : 'var(--foreground)',
+                                transition: 'all 0.15s ease',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Hide button (only shown when expanded from collapsed state) */}
+                        {shouldCollapse && showAllTickers && (
+                          <button
+                            onClick={() => setShowAllTickers(false)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              border: '1px solid var(--border)',
+                              cursor: 'pointer',
+                              backgroundColor: 'var(--canvas)',
+                              color: 'var(--foreground)',
+                              marginTop: '4px',
+                            }}
+                          >
+                            ▲ Hide
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 <input
