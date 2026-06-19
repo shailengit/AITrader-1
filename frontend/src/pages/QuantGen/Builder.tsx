@@ -105,6 +105,12 @@ export default function Builder() {
   const importedTickers = fromScreenerTickers
     ? fromScreenerTickers.split(',').map(t => t.trim()).filter(Boolean)
     : [];
+  const [showAllTickers, setShowAllTickers] = useState(false);
+  const tickerCount = importedTickers.length;
+  const shouldCollapse = tickerCount > 8;
+  const visibleTickers = shouldCollapse
+    ? importedTickers.slice(0, 8)
+    : importedTickers;
   const [strategyPrompt, setStrategyPrompt] = useState("");
   const [tickers, setTickers] = useState(() => importedTickers[0] || "AAPL");
   const [code, setCode] = useState("");
@@ -1539,47 +1545,6 @@ export default function Builder() {
               </div>
             </div>
 
-            {/* Indicator Browser */}
-            <div style={{ marginBottom: '12px' }}>
-              <button
-                onClick={() => setIsIndicatorBrowserOpen(!isIndicatorBrowserOpen)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: 'var(--surface)',
-                  color: 'var(--foreground)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <Box size={14} />
-                Indicator Browser
-                <span style={{ marginLeft: 'auto' }}>
-                  {isIndicatorBrowserOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                </span>
-              </button>
-              {isIndicatorBrowserOpen && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                }}>
-                  <IndicatorBrowser onInsertSnippet={handleInsertSnippet} />
-                </div>
-              )}
-            </div>
-
             {/* Chat Assistant */}
             <div
               className="rounded-xl overflow-hidden shadow-sm flex flex-col"
@@ -2211,6 +2176,51 @@ export default function Builder() {
                 />
               </div>
             )}
+
+            {/* Indicator Browser */}
+            <div
+              className="rounded-xl overflow-hidden flex flex-col"
+              style={{
+                flexShrink: 0,
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <button
+                onClick={() => setIsIndicatorBrowserOpen(!isIndicatorBrowserOpen)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "none",
+                  backgroundColor: "var(--surface-raised)",
+                  color: "var(--foreground)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                }}
+              >
+                <Box size={14} />
+                Indicator Browser
+                <span style={{ marginLeft: "auto" }}>
+                  {isIndicatorBrowserOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </span>
+              </button>
+              {isIndicatorBrowserOpen && (
+                <div style={{
+                  padding: "12px",
+                  maxHeight: "320px",
+                  overflowY: "auto",
+                }}>
+                  <IndicatorBrowser onInsertSnippet={handleInsertSnippet} />
+                </div>
+              )}
+            </div>
 
             {/* Strategy Library */}
             <div
