@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { TrendingDown, Activity, DollarSign, ArrowLeft, Trash2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { clearAppReferrer } from '@/components/layout/Layout';
 import { CandleStickChart } from '@/components/quantgen/CandleStickChart';
 import { IndicatorPanel } from '@/components/quantgen/IndicatorPanel';
 import OptimizationResults from '@/components/quantgen/OptimizationResults';
@@ -40,7 +41,7 @@ interface OHLCV {
 }
 
 interface EquityPoint {
-  time: number;
+  time: number | string;
   value: number;
 }
 
@@ -76,7 +77,7 @@ interface DashboardData {
   ohlcv: OHLCV[];
   optimization: OptimizationData | null;
   output: string;
-  drawdownData: Array<{ time: string; drawdown: number; bench_drawdown: number }>;
+  drawdownData: Array<{ time: number; drawdown: number; bench_drawdown: number }>;
   trades: Trade[];
   indicators: PanelIndicator[];
   benchmark_equity: EquityPoint[];
@@ -92,15 +93,26 @@ export default function Dashboard() {
         if (parsed.drawdown) {
           const dd = parsed.drawdown;
           const bdd = parsed.benchmark_drawdown || {};
+          const parseTs = (key: string | number): number => {
+            if (typeof key === 'number') return key;
+            // Numeric strings from the backend often carry a trailing ".0"
+            // (e.g. "1577923200.0") because the drawdown dict is keyed by
+            // float timestamps. String(n) !== key in that case, so parse
+            // numerically first and only fall back to date parsing otherwise.
+            const n = Number(key);
+            if (!isNaN(n) && isFinite(n) && n > 0) return n;
+            const parsedDate = Date.parse(key);
+            return isNaN(parsedDate) ? 0 : Math.floor(parsedDate / 1000);
+          };
           const allDates = Array.from(new Set([...Object.keys(dd), ...Object.keys(bdd)]))
-            .sort((a, b) => parseFloat(a) - parseFloat(b));
+            .sort((a, b) => parseTs(a) - parseTs(b));
           drawdownData = allDates.map((dateStr) => {
-            const ts = parseFloat(dateStr);
+            const ts = parseTs(dateStr);
             return {
-              time: String(ts),
+              time: ts,
               dateStr: new Date(ts * 1000).toISOString().split('T')[0],
-              drawdown: dd[dateStr] ? parseFloat(dd[dateStr]) : 0,
-              bench_drawdown: bdd[dateStr] ? parseFloat(bdd[dateStr]) : 0,
+              drawdown: dd[dateStr] != null ? Number(dd[dateStr]) : 0,
+              bench_drawdown: bdd[dateStr] != null ? Number(bdd[dateStr]) : 0,
             };
           });
         }
@@ -249,16 +261,24 @@ export default function Dashboard() {
         }
       });
       return equity.map((item) => {
-        const dayKey = Math.floor(item.time / 86400) * 86400;
+        const itemTime = typeof item.time === 'number' ? item.time : Date.parse(item.time) / 1000;
+        const dayKey = Math.floor(itemTime / 86400) * 86400;
         return {
-          ...item,
+          time: itemTime,
+          value: item.value,
           benchmark: benchByDay.get(dayKey) ?? null,
         };
       });
     }
 
     // Fallback: recompute from OHLCV (only valid when equity and ohlcv share the same timeline)
-    if (!ohlcv?.length) return equity;
+    if (!ohlcv?.length) {
+      return equity.map((item) => ({
+        time: typeof item.time === 'number' ? item.time : Date.parse(item.time) / 1000,
+        value: item.value,
+        benchmark: null,
+      }));
+    }
     try {
       const startValue = equity[0]?.value || 10000;
       const closePrices = ohlcv.map((d) => d.close);
@@ -266,10 +286,14 @@ export default function Dashboard() {
       for (let i = 1; i < closePrices.length; i++) {
         benchmark.push(benchmark[i - 1] * (1 + (closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]));
       }
-      return equity.map((item, index) => ({
-        ...item,
-        benchmark: benchmark[index] ? benchmark[index] * startValue : null,
-      }));
+      return equity.map((item, index) => {
+        const itemTime = typeof item.time === 'number' ? item.time : Date.parse(item.time) / 1000;
+        return {
+          time: itemTime,
+          value: item.value,
+          benchmark: benchmark[index] ? benchmark[index] * startValue : null,
+        };
+      });
     } catch { return equity; }
   }, [equity, benchmark_equity, ohlcv]);
 
@@ -332,6 +356,36 @@ export default function Dashboard() {
   const startDt = getVal(['Start', 'Start Date']);
   const endDt = getVal(['End', 'End Date']);
 
+  // Compute unified x-axis range for all charts based on backtest start/end dates.
+  // Falls back to the min/max time present in the data if stats are unavailable.
+  const allTimes = [
+    ...(ohlcv?.map((d) => d.time) || []),
+    ...(equity?.map((d) => (typeof d.time === 'number' ? d.time : Date.parse(d.time) / 1000)) || []),
+    ...(drawdownData?.map((d) => d.time) || []),
+  ].filter((t) => typeof t === 'number' && !isNaN(t));
+
+  const dataMinTime = allTimes.length ? Math.min(...allTimes) : undefined;
+  const dataMaxTime = allTimes.length ? Math.max(...allTimes) : undefined;
+
+  const parseStatDate = (dateStr: string | number | undefined): number | undefined => {
+    if (dateStr === undefined || dateStr === null || dateStr === '') return undefined;
+    const parsed = Date.parse(String(dateStr));
+    return isNaN(parsed) ? undefined : Math.floor(parsed / 1000);
+  };
+
+  // Prefer data-derived UTC timestamps for the visible range. Candle and
+  // equity times are UTC seconds, while stat dates are naive strings that
+  // Date.parse() reads as local time — using those shifts the window and
+  // clips the first candle(s) in non-UTC timezones (e.g. the price chart
+  // starting a day late). Fall back to stat dates only when no data exists.
+  const chartStart = dataMinTime ?? parseStatDate(startDt);
+  const chartEnd = dataMaxTime ?? parseStatDate(endDt);
+
+  const timeDomain: [number, number] | ['auto', 'auto'] =
+    chartStart !== undefined && chartEnd !== undefined
+      ? [chartStart, chartEnd]
+      : ['auto', 'auto'];
+
   const clearResults = () => {
     localStorage.removeItem('lastRunData');
     localStorage.removeItem('lastRunStats');
@@ -372,6 +426,26 @@ export default function Dashboard() {
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <NavLink
+                to='/quantgen/build'
+                onClick={() => clearAppReferrer()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  color: 'var(--accent)',
+                }}
+              >
+                <ArrowLeft size={14} />
+                Back to Builder
+              </NavLink>
               <span
                 style={{
                   fontSize: '12px',
@@ -494,7 +568,19 @@ export default function Dashboard() {
                       const chartIndicators: ChartIndicator[] = indicators
                         .filter((ind) => selIndicators[ind.name] !== false)
                         .map((ind) => ({ name: ind.name, type: ind.type, data: [], color: `hsl(${(ind.name.length * 137.508) % 360}, 70%, 50%)` }));
-                      return <CandleStickChart data={ohlcv} trades={chartTrades} indicators={chartIndicators} height={360} />;
+                      return (
+                        <CandleStickChart
+                          data={ohlcv}
+                          trades={chartTrades}
+                          indicators={chartIndicators}
+                          height={360}
+                          visibleRange={
+                            timeDomain[0] !== 'auto'
+                              ? { from: timeDomain[0], to: timeDomain[1] }
+                              : undefined
+                          }
+                        />
+                      );
                     })()
                   ) : (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '13px' }}>
@@ -519,7 +605,15 @@ export default function Dashboard() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} vertical={false} />
-                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]} minTickGap={50} />
+                      <XAxis
+                        dataKey="time"
+                        type="number"
+                        domain={timeDomain}
+                        allowDataOverflow
+                        tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                        tickFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]}
+                        minTickGap={50}
+                      />
                       <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }} labelFormatter={(v) => typeof v === 'number' ? new Date(v * 1000).toISOString().split('T')[0] : String(v).split(' ')[0]} />
                       <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#colorVal)" name="Strategy" />
@@ -544,7 +638,15 @@ export default function Dashboard() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.2} vertical={false} />
-                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickFormatter={(v) => new Date(parseFloat(v) * 1000).toISOString().split('T')[0]} minTickGap={50} />
+                      <XAxis
+                        dataKey="time"
+                        type="number"
+                        domain={timeDomain}
+                        allowDataOverflow
+                        tick={{ fontSize: 10, fill: 'var(--muted)' }}
+                        tickFormatter={(v) => new Date((typeof v === 'number' ? v : parseFloat(v)) * 1000).toISOString().split('T')[0]}
+                        minTickGap={50}
+                      />
                       <YAxis tick={{ fontSize: 10, fill: 'var(--muted)' }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }} />
                       <Area type="monotone" dataKey="drawdown" name="Strategy DD%" stroke="#f43f5e" fill="url(#colorDD)" strokeWidth={2} />

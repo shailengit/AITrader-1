@@ -24,6 +24,7 @@ import { Card } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/Badge'
 import { ProgressMetric } from '../components/ui/Metric'
 import { useTheme } from '../context/ThemeContext'
+import { recordAppReferrer } from '../components/layout/Layout'
 import { CandleStickChart } from '../components/quantgen/CandleStickChart'
 
 interface Sector {
@@ -55,13 +56,33 @@ interface Stock {
   ref_date: string | null
   forward_return: number | null
   is_real_data: boolean
+  sector?: string
+  perf_1m?: number
+  perf_6m?: number
+}
+
+const SECTOR_ROTATION_STATE_KEY = 'sectorRotation:lastView'
+
+function getSavedSectorRotationState() {
+  try {
+    const raw = sessionStorage.getItem(SECTOR_ROTATION_STATE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return null
 }
 
 export default function SectorRotation() {
   const navigate = useNavigate()
+  const savedState = getSavedSectorRotationState()
+  const oneMonthAgo = new Date()
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
   const [sectors, setSectors] = useState<Sector[]>([])
-  const [selectedSector, setSelectedSector] = useState<Sector | null>(null)
+  const [selectedSector, setSelectedSector] = useState<Sector | null>(savedState?.selectedSector || null)
   const [stocks, setStocks] = useState<Stock[]>([])
+  const [topLeaders, setTopLeaders] = useState<Stock[]>([])
+  const [loadingTopLeaders, setLoadingTopLeaders] = useState(false)
+  const [viewMode, setViewMode] = useState<'sector' | 'top20'>(savedState?.viewMode || 'sector')
   const [analyzedStock, setAnalyzedStock] = useState<Stock | null>(null)
   const [chartTicker, setChartTicker] = useState<string | null>(null)
   const [chartData, setChartData] = useState<any[]>([])
@@ -69,10 +90,8 @@ export default function SectorRotation() {
   const [loading, setLoading] = useState(true)
   const [isDbConnected, setIsDbConnected] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString())
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-  const [cutoffDate, setCutoffDate] = useState(oneMonthAgo.toISOString().split('T')[0])
-  const [holdingDays, setHoldingDays] = useState(30)
+  const [cutoffDate, setCutoffDate] = useState(savedState?.cutoffDate || oneMonthAgo.toISOString().split('T')[0])
+  const [holdingDays, setHoldingDays] = useState(savedState?.holdingDays ?? 30)
   const { isDarkMode } = useTheme()
 
   // Theme-aware colors
@@ -119,6 +138,22 @@ export default function SectorRotation() {
     }
   }, [selectedSector, cutoffDate, holdingDays])
 
+  useEffect(() => {
+    if (viewMode === 'top20') {
+      fetchTopMomentumLeaders()
+    }
+  }, [viewMode, cutoffDate, holdingDays])
+
+  // Persist view state so returning from QuantGen restores the exact Sector Rotation view
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        SECTOR_ROTATION_STATE_KEY,
+        JSON.stringify({ selectedSector, viewMode, cutoffDate, holdingDays })
+      )
+    } catch {}
+  }, [selectedSector, viewMode, cutoffDate, holdingDays])
+
   const buildQueryParams = () => {
     const params = new URLSearchParams()
     if (cutoffDate) {
@@ -138,7 +173,11 @@ export default function SectorRotation() {
       const data = await res.json()
       setSectors(data)
       if (data.length > 0) {
-        setSelectedSector(data[0])
+        const restored = savedState?.selectedSector
+        const stillValid = restored && data.some((s: Sector) => s.ticker === restored.ticker)
+        if (!stillValid) {
+          setSelectedSector(data[0])
+        }
       }
     } catch (err) {
       console.error('Failed to fetch sectors:', err)
@@ -160,9 +199,26 @@ export default function SectorRotation() {
     }
   }
 
-  const exportToQuantGen = () => {
-    const tickers = stocks.map(s => s.ticker).join(',')
+  const fetchTopMomentumLeaders = async () => {
+    try {
+      setLoadingTopLeaders(true)
+      const qs = buildQueryParams()
+      const url = qs ? `/api/top-momentum-leaders?${qs}` : '/api/top-momentum-leaders'
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to fetch top momentum leaders')
+      const data = await res.json()
+      setTopLeaders(data)
+    } catch (err) {
+      console.error('Failed to fetch top momentum leaders:', err)
+    } finally {
+      setLoadingTopLeaders(false)
+    }
+  }
+
+  const exportToQuantGen = (stockList: Stock[]) => {
+    const tickers = stockList.map(s => s.ticker).join(',')
     const fromDate = cutoffDate || new Date().toISOString().split('T')[0]
+    recordAppReferrer('/sectors', 'Sector Rotation')
     navigate(`/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`)
   }
 
@@ -472,171 +528,359 @@ export default function SectorRotation() {
       {/* Stock Leaders */}
       <div style={{ marginTop: '100px', marginBottom: '60px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
+          <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 mb-4">
+            <div className="text-left">
               <h2 className="text-3xl font-bold tracking-tight mb-2" style={{ color: colors.text }}>
-                Momentum Leaders in {selectedSector?.ticker}
+                {viewMode === 'sector'
+                  ? `Momentum Leaders in ${selectedSector?.ticker}`
+                  : 'Top 20 Momentum Leaders (All Sectors)'}
               </h2>
-              <p className="text-base" style={{ color: colors.muted }}>Top performing stocks currently exhibiting technical strength</p>
+              <p className="text-base" style={{ color: colors.muted }}>
+                {viewMode === 'sector'
+                  ? 'Top performing stocks currently exhibiting technical strength'
+                  : 'Highest 3-month performers across all 11 sectors, regardless of industry'}
+              </p>
             </div>
-            {stocks.length > 0 && (
-              <button
-                onClick={exportToQuantGen}
-                className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all hover:scale-105"
+            <div className="flex items-center gap-4">
+              <div
+                className="flex p-1 rounded-xl"
                 style={{
-                  backgroundColor: '#10B981',
-                  color: '#000000',
-                  border: '1px solid #10B981',
-                  boxShadow: '0 0 20px rgba(16,185,129,0.3)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#34D399'
-                  e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#10B981'
-                  e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.3)'
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
+                  border: `1px solid ${colors.border}`,
                 }}
               >
-                Export {stocks.length} Tickers to QuantGen
-              </button>
-            )}
-          </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
-          {stocks.map((stock) => {
-            const volumeRatio = stock.volume_today / stock.volume_avg_20d
-            const isVolumeSpike = volumeRatio > 1.5
-            const isPriceBreakout = stock.price > stock.high_10d
-            const isSqueezeTriggered = isVolumeSpike && isPriceBreakout && stock.bb_expanding
-
-            return (
-              <motion.div
-                key={stock.ticker}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="border rounded-2xl p-7 overflow-hidden relative hover-lift"
-                style={{
-                  backgroundColor: isDarkMode ? (isSqueezeTriggered ? 'rgba(16, 185, 129, 0.05)' : colors.surface) : (isSqueezeTriggered ? '#f0fdf4' : '#ffffff'),
-                  borderColor: isSqueezeTriggered ? 'rgba(16, 185, 129, 0.6)' : colors.border,
-                  boxShadow: isSqueezeTriggered 
-                    ? (isDarkMode ? '0 0 30px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16,185,129,0.1)' : '0 10px 30px rgba(16, 185, 129, 0.2)') 
-                    : (isDarkMode ? '0 10px 30px rgba(0,0,0,0.4)' : '0 5px 15px rgba(0,0,0,0.05)'),
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-              >
-                {isSqueezeTriggered && (
-                  <div
-                    className="absolute top-0 right-0 text-xs font-bold px-4 py-1.5 rounded-bl-2xl uppercase tracking-tight"
-                    style={{ 
-                      backgroundColor: '#10B981', 
-                      color: '#ffffff',
-                      boxShadow: '0 4px 15px rgba(16,185,129,0.4)'
-                    }}
-                  >
-                    Triggered
-                  </div>
-                )}
-
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h4 className="text-3xl font-bold leading-none mb-2" style={{ color: colors.text }}>{stock.ticker}</h4>
-                    <p className="text-sm" style={{ color: colors.muted }}>{stock.name}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-mono" style={{ color: colors.text }}>${stock.price.toFixed(2)}</p>
-                    <p className="text-xs uppercase mt-1" style={{ color: colors.muted }}>Price on {stock.ref_date || 'latest'}</p>
-                    {stock.forward_return != null && (
-                      <p className={`text-sm font-mono font-bold mt-1 ${stock.forward_return >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                        {stock.forward_return >= 0 ? '+' : ''}{(stock.forward_return * 100).toFixed(2)}% ({holdingDays}d fwd)
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <ProgressMetric
-                  value={((stock.perf_3m - stock.sector_perf_3m) * 100).toFixed(2)}
-                  label="3M Outperformance"
-                  progress={Math.min(100, Math.max(0, ((stock.perf_3m - stock.sector_perf_3m) * 100 + 50)))}
-                  progressColor="emerald"
-                  suffix={`% vs ${selectedSector?.ticker}`}
-                />
-
-                <div className="grid grid-cols-3 gap-3 mt-6">
-                  <button
-                    onClick={() => fetchChartData(stock.ticker)}
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
-                    style={{
-                      backgroundColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
-                      borderColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.4)' : colors.border
-                    }}
-                  >
-                    <ArrowUpRight className={`w-5 h-5 ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
-                    <span className={`text-xs uppercase font-bold ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Price</span>
-                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Maximize2 className="w-3 h-3 text-emerald-500" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => fetchChartData(stock.ticker)}
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
-                    style={{
-                      backgroundColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
-                      borderColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.4)' : colors.border
-                    }}
-                  >
-                    <Activity className={`w-5 h-5 ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
-                    <span className={`text-xs uppercase font-bold ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Volume</span>
-                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Maximize2 className="w-3 h-3 text-emerald-500" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => fetchChartData(stock.ticker)}
-                    className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
-                    style={{
-                      backgroundColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
-                      borderColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.4)' : colors.border
-                    }}
-                  >
-                    <BarChart2 className={`w-5 h-5 ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
-                    <span className={`text-xs uppercase font-bold ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Bands</span>
-                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Maximize2 className="w-3 h-3 text-emerald-500" />
-                    </div>
-                  </button>
-                </div>
-
                 <button
-                  onClick={() => setAnalyzedStock(stock)}
-                  className="w-full mt-6 py-4 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover-lift"
+                  onClick={() => setViewMode('sector')}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
                   style={{
-                    backgroundColor: isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
-                    color: isSqueezeTriggered ? '#000000' : colors.text,
-                    border: `1px solid ${isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.1)' : '#d2d2d7'}`,
-                    boxShadow: isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isSqueezeTriggered) {
-                      e.currentTarget.style.backgroundColor = '#34D399';
-                      e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
-                    } else {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.1)' : '#e5e5e7';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7';
-                    e.currentTarget.style.boxShadow = isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none';
+                    backgroundColor: viewMode === 'sector' ? (isDarkMode ? 'rgba(16,185,129,0.2)' : '#10B981') : 'transparent',
+                    color: viewMode === 'sector' ? (isDarkMode ? '#34D399' : '#000000') : colors.muted,
+                    border: viewMode === 'sector' ? `1px solid ${isDarkMode ? 'rgba(16,185,129,0.4)' : '#10B981'}` : '1px solid transparent',
                   }}
                 >
-                  Analyze Setup
+                  Sector Leaders
                 </button>
-              </motion.div>
-            )
-          })}
+                <button
+                  onClick={() => setViewMode('top20')}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    backgroundColor: viewMode === 'top20' ? (isDarkMode ? 'rgba(16,185,129,0.2)' : '#10B981') : 'transparent',
+                    color: viewMode === 'top20' ? (isDarkMode ? '#34D399' : '#000000') : colors.muted,
+                    border: viewMode === 'top20' ? `1px solid ${isDarkMode ? 'rgba(16,185,129,0.4)' : '#10B981'}` : '1px solid transparent',
+                  }}
+                >
+                  Top 20 All Sectors
+                </button>
+              </div>
+              {viewMode === 'sector' && stocks.length > 0 && (
+                <button
+                  onClick={() => exportToQuantGen(stocks)}
+                  className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: '#10B981',
+                    color: '#000000',
+                    border: '1px solid #10B981',
+                    boxShadow: '0 0 20px rgba(16,185,129,0.3)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#34D399'
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#10B981'
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.3)'
+                  }}
+                >
+                  Export {stocks.length} Tickers to QuantGen
+                </button>
+              )}
+              {viewMode === 'top20' && topLeaders.length > 0 && (
+                <button
+                  onClick={() => exportToQuantGen(topLeaders)}
+                  className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: '#10B981',
+                    color: '#000000',
+                    border: '1px solid #10B981',
+                    boxShadow: '0 0 20px rgba(16,185,129,0.3)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#34D399'
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#10B981'
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(16,185,129,0.3)'
+                  }}
+                >
+                  Export {topLeaders.length} Tickers to QuantGen
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+
+        {viewMode === 'sector' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+            {stocks.map((stock) => {
+              const volumeRatio = stock.volume_today / stock.volume_avg_20d
+              const isVolumeSpike = volumeRatio > 1.5
+              const isPriceBreakout = stock.price > stock.high_10d
+              const isSqueezeTriggered = isVolumeSpike && isPriceBreakout && stock.bb_expanding
+
+              return (
+                <motion.div
+                  key={stock.ticker}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="border rounded-2xl p-7 overflow-hidden relative hover-lift"
+                  style={{
+                    backgroundColor: isDarkMode ? (isSqueezeTriggered ? 'rgba(16, 185, 129, 0.05)' : colors.surface) : (isSqueezeTriggered ? '#f0fdf4' : '#ffffff'),
+                    borderColor: isSqueezeTriggered ? 'rgba(16, 185, 129, 0.6)' : colors.border,
+                    boxShadow: isSqueezeTriggered
+                      ? (isDarkMode ? '0 0 30px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16,185,129,0.1)' : '0 10px 30px rgba(16, 185, 129, 0.2)')
+                      : (isDarkMode ? '0 10px 30px rgba(0,0,0,0.4)' : '0 5px 15px rgba(0,0,0,0.05)'),
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                >
+                  {isSqueezeTriggered && (
+                    <div
+                      className="absolute top-0 right-0 text-xs font-bold px-4 py-1.5 rounded-bl-2xl uppercase tracking-tight"
+                      style={{
+                        backgroundColor: '#10B981',
+                        color: '#ffffff',
+                        boxShadow: '0 4px 15px rgba(16,185,129,0.4)'
+                      }}
+                    >
+                      Triggered
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h4 className="text-3xl font-bold leading-none mb-2" style={{ color: colors.text }}>{stock.ticker}</h4>
+                      <p className="text-sm" style={{ color: colors.muted }}>{stock.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-mono" style={{ color: colors.text }}>${stock.price.toFixed(2)}</p>
+                      <p className="text-xs uppercase mt-1" style={{ color: colors.muted }}>Price on {stock.ref_date || 'latest'}</p>
+                      {stock.forward_return != null && (
+                        <p className={`text-sm font-mono font-bold mt-1 ${stock.forward_return >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                          {stock.forward_return >= 0 ? '+' : ''}{(stock.forward_return * 100).toFixed(2)}% ({holdingDays}d fwd)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <ProgressMetric
+                    value={((stock.perf_3m - stock.sector_perf_3m) * 100).toFixed(2)}
+                    label="3M Outperformance"
+                    progress={Math.min(100, Math.max(0, ((stock.perf_3m - stock.sector_perf_3m) * 100 + 50)))}
+                    progressColor="emerald"
+                    suffix={`% vs ${selectedSector?.ticker}`}
+                  />
+
+                  <div className="grid grid-cols-3 gap-3 mt-6">
+                    <button
+                      onClick={() => fetchChartData(stock.ticker)}
+                      className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
+                      style={{
+                        backgroundColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
+                        borderColor: isPriceBreakout ? 'rgba(16, 185, 129, 0.4)' : colors.border
+                      }}
+                    >
+                      <ArrowUpRight className={`w-5 h-5 ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                      <span className={`text-xs uppercase font-bold ${isPriceBreakout ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Price</span>
+                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Maximize2 className="w-3 h-3 text-emerald-500" />
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => fetchChartData(stock.ticker)}
+                      className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
+                      style={{
+                        backgroundColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
+                        borderColor: isVolumeSpike ? 'rgba(16, 185, 129, 0.4)' : colors.border
+                      }}
+                    >
+                      <Activity className={`w-5 h-5 ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                      <span className={`text-xs uppercase font-bold ${isVolumeSpike ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Volume</span>
+                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Maximize2 className="w-3 h-3 text-emerald-500" />
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => fetchChartData(stock.ticker)}
+                      className="p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group relative"
+                      style={{
+                        backgroundColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.1)' : isDarkMode ? 'rgba(63, 63, 70, 0.3)' : 'rgba(0, 0, 0, 0.05)',
+                        borderColor: stock.bb_expanding ? 'rgba(16, 185, 129, 0.4)' : colors.border
+                      }}
+                    >
+                      <BarChart2 className={`w-5 h-5 ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-400'}`} />
+                      <span className={`text-xs uppercase font-bold ${stock.bb_expanding ? 'text-emerald-500' : isDarkMode ? 'text-zinc-600' : 'text-zinc-500'}`}>Bands</span>
+                      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Maximize2 className="w-3 h-3 text-emerald-500" />
+                      </div>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setAnalyzedStock(stock)}
+                    className="w-full mt-6 py-4 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover-lift"
+                    style={{
+                      backgroundColor: isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
+                      color: isSqueezeTriggered ? '#000000' : colors.text,
+                      border: `1px solid ${isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.1)' : '#d2d2d7'}`,
+                      boxShadow: isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isSqueezeTriggered) {
+                        e.currentTarget.style.backgroundColor = '#34D399';
+                        e.currentTarget.style.boxShadow = '0 0 30px rgba(16,185,129,0.5)';
+                      } else {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.1)' : '#e5e5e7';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isSqueezeTriggered ? '#10B981' : isDarkMode ? 'rgba(255,255,255,0.05)' : '#f5f5f7';
+                      e.currentTarget.style.boxShadow = isSqueezeTriggered ? '0 0 20px rgba(16,185,129,0.3)' : 'none';
+                    }}
+                  >
+                    Analyze Setup
+                  </button>
+                </motion.div>
+              )
+            })}
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl overflow-hidden border"
+            style={{
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              boxShadow: isDarkMode ? '0 10px 30px rgba(0,0,0,0.4)' : '0 5px 15px rgba(0,0,0,0.05)',
+            }}
+          >
+            {loadingTopLeaders ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <Activity className="w-10 h-10 text-emerald-500 animate-spin" />
+                <p className="font-mono text-sm uppercase tracking-widest" style={{ color: colors.muted }}>Scanning all sectors...</p>
+              </div>
+            ) : topLeaders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <p className="text-lg" style={{ color: colors.muted }}>No cross-sector momentum leaders available.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${colors.border}`, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f5f5f7' }}>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono" style={{ color: colors.muted }}>Rank</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono" style={{ color: colors.muted }}>Ticker</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono" style={{ color: colors.muted }}>Sector</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-right" style={{ color: colors.muted }}>1M Perf</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-right" style={{ color: colors.muted }}>3M Perf</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-right" style={{ color: colors.muted }}>6M Perf</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-right" style={{ color: colors.muted }}>Price</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-right" style={{ color: colors.muted }}>Volume</th>
+                      <th className="p-4 text-xs uppercase tracking-wider font-mono text-center" style={{ color: colors.muted }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topLeaders.map((stock, index) => {
+                      const volumeRatio = stock.volume_today / stock.volume_avg_20d
+                      const rankColors = ['#fbbf24', '#9ca3af', '#b45309']
+                      const rankBg = index < 3 ? rankColors[index] : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+                      const rankText = index < 3 ? '#000000' : colors.muted
+
+                      return (
+                        <tr
+                          key={stock.ticker}
+                          style={{ borderBottom: `1px solid ${colors.border}` }}
+                          className="transition-colors hover:bg-emerald-500/5"
+                        >
+                          <td className="p-4">
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                              style={{
+                                backgroundColor: rankBg,
+                                color: rankText,
+                                boxShadow: index < 3 ? '0 2px 10px rgba(0,0,0,0.2)' : 'none',
+                              }}
+                            >
+                              {index + 1}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <button
+                              onClick={() => setAnalyzedStock(stock)}
+                              className="text-lg font-bold transition-colors hover:text-emerald-500"
+                              style={{ color: colors.text }}
+                            >
+                              {stock.ticker}
+                            </button>
+                            <p className="text-xs" style={{ color: colors.muted }}>{stock.name}</p>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-sm" style={{ color: colors.text }}>{stock.sector}</span>
+                          </td>
+                          <td className="p-4 text-right font-mono text-sm" style={{ color: (stock.perf_1m || 0) >= 0 ? '#10B981' : '#f87171' }}>
+                            {formatPercent(stock.perf_1m || 0)}
+                          </td>
+                          <td className="p-4 text-right font-mono text-sm font-bold" style={{ color: stock.perf_3m >= 0 ? '#10B981' : '#f87171' }}>
+                            {formatPercent(stock.perf_3m)}
+                          </td>
+                          <td className="p-4 text-right font-mono text-sm" style={{ color: (stock.perf_6m || 0) >= 0 ? '#10B981' : '#f87171' }}>
+                            {formatPercent(stock.perf_6m || 0)}
+                          </td>
+                          <td className="p-4 text-right font-mono text-sm" style={{ color: colors.text }}>
+                            ${stock.price.toFixed(2)}
+                          </td>
+                          <td className="p-4 text-right">
+                            <span className="text-sm font-mono" style={{ color: colors.text }}>{(stock.volume_today / 1_000_000).toFixed(2)}M</span>
+                            <span className="text-xs ml-2 px-2 py-0.5 rounded-full" style={{
+                              backgroundColor: volumeRatio > 1.5 ? 'rgba(16,185,129,0.15)' : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                              color: volumeRatio > 1.5 ? '#10B981' : colors.muted
+                            }}>
+                              {volumeRatio.toFixed(2)}x
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => fetchChartData(stock.ticker)}
+                                className="p-2 rounded-lg transition-colors"
+                                style={{
+                                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                  color: colors.muted,
+                                }}
+                                title="View chart"
+                              >
+                                <BarChart2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setAnalyzedStock(stock)}
+                                className="px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                                style={{
+                                  backgroundColor: '#10B981',
+                                  color: '#000000',
+                                }}
+                              >
+                                Analyze
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Analysis Modal */}

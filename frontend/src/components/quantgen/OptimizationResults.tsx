@@ -25,7 +25,7 @@ interface OptimizationData {
   mode: 'simple' | 'wfo' | 'true_wfo';
   heatmap?: HeatmapRow[];
   windows?: WFOWindow[];
-  oos_equity?: { time: number; value: number }[];
+  oos_equity?: { time: number | string; value: number }[];
   max_windows?: number;
 }
 

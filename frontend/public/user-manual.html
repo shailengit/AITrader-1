@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeCraft — User Manual</title>
+<style>
+  :root {
+    --canvas: #0B0D0E;
+    --surface: #141719;
+    --surface-raised: #1A1D21;
+    --border: #2A2E33;
+    --foreground: #E8EAED;
+    --muted: #8E9399;
+    --accent: #4FC3F7;
+    --green: #10B981;
+    --amber: #F59E0B;
+    --red: #EF4444;
+    --purple: #A78BFA;
+    --cyan: #22D3EE;
+    --body-font: 15px;
+    --content-width: 960px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--canvas);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+    font-size: var(--body-font);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ===== Nav ===== */
+  nav.toc {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 32px 0; z-index: 10;
+  }
+  nav.toc::-webkit-scrollbar { width: 4px; }
+  nav.toc::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  nav.toc .logo {
+    padding: 0 24px 24px;
+    font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+    color: var(--foreground);
+    border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  nav.toc .logo span { color: var(--accent); }
+  nav.toc a {
+    display: block; padding: 8px 24px; color: var(--muted); text-decoration: none;
+    font-size: 14px; transition: color 0.15s, background 0.15s;
+  }
+  nav.toc a:hover, nav.toc a.active { color: var(--foreground); background: var(--surface-raised); }
+  nav.toc a.section { margin-top: 8px; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); pointer-events: none; }
+  nav.toc a.sub { padding-left: 36px; font-size: 13px; }
+
+  /* ===== Main ===== */
+  main { margin-left: 260px; max-width: var(--content-width); padding: 48px 64px 120px; }
+
+  /* ===== Typography ===== */
+  h1 { font-size: 36px; font-weight: 700; letter-spacing: -0.5px; margin: 48px 0 8px; }
+  h1:first-child { margin-top: 0; }
+  h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.3px; margin: 48px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 18px; font-weight: 600; margin: 32px 0 8px; color: var(--accent); }
+  h4 { font-size: 16px; font-weight: 600; margin: 24px 0 6px; }
+  p { margin: 12px 0; }
+  ul, ol { margin: 12px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+  strong { color: var(--foreground); font-weight: 600; }
+  code {
+    background: var(--surface-raised); padding: 2px 6px; border-radius: 4px;
+    font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 13px; color: var(--cyan);
+  }
+  pre {
+    background: var(--surface-raised); padding: 20px; border-radius: 8px;
+    overflow-x: auto; margin: 16px 0; border: 1px solid var(--border);
+    font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 13px; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; color: var(--cyan); }
+
+  /* ===== Cards / Callouts ===== */
+  .tip, .note, .warn {
+    padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+    border-left: 3px solid;
+  }
+  .tip { background: rgba(16,185,129,0.08); border-color: var(--green); }
+  .note { background: rgba(79,195,247,0.08); border-color: var(--accent); }
+  .warn { background: rgba(245,158,11,0.08); border-color: var(--amber); }
+  .tip::before { content: "💡 Tip: "; font-weight: 600; color: var(--green); }
+  .note::before { content: "ℹ️ Note: "; font-weight: 600; color: var(--accent); }
+  .warn::before { content: "⚠️ Warning: "; font-weight: 600; color: var(--amber); }
+
+  /* ===== Feature Cards ===== */
+  .feature-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+  }
+  .feature-card {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px;
+  }
+  .feature-card h4 { margin-top: 0; font-size: 15px; }
+  .feature-card p { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+
+  /* ===== API Table ===== */
+  table.api {
+    width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;
+  }
+  table.api th, table.api td {
+    padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+  }
+  table.api th { background: var(--surface); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; color: var(--muted); }
+  table.api td { font-family: "SF Mono", "JetBrains Mono", monospace; font-size: 13px; }
+  table.api tr:hover td { background: var(--surface-raised); }
+  table.api .method {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  }
+  .method.get { background: rgba(79,195,247,0.15); color: var(--accent); }
+  .method.post { background: rgba(167,139,250,0.15); color: var(--purple); }
+  .method.del { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  /* ===== Status badges ===== */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .badge-green { background: rgba(16,185,129,0.15); color: var(--green); }
+  .badge-blue { background: rgba(79,195,247,0.15); color: var(--accent); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+  /* ===== Screenshot placeholder ===== */
+  .screenshot {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: 8px; padding: 40px; text-align: center; margin: 20px 0;
+    color: var(--muted); font-size: 14px;
+  }
+
+  /* ===== Keyboard ===== */
+  kbd {
+    display: inline-block; padding: 2px 6px; background: var(--surface-raised);
+    border: 1px solid var(--border); border-radius: 4px;
+    font-family: "SF Mono", monospace; font-size: 12px; color: var(--foreground);
+    box-shadow: 0 1px 0 var(--border);
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 900px) {
+    nav.toc { position: static; width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 16px 0; }
+    main { margin-left: 0; padding: 24px 20px 80px; }
+    .feature-grid { grid-template-columns: 1fr; }
+    table.api { font-size: 12px; }
+    table.api th, table.api td { padding: 6px 8px; }
+  }
+
+  /* ===== Last updated ===== */
+  .last-updated {
+    margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 13px; color: var(--muted); text-align: center;
+  }
+
+  /* ===== Scroll margin for fixed nav ===== */
+  section { scroll-margin-top: 16px; }
+
+  /* ===== Collapsible feature sections for future appending ===== */
+  .appendix-item {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px; margin: 12px 0;
+  }
+  .appendix-item h4 { margin-top: 0; }
+  .appendix-item .meta { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .appendix-item .meta span { margin-right: 16px; }
+
+  /* ===== Breadcrumb separator ===== */
+  .route-path {
+    font-family: "SF Mono", monospace; font-size: 13px;
+    background: var(--surface-raised); padding: 8px 14px; border-radius: 6px;
+    display: inline-block; margin: 4px 0 12px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<nav class="toc">
+  <div class="logo"><span>T</span>radeCraft</div>
+  <a href="#introduction" class="active">Introduction</a>
+  <a href="#getting-started" class="section">Getting Started</a>
+  <a href="#quick-start" class="sub">Quick Start</a>
+  <a href="#navigation" class="sub">Navigation</a>
+  <a href="#theme" class="sub">Theme &amp; Display</a>
+
+  <a href="#sector-rotation" class="section">Sector Rotation Scanner</a>
+  <a href="#sr-overview" class="sub">Overview</a>
+  <a href="#sr-etf-analysis" class="sub">ETF Analysis</a>
+  <a href="#sr-stock-leaders" class="sub">Stock Leaders</a>
+  <a href="#sr-charting" class="sub">Charting</a>
+  <a href="#sr-export" class="sub">Export to QuantGen</a>
+
+  <a href="#ai-screener" class="section">AI Stock Screener</a>
+  <a href="#screener-overview" class="sub">Overview</a>
+  <a href="#screener-dormant" class="sub">Dormant Giant Mode</a>
+  <a href="#screener-quant" class="sub">Quant Strategy Mode</a>
+  <a href="#screener-ai" class="sub">AI Agent Analysis</a>
+  <a href="#screener-results" class="sub">Results &amp; Reports</a>
+
+  <a href="#quantgen" class="section">QuantGen Strategy Builder</a>
+  <a href="#qg-overview" class="sub">Overview</a>
+  <a href="#qg-builder" class="sub">Builder Workspace</a>
+  <a href="#qg-strategies" class="sub">Strategy Library</a>
+  <a href="#qg-optimization" class="sub">Optimization &amp; WFO</a>
+  <a href="#qg-dashboard" class="sub">Dashboard &amp; Results</a>
+
+  <a href="#markov" class="section">Markov Chain Trader</a>
+  <a href="#mct-overview" class="sub">Overview</a>
+  <a href="#mct-scan" class="sub">Running a Scan</a>
+  <a href="#mct-regime" class="sub">Sector Regime Grid</a>
+  <a href="#mct-signals" class="sub">Signals Table</a>
+
+  <a href="#earnings" class="section">Earnings Calendar</a>
+
+  <a href="#appendix" class="section">Appendix</a>
+  <a href="#app-future" class="sub">Future Features</a>
+  <a href="#app-tech" class="sub">Technical Reference</a>
+  <a href="#app-faq" class="sub">FAQ</a>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main>
+
+<!-- ============ INTRODUCTION ============ -->
+<section id="introduction">
+  <h1>TradeCraft User Manual</h1>
+  <p>
+    TradeCraft is a unified trading research platform combining five powerful tools into one seamless interface.
+    Backed by a live PostgreSQL market database, it connects the entire workflow from sector analysis to
+    backtested strategy — without switching between multiple applications.
+  </p>
+
+  <div class="note">
+    This manual covers all features available as of <strong>June 2026</strong>.
+    As new features are added, they will be appended to the <a href="#appendix" style="color:var(--accent)">Appendix</a>
+    section of this document.
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <h4>🔄 Sector Rotation Scanner</h4>
+      <p>Analyze 11 sector ETFs for momentum acceleration. Identify leading stocks within each sector.</p>
+    </div>
+    <div class="feature-card">
+      <h4>🔍 AI Stock Screener</h4>
+      <p>Screen the S&P 1500 with technical/fundamental modes and optional multi-agent AI analysis.</p>
+    </div>
+    <div class="feature-card">
+      <h4>⚡ QuantGen Strategy Builder</h4>
+      <p>Generate, backtest, and optimize quantitative strategies with AI-assisted code generation.</p>
+    </div>
+    <div class="feature-card">
+      <h4>📊 Markov Chain Trader</h4>
+      <p>Regime-aware convergent signals using Markov-switching models plus pattern recognition.</p>
+    </div>
+    <div class="feature-card">
+      <h4>📅 Earnings Calendar</h4>
+      <p>Track upcoming earnings announcements with EPS/revenue estimates for the S&P 1500.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GETTING STARTED ============ -->
+<section id="getting-started">
+  <h2>Getting Started</h2>
+
+  <h3 id="quick-start">Quick Start</h3>
+  <ol>
+    <li><strong>Open the app</strong> — Navigate to the TradeCraft URL in your browser.</li>
+    <li><strong>Choose a tool</strong> — The landing page displays five tool cards. Click any card to enter that module.</li>
+    <li><strong>Sidebar navigation</strong> — Once inside a tool, use the sidebar on the left to switch between modules.</li>
+    <li><strong>Run your first scan</strong> — Try the <a href="#sector-rotation" style="color:var(--accent)">Sector Rotation Scanner</a> first: it requires no configuration and immediately shows sector performance.</li>
+    <li><strong>Export to QuantGen</strong> — Found an interesting stock? Export it directly to the QuantGen strategy builder for backtesting.</li>
+  </ol>
+
+  <h3 id="navigation">Navigation</h3>
+  <p>The app uses a sidebar navigation pattern:</p>
+  <ul>
+    <li><strong>6 sidebar links</strong> — Home, Sector Rotation, Stock Screener, Markov Trader, Earnings Calendar, QuantGen</li>
+    <li><strong>QuantGen has sub-routes</strong> — Builder (<code>/quantgen/build</code>), Dashboard (<code>/quantgen/dashboard</code>), Library (<code>/quantgen/library</code>)</li>
+    <li><strong>Landing page</strong> (<code>/</code>) is the full-width marketing dashboard — no sidebar</li>
+    <li>All other pages render inside the sidebar layout</li>
+  </ul>
+
+  <h3 id="theme">Theme &amp; Display</h3>
+  <p>
+    TradeCraft defaults to <strong>dark mode</strong> (designed for early-morning and late-night trading sessions).
+    Toggle dark/light mode using the switch in the top-right corner.
+  </p>
+  <p>
+    <strong>Target display:</strong> Designed for 1440px–1728px viewports (optimized for MacBook Pro 16").
+    Content max-width is 1280px, centered with auto margins.
+    Responsive down to 768px.
+  </p>
+</section>
+
+<!-- ============ SECTOR ROTATION ============ -->
+<section id="sector-rotation">
+  <h2>Sector Rotation Scanner</h2>
+  <p class="route-path">Route: /sectors &nbsp;|&nbsp; API: /api/sectors, /api/stocks/{sector}, /api/ohlcv/{ticker}</p>
+
+  <h3 id="sr-overview">Overview</h3>
+  <p>
+    The Sector Rotation Scanner analyzes all 11 U.S. sector ETFs to identify which sectors have the strongest
+    momentum acceleration, then drills into the top-performing stocks within each sector.
+  </p>
+
+  <p><strong>The 11 sector ETFs tracked:</strong></p>
+  <div class="feature-grid">
+    <div class="feature-card"><span class="badge badge-blue">XLK</span> Technology</div>
+    <div class="feature-card"><span class="badge badge-blue">XLE</span> Energy</div>
+    <div class="feature-card"><span class="badge badge-blue">XLF</span> Financials</div>
+    <div class="feature-card"><span class="badge badge-blue">XLV</span> Healthcare</div>
+    <div class="feature-card"><span class="badge badge-blue">XLY</span> Consumer Discretionary</div>
+    <div class="feature-card"><span class="badge badge-blue">XLI</span> Industrials</div>
+    <div class="feature-card"><span class="badge badge-blue">XLC</span> Communication Services</div>
+    <div class="feature-card"><span class="badge badge-blue">XLP</span> Consumer Staples</div>
+    <div class="feature-card"><span class="badge badge-blue">XLB</span> Materials</div>
+    <div class="feature-card"><span class="badge badge-blue">XLRE</span> Real Estate</div>
+    <div class="feature-card"><span class="badge badge-blue">XLU</span> Utilities</div>
+  </div>
+
+  <h3 id="sr-etf-analysis">ETF Analysis</h3>
+  <p>The main view shows an <strong>acceleration bar chart</strong> ranking all 11 ETFs by their acceleration spread (3-month performance minus 6-month performance).</p>
+  <ul>
+    <li><strong>Positive acceleration</strong> (green) — sector gaining momentum recently</li>
+    <li><strong>Negative acceleration</strong> (gray) — sector losing momentum</li>
+    <li><strong>Gold/silver/bronze badges</strong> — top 3 ranked sectors</li>
+  </ul>
+
+  <h4>Controls</h4>
+  <table class="api">
+    <tr><th>Control</th><th>Description</th></tr>
+    <tr><td>Date Picker</td><td>Sets the "As Of" date for historical analysis</td></tr>
+    <tr><td>Holding Period</td><td>Forward return window: 7d / 30d / 60d / 90d</td></tr>
+    <tr><td>Refresh</td><td>Re-fetches data with current parameters</td></tr>
+  </table>
+
+  <h3 id="sr-stock-leaders">Stock Leaders</h3>
+  <p>Click any sector card or bar to see the top ~50 stocks within that sector. Each stock card shows:</p>
+  <ul>
+    <li><strong>Ticker &amp; Price</strong> — current price from database</li>
+    <li><strong>3M Outperformance</strong> — stock performance relative to its sector ETF</li>
+    <li><strong>Indicator buttons</strong> — three quick-scan signals:
+      <ul>
+        <li><span class="badge badge-green">Price Break</span> — stock broke above recent range</li>
+        <li><span class="badge badge-amber">Volume Spike</span> — unusually high volume detected</li>
+        <li><span class="badge badge-blue">Bollinger Expanding</span> — volatility expansion signal</li>
+      </ul>
+    </li>
+    <li><strong>"Analyze Setup"</strong> — opens a modal showing Bollinger Band position, SMA50/SMA200 alignment, and a composite setup strength score (0–100%)</li>
+  </ul>
+
+  <h3 id="sr-charting">Charting</h3>
+  <p>Click any indicator button or chart icon to open the <strong>candlestick chart modal</strong> powered by TradingView's Lightweight Charts:</p>
+  <ul>
+    <li>OHLCV candlesticks with <strong>volume histogram</strong> (green/red bars for up/down days)</li>
+    <li><strong>Bollinger Band overlays</strong> (upper, middle SMA20, lower bands)</li>
+    <li><strong>SMA 50</strong> overlay</li>
+    <li><strong>Summary cards</strong>: Price Action (SMA20, SMA50) + Volume Metrics (SMA20/V, SMA50/V)</li>
+    <li>Interval options: Daily, 1h, 30m, 15m, 5m, 1m (sub-daily from minute database)</li>
+  </ul>
+
+  <h3 id="sr-export">Export to QuantGen</h3>
+  <p>
+    The <strong>"Export N Tickers to QuantGen"</strong> button at the top-right sends your filtered stock list
+    directly to the QuantGen Builder. It passes the tickers and the "As Of" date as URL parameters —
+    QuantGen uses these as the starting point for strategy generation and Walk-Forward Optimization.
+  </p>
+  <p>Target URL: <code>/quantgen/build?tickers=AAPL,MSFT,...&amp;from_date=2026-06-13</code></p>
+</section>
+
+<!-- ============ AI STOCK SCREENER ============ -->
+<section id="ai-screener">
+  <h2>AI Stock Screener</h2>
+  <p class="route-path">Route: /screener &nbsp;|&nbsp; API: /api/screener/*</p>
+
+  <h3 id="screener-overview">Overview</h3>
+  <p>
+    The AI Stock Screener scans the full S&P 1500 universe using two distinct screening modes.
+    Each mode can optionally engage a multi-agent AI team (powered by Agno) for natural-language
+    analysis reports and reasoning.
+  </p>
+
+  <h4>Common Controls</h4>
+  <table class="api">
+    <tr><th>Control</th><th>Description</th></tr>
+    <tr><td>Mode Selector</td><td>Choose between Dormant Giant or Quant Strategy</td></tr>
+    <tr><td>AI Toggle</td><td>Enable/disable multi-agent AI analysis (adds ~30-60s to scan time)</td></tr>
+    <tr><td>Cutoff Date</td><td>Historical date for screening</td></tr>
+    <tr><td>Custom Directives</td><td>Natural-language instructions to guide the screener</td></tr>
+    <tr><td><kbd>S</kbd></td><td>Keyboard shortcut to start the scan</td></tr>
+  </table>
+
+  <h3 id="screener-dormant">Dormant Giant Mode</h3>
+  <p>
+    Finds stocks that are "coiling" — exhibiting a <strong>Bollinger Squeeze</strong> with consolidation,
+    accumulation, and relative strength — poised for explosive moves. Each candidate receives an
+    <strong>explosiveness score</strong> (0–100).
+  </p>
+
+  <h4>Threshold Controls</h4>
+  <table class="api">
+    <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+    <tr><td>Consolidation Tightness</td><td>0–100%</td><td>How tight the price range must be</td></tr>
+    <tr><td>MFI Accumulation</td><td>0–100%</td><td>Money Flow Index buying pressure threshold</td></tr>
+    <tr><td>Volume Cluster</td><td>0–100%</td><td>Volume pattern clustering requirement</td></tr>
+    <tr><td>RS vs Market</td><td>0–100%</td><td>Relative strength versus the broader market</td></tr>
+    <tr><td>Sector Momentum</td><td>On/Off</td><td>Require the stock's sector to have positive momentum</td></tr>
+  </table>
+
+  <h4>What Matters for Each Signal</h4>
+  <ul>
+    <li><strong>MFI</strong> — Money Flow Index above threshold = accumulation pressure</li>
+    <li><strong>Volume Cluster</strong> — volume clustering near recent highs = institutional interest</li>
+    <li><strong>RS Ratio</strong> — stock outperforming market = relative strength</li>
+    <li><strong>Bandwidth %</strong> — Bollinger Band tightening = squeeze setup</li>
+  </ul>
+
+  <div class="tip">
+    Start with default thresholds for the first pass, then tighten consolidation (lower) or
+    loosen MFI (higher) to narrow or widen the candidate pool.
+  </div>
+
+  <h3 id="screener-quant">Quant Strategy Mode</h3>
+  <p>
+    A flexible technical/fundamental screening engine with natural-language filter parsing.
+  </p>
+
+  <h4>Two-Phase Workflow</h4>
+  <ol>
+    <li><strong>Describe in plain English</strong> — Type something like: <em>"Stocks with RSI between 40-60, ADX above 25, positive EPS growth, near 52-week highs"</em></li>
+    <li>Click <strong>"Generate Filters from Prompt"</strong> — an LLM parses your description into structured filters</li>
+    <li><strong>Review and edit</strong> — The filter panel appears with editable controls:
+      <ul>
+        <li>ATH Proximity slider</li>
+        <li>Volume Ratio slider</li>
+        <li>RSI range, SMA relations, indicator cross conditions</li>
+        <li>Sort order (by score / volatility / volume / EPS)</li>
+        <li>Earnings-within-days constraint</li>
+        <li>Max results</li>
+      </ul>
+    </li>
+    <li><strong>Run the scan</strong> — Deterministic filter engine applies your rules across the S&P 1500</li>
+  </ol>
+
+  <h4>Scoring System</h4>
+  <p>Each stock gets a <strong>hybrid quant score</strong> (0–100) combining:</p>
+  <ul>
+    <li><strong>Base Setup Score</strong> (weighted by Scoring Split slider): trend 30% + momentum 25% + volatility 20% + volume 25%</li>
+    <li><strong>Filter Match Bonus</strong>: additional points per matched filter condition</li>
+  </ul>
+
+  <h4>Technical Indicator Guide</h4>
+  <p>
+    The Quant Strategy screener uses the <code>ta</code> library with 80+ technical indicators.
+    Click the <strong>"Technical Indicator Guide"</strong> help modal in the app for a full reference.
+    Key column prefixes:
+  </p>
+  <ul>
+    <li><code>trend_sma_*</code> — Simple Moving Averages</li>
+    <li><code>momentum_rsi</code> — Relative Strength Index</li>
+    <li><code>trend_macd</code> — MACD</li>
+    <li><code>volatility_bb*</code> — Bollinger Bands</li>
+    <li><code>volume_*</code> — Volume indicators</li>
+  </ul>
+
+  <h3 id="screener-ai">AI Agent Analysis</h3>
+  <p>
+    When <strong>AI Toggle is enabled</strong>, an Agno multi-agent team is spawned to analyze the
+    screening results. Each agent has a specialized role:
+  </p>
+  <ul>
+    <li><strong>Lead Analyst</strong> — coordinates the team</li>
+    <li><strong>Technical Analyst</strong> — chart patterns and technical setup quality</li>
+    <li><strong>Fundamental Analyst</strong> — EPS trends, revenue growth, valuation</li>
+    <li><strong>Risk Manager</strong> — volatility, drawdown risk, sector concentration</li>
+  </ul>
+  <p>
+    The AI team generates a natural-language report for each candidate stock with trade rationale,
+    key risks, and a conviction rating. Click the <strong>"AI Report"</strong> button on any result card
+    to view the full analysis.
+  </p>
+
+  <div class="note">
+    AI analysis uses Ollama (local LLM) by default. The model is configured via the
+    <code>OLLAMA_MODEL_ID</code> environment variable. AI analysis adds approximately 30–60 seconds
+    to the scan time depending on the number of candidates.
+  </div>
+
+  <h3 id="screener-results">Results &amp; Reports</h3>
+  <p>Results appear as a <strong>3-column grid of result cards</strong>. Each card shows:</p>
+  <ul>
+    <li><strong>Signal dot</strong> — green/amber/red for conviction level</li>
+    <li><strong>Sector badge</strong> — the stock's sector</li>
+    <li><strong>Explosiveness ScoreBadge</strong> (0–100) — color-coded by tier</li>
+    <li><strong>Base Setup quartet</strong> — Trend / Momentum / Volatility / Volume scores</li>
+    <li><strong>Price, 52W high, ATH</strong> proximity</li>
+    <li><strong>Signal text</strong> — plain-English rationale</li>
+    <li><strong>Fundamentals</strong> — EPS growth, revenue growth, PEG ratio, beta, days until earnings</li>
+    <li><strong>Technicals</strong> — SMA20, EMA9, RSI, MACD</li>
+    <li><strong>Signal Breakdown</strong> (Dormant Giant) — MFI, Volume Cluster, RS Ratio, Bandwidth %</li>
+  </ul>
+
+  <h4>Post-Scan Actions</h4>
+  <ul>
+    <li><strong>Download PDF Report</strong> — generates a downloadable screening report</li>
+    <li><strong>Export to QuantGen</strong> — sends selected tickers to the strategy builder</li>
+    <li><strong>Chart</strong> — click any result card to open the OHLCV chart modal</li>
+    <li><strong>Clear</strong> — resets results</li>
+  </ul>
+
+  <h4>Session Persistence</h4>
+  <p>
+    Results, scan status, and agent logs are saved to <code>localStorage</code> with a 24-hour expiry.
+    Refreshing the page or navigating away and back preserves your last scan results.
+  </p>
+
+  <h4>Terminal Log Viewer</h4>
+  <p>
+    Toggle the <strong>Terminal</strong> view to see live agent logs, reasoning steps, and tool calls
+    during AI analysis. Uses xterm.js for a real terminal experience.
+  </p>
+</section>
+
+<!-- ============ QUANTGEN ============ -->
+<section id="quantgen">
+  <h2>QuantGen Strategy Builder</h2>
+  <p class="route-path">Routes: /quantgen, /quantgen/build, /quantgen/dashboard, /quantgen/library</p>
+
+  <h3 id="qg-overview">Overview</h3>
+  <p>
+    QuantGen is the quantitative strategy development environment. It combines AI-powered code generation,
+    a full Monaco code editor, VectorBT backtesting, Walk-Forward Optimization, and a rich results dashboard.
+  </p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <h4>🤖 AI Code Generation</h4>
+      <p>Describe your strategy in plain English. The LLM generates Python/VectorBT code with auto-fix.</p>
+    </div>
+    <div class="feature-card">
+      <h4>⚡ VectorBT Backtesting</h4>
+      <p>Execute strategies with VectorBT's high-performance engine. Equity curves, stats, trades.</p>
+    </div>
+    <div class="feature-card">
+      <h4>🎯 Walk-Forward Optimization</h4>
+      <p>Simple grid, rolling WFO, or True WFO (1-day-at-a-time simulation). Avoid curve-fitting.</p>
+    </div>
+    <div class="feature-card">
+      <h4>💬 AI Chat Assistant</h4>
+      <p>Iterate on strategy code conversationally. "Apply Changes" one-click code updates.</p>
+    </div>
+  </div>
+
+  <h3 id="qg-builder">Builder Workspace (<code>/quantgen/build</code>)</h3>
+
+  <h4>Step 1: Describe Your Strategy</h4>
+  <p>Enter a plain-English strategy description:</p>
+  <pre><code>Enter a SMA crossover strategy:
+Buy when 20-day SMA crosses above 50-day SMA.
+Exit when 20-day SMA crosses below 50-day SMA.
+Use SPY as benchmark.</code></pre>
+  <p>Click <strong>"Generate Strategy"</strong> to get AI-generated VectorBT Python code.</p>
+
+  <div class="note">
+    The AI code generator automatically runs a <strong>CodeVerifier</strong> that detects and fixes
+    up to 3 common categories of errors before showing you the code. It also consults a
+    <strong>Lessons Learned</strong> store of past fixes for recurring patterns.
+  </div>
+
+  <h4>Step 2: Edit in Monaco Editor</h4>
+  <p>
+    The code appears in a full Monaco editor (VS Code engine) with Python syntax highlighting.
+    The strategy code must follow this structure:
+  </p>
+  <ul>
+    <li><strong>Indicator definitions</strong> — define indicators using VectorBT's factory API</li>
+    <li><strong>Signal logic</strong> — entry/exit conditions using <code>.vbt.gt()</code>, <code>.vbt.lt()</code>, <code>vbt.combine_logic()</code></li>
+    <li><strong>Parameters section</strong> — annotate parameter ranges as comments for the optimizer to auto-detect</li>
+    <li><strong>Portfolio.from_signals</strong> — the final call that produces the portfolio</li>
+  </ul>
+
+  <div class="warn">
+    <strong>VectorBT comparison syntax:</strong> When writing signal logic for optimization, always use
+    <code>.vbt.gt()</code>, <code>.vbt.lt()</code>, and <code>vbt.combine_logic()</code> instead of
+    <code>&gt;</code>, <code>&lt;</code>, <code>&amp;</code>. Standard operators work for single backtests
+    but fail during multi-parameter optimization. Add <code>broadcast_kwargs={'keep_pd': True}</code>
+    and <code>jitted=True</code> to <code>Portfolio.from_signals</code>.
+  </div>
+
+  <h4>Step 3: Configure &amp; Run</h4>
+  <p>Choose run mode and configure parameters:</p>
+
+  <table class="api">
+    <tr><th>Mode</th><th>What it does</th><th>When to use</th></tr>
+    <tr><td><span class="badge badge-green">Backtest</span></td><td>Single run with current parameters on full date range</td><td>Quick validation of strategy logic</td></tr>
+    <tr><td><span class="badge badge-blue">Optimize</span></td><td>Grid search + optional Walk-Forward Optimization</td><td>Finding best parameter set</td></tr>
+  </table>
+
+  <h4>Optimization Config Panel</h4>
+  <p>Control panel visible in Optimize mode:</p>
+  <ul>
+    <li><strong>Optimization mode</strong>: Simple (full-range grid), WFO (rolling/expanding windows), True WFO (1-day step)</li>
+    <li><strong>Metric</strong>: total_return / sharpe / sortino / max_drawdown</li>
+    <li><strong>WFO config</strong>: rolling or expanding, window count, train/test ratio, split method, date range</li>
+    <li><strong>Parameter ranges</strong>: auto-extracted from <code># Parameters</code> comments in code</li>
+  </ul>
+
+  <h4>AI Chat Assistant</h4>
+  <p>The collapsible chat panel lets you:</p>
+  <ul>
+    <li>Ask questions about the strategy code</li>
+    <li>Request modifications in natural language</li>
+    <li>Click <strong>"Apply Changes"</strong> on any response that contains code blocks to instantly update the editor</li>
+    <li>Conversation context is maintained across messages</li>
+  </ul>
+
+  <h4>Auto-Save</h4>
+  <p>Builder state auto-saves to <code>localStorage</code>. Navigating away and back restores your work.</p>
+
+  <h3 id="qg-strategies">Strategy Library (<code>/quantgen/library</code>)</h3>
+  <p>Browse and manage saved strategies. Features:</p>
+  <ul>
+    <li><strong>Search</strong> — by name or description</li>
+    <li><strong>Filter by status</strong> — All / Draft / Backtested / Optimized / Live</li>
+    <li><strong>Sortable columns</strong> — Name, Status, Return, Sharpe, Win Rate, Updated</li>
+    <li><strong>Expandable rows</strong> — show description, 4-metric performance card, code preview</li>
+    <li><strong>Actions</strong> — Edit (opens Builder), View Results (opens Dashboard), Delete (with confirmation)</li>
+  </ul>
+  <p>Strategies are saved as <code>.py</code> files in the <code>strategies/</code> directory. Backups are created before overwrite or delete (<code>.deleted</code> suffix).</p>
+
+  <h3 id="qg-optimization">Optimization &amp; Walk-Forward Optimization</h3>
+
+  <h4>Simple Optimization</h4>
+  <p>Grid search over all parameter combinations on the full date range. Fastest, but risks curve-fitting.</p>
+
+  <h4>Walk-Forward Optimization (WFO)</h4>
+  <p>
+    Divides the date range into rolling windows. For each window, optimizes on the training portion
+    and tests on the out-of-sample (OOS) portion. Choose:
+  </p>
+  <ul>
+    <li><strong>Rolling</strong> — windows move forward, old data drops off</li>
+    <li><strong>Expanding</strong> — each window adds new data to an ever-growing training set</li>
+    <li><strong>Split method</strong> — ratio (e.g. 70/30) or fixed number of train/test days</li>
+  </ul>
+
+  <h4>True Walk-Forward Optimization</h4>
+  <p>
+    The most realistic simulation of live trading. Steps <strong>1 day at a time</strong>:
+  </p>
+  <ol>
+    <li>Optimize parameters on training window (past N days)</li>
+    <li>Pick the best parameters from that window</li>
+    <li>Generate a signal from the last day of the training window</li>
+    <li>Trade the <strong>next day</strong> only (1-day position)</li>
+    <li>Position state carries over between windows (like real trading)</li>
+    <li>Slide the window forward by 1 day and repeat</li>
+  </ol>
+
+  <div class="tip">
+    Use True WFO when you need the most realistic backtest possible. It's slower but avoids any
+    future leakage. Standard WFO is a good balance of speed and rigor for iterative development.
+  </div>
+
+  <h3 id="qg-dashboard">Dashboard &amp; Results (<code>/quantgen/dashboard</code>)</h3>
+  <p>After running a backtest or optimization, the Dashboard displays comprehensive results:</p>
+
+  <table class="api">
+    <tr><th>Section</th><th>What's Displayed</th></tr>
+    <tr><td>Ticker Identity Card</td><td>Ticker, company name, sector, industry, market cap, beta, latest price</td></tr>
+    <tr><td>4 Metric Cards</td><td>Total Return, Sharpe Ratio, Max Drawdown, Win Rate (all vs benchmark)</td></tr>
+    <tr><td>Price Chart</td><td>OHLCV candlestick chart with trade markers (green buy arrows, red sell arrows), indicator toggles</td></tr>
+    <tr><td>Equity Curve</td><td>Strategy equity vs buy-and-hold benchmark</td></tr>
+    <tr><td>Drawdown Analysis</td><td>Strategy drawdown vs benchmark drawdown</td></tr>
+    <tr><td>Optimization Results</td><td>When optimization was run: mode badge, OOS equity chart, per-window table, heatmap</td></tr>
+    <tr><td>Detailed Statistics</td><td>Full stats key-value pairs</td></tr>
+    <tr><td>Fundamentals Panel</td><td>Quarterly financials, growth rates from database</td></tr>
+    <tr><td>Research Intelligence</td><td>4-agent research report (Dumb Agent, Volatility Agent, Data Agent, Tape Reader) with regenerate button</td></tr>
+    <tr><td>Raw Data &amp; Logs</td><td>Collapsible stats JSON and execution log</td></tr>
+  </table>
+
+  <h4>Available Indicators on Chart</h4>
+  <p>
+    The <strong>Indicator Panel</strong> lets you toggle visibility of technical indicators
+    on the candlestick chart. Available indicators are listed via the <code>/api/indicators</code>
+    endpoint and include SMA, EMA, Bollinger Bands, RSI, and more from VectorBT's indicator library.
+  </p>
+</section>
+
+<!-- ============ MARKOV ============ -->
+<section id="markov">
+  <h2>Markov Chain Trader</h2>
+  <p class="route-path">Route: /markov &nbsp;|&nbsp; API: /api/markov/*</p>
+
+  <h3 id="mct-overview">Overview</h3>
+  <p>
+    The Markov Chain Trader is a <strong>regime-aware convergent signal system</strong> that combines
+    two independent models to generate high-conviction BUY/HOLD/SELL signals:
+  </p>
+  <ol>
+    <li><strong>Statistical Jump Model</strong> — Markov-switching regression with jump penalty (prevents chattering) + GJR-GARCH(1,1,1) with Student-t for volatility regime detection</li>
+    <li><strong>Pattern Recognizer</strong> — XGBoost (fast) or LSTM (deep) classifier trained with utility-aware loss to predict BUY/HOLD/SELL</li>
+  </ol>
+  <p>
+    <strong>Convergence rule:</strong> A BUY signal is only emitted when <em>both</em> models agree
+    <em>and</em> the market is in a bull/low-volatility regime. This prevents false signals during
+    transitional or high-volatility periods.
+  </p>
+
+  <h3 id="mct-scan">Running a Scan</h3>
+
+  <h4>Controls</h4>
+  <table class="api">
+    <tr><th>Control</th><th>Description</th></tr>
+    <tr><td>Model Toggle</td><td><span class="badge badge-blue">XGBoost (Fast)</span> — tree-based, sub-second predictions, retrained daily<br>
+      <span class="badge badge-purple">LSTM (Deep)</span> — PyTorch LSTM, 5-15s per ticker (first run), retrained quarterly</td></tr>
+    <tr><td>BUY/SELL Threshold</td><td>0.5% – 5.0% — forward return threshold for label generation</td></tr>
+    <tr><td>Min Conviction</td><td>0.30 – 0.95 — minimum probability required to act on a signal</td></tr>
+    <tr><td>Max Results</td><td>5 – 200 — maximum number of tickers to scan</td></tr>
+    <tr><td>View Toggle</td><td>Actionable (conviction ≥ 0.6) vs Full List</td></tr>
+  </table>
+
+  <h4>First Scan vs Cached Scans</h4>
+  <table class="api">
+    <tr><th></th><th>First scan (cold start)</th><th>Subsequent scans (cached)</th></tr>
+    <tr><td>XGBoost (50 tickers)</td><td>~30–90 seconds</td><td>~15–30 seconds</td></tr>
+    <tr><td>LSTM (50 tickers)</td><td>~4–13 minutes</td><td>~20–45 seconds</td></tr>
+  </table>
+
+  <div class="tip">
+    Use <strong>XGBoost</strong> for daily scanning — it's fast, interpretable, and retrained automatically
+    every day. LSTM is best for quarterly batch retraining where sequence modeling depth matters more than speed.
+  </div>
+
+  <h3 id="mct-regime">Sector Regime Grid</h3>
+  <p>
+    The top section of the Markov page displays a grid of all 11 sector ETFs with their current
+    regime state. Each card shows:
+  </p>
+  <ul>
+    <li><strong>ETF ticker</strong> (XLK, XLE, XLF, etc.)</li>
+    <li><strong>Regime indicator</strong> — <span class="badge badge-green">BULL</span> (green) or <span class="badge badge-red">BEAR</span> (red)</li>
+    <li><strong>Bull probability</strong> % — how confident the model is in the bull state</li>
+    <li><strong>Vol regime</strong> — <span class="badge badge-green">LOW</span> or <span class="badge badge-amber">HIGH</span> volatility state</li>
+  </ul>
+
+  <h3 id="mct-signals">Signals Table</h3>
+  <p>The signals table displays scan results with columns:</p>
+  <ul>
+    <li><strong>Rank</strong> — sorted by conviction descending</li>
+    <li><strong>Ticker</strong> — stock symbol</li>
+    <li><strong>Sector</strong> — sector classification</li>
+    <li><strong>Signal</strong> — <span class="badge badge-green">BUY</span>, <span class="badge badge-amber">HOLD</span>, or <span class="badge badge-red">SELL</span></li>
+    <li><strong>Conviction</strong> — visual bar + percentage (0–100%)</li>
+    <li><strong>Price</strong> — latest available price</li>
+    <li><strong>ETF</strong> — associated sector ETF</li>
+  </ul>
+
+  <h4>Background Retraining</h4>
+  <p>
+    The <code>POST /api/markov/retrain</code> endpoint triggers background retraining:
+  </p>
+  <ul>
+    <li><strong>XGBoost:</strong> up to 500 tickers, ~8 minutes in background</li>
+    <li><strong>LSTM:</strong> up to 200 tickers, ~30 minutes — only runs in quarterly months (Jan, Apr, Jul, Oct)</li>
+  </ul>
+  <p>Check retraining status via <code>GET /api/markov/status</code>.</p>
+</section>
+
+<!-- ============ EARNINGS ============ -->
+<section id="earnings">
+  <h2>Earnings Calendar</h2>
+  <p class="route-path">Route: /earnings &nbsp;|&nbsp; API: /api/earnings/*</p>
+
+  <h3>Overview</h3>
+  <p>
+    The Earnings Calendar tracks upcoming earnings announcements across the S&P 1500.
+    Data is synced from <strong>Finnhub</strong> (requires <code>FINNHUB_API_KEY</code> environment variable).
+  </p>
+
+  <h4>Controls</h4>
+  <table class="api">
+    <tr><th>Control</th><th>Description</th></tr>
+    <tr><td>Date Range</td><td>Quick-select: Next 7 / 14 / 30 / 90 days</td></tr>
+    <tr><td>Refresh</td><td>Re-fetch calendar data</td></tr>
+  </table>
+
+  <h4>Display</h4>
+  <ul>
+    <li>Earnings events are <strong>grouped by date</strong> with a <span class="badge badge-amber">Today</span> badge on the current date</li>
+    <li>Each event card shows:
+      <ul>
+        <li><strong>Ticker</strong> — stock symbol</li>
+        <li><strong>Time badge</strong> — <span class="badge badge-blue">BMO</span> (Before Market Open) / <span class="badge badge-purple">AMC</span> (After Market Close) / <span class="badge badge-amber">DMH</span> (During Market Hours) / <span class="badge badge-red">TNS</span> (Temporary Not Specified)</li>
+        <li><strong>EPS estimate</strong> — consensus earnings per share estimate</li>
+        <li><strong>Revenue estimate</strong> — consensus revenue estimate</li>
+        <li><strong>Beat/Miss badge</strong> — when actuals are available, with the actual value</li>
+        <li><strong>Days-until countdown</strong> — days remaining until the event</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h4>API Endpoints</h4>
+  <table class="api">
+    <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+    <tr><td><code>/api/earnings/calendar</code></td><td><span class="method get">GET</span></td><td>Upcoming earnings in date range. Params: <code>from</code>, <code>to</code>, <code>tickers</code>, <code>days</code> (default 14)</td></tr>
+    <tr><td><code>/api/earnings/next/{ticker}</code></td><td><span class="method get">GET</span></td><td>Next earnings for a single ticker</td></tr>
+    <tr><td><code>/api/earnings/sync</code></td><td><span class="method post">POST</span></td><td>Manually trigger Finnhub sync. Body: <code>start_date</code>, <code>end_date</code></td></tr>
+  </table>
+</section>
+
+<!-- ============ APPENDIX ============ -->
+<section id="appendix">
+  <h2>Appendix</h2>
+
+  <h3 id="app-future">Future Features</h3>
+  <p>
+    This section is reserved for documenting new features as they are added to TradeCraft.
+    When a new feature is shipped, append its documentation here following the same format
+    as the sections above — with overview, controls, data display, and API reference.
+  </p>
+
+  <!-- ===== APPEND NEW FEATURES BELOW THIS LINE ===== -->
+  <!-- Template for new feature entries:
+  <div class="appendix-item" id="feature-NAME">
+    <h4>Feature Name</h4>
+    <div class="meta">
+      <span>📅 Added: Month YYYY</span>
+      <span>📍 Route: /route-path</span>
+    </div>
+    <p>Description of the feature...</p>
+    <h5>Controls</h5>
+    <table class="api">...</table>
+    <h5>API Endpoints</h5>
+    <table class="api">...</table>
+  </div>
+  -->
+
+  <h3 id="app-tech">Technical Reference</h3>
+
+  <h4>Database</h4>
+  <p>TradeCraft uses two PostgreSQL databases:</p>
+  <ul>
+    <li><strong>sp1500_1d</strong> — daily OHLCV data. Individual stock tables (lowercase ticker names) with columns: <code>Date</code>, <code>Open</code>, <code>High</code>, <code>Low</code>, <code>Close</code>, <code>Volume</code></li>
+    <li><strong>sp1500_1m</strong> — minute-level data with 60-day retention (TimescaleDB <code>drop_chunks</code>)</li>
+  </ul>
+  <p>Additional tables: <code>stock_metadata</code> (sector/industry info), <code>stock_financials_quarterly</code> (EPS/revenue), <code>earnings_calendar</code> (earnings events)</p>
+
+  <h4>Environment Variables</h4>
+  <table class="api">
+    <tr><th>Variable</th><th>Default</th><th>Purpose</th></tr>
+    <tr><td><code>DB_USER</code></td><td>postgres</td><td>Database user</td></tr>
+    <tr><td><code>DB_PASSWORD</code></td><td>sarina00</td><td>Database password</td></tr>
+    <tr><td><code>DB_HOST</code></td><td>127.0.0.1</td><td>Database host</td></tr>
+    <tr><td><code>DB_PORT</code></td><td>5431</td><td>Database port</td></tr>
+    <tr><td><code>DB_NAME</code></td><td>sp1500_1d</td><td>Daily database name</td></tr>
+    <tr><td><code>OLLAMA_MODEL_ID</code></td><td>—</td><td>LLM model for AI code gen &amp; screener analysis</td></tr>
+    <tr><td><code>FINNHUB_API_KEY</code></td><td>—</td><td>API key for earnings data sync</td></tr>
+    <tr><td><code>CORS_ORIGINS</code></td><td>—</td><td>Allowed CORS origins</td></tr>
+  </table>
+
+  <h4>Quick Command Reference</h4>
+  <pre><code># Start backend (from backend/)
+./venv/bin/python -m app.main
+
+# Start frontend (from frontend/)
+npm run dev
+
+# Run tests
+cd backend && ./venv/bin/python -m pytest</code></pre>
+
+  <h3 id="app-faq">Frequently Asked Questions</h3>
+
+  <h4>Why are some features showing "Demo Mode"?</h4>
+  <p>
+    If the PostgreSQL database is not available, certain features fall back to mock data.
+    Check the database connection status at the top of the page. Ensure PostgreSQL is running
+    and the <code>sp1500_1d</code> database exists with the correct credentials.
+  </p>
+
+  <h4>How often is market data updated?</h4>
+  <p>
+    Daily data is refreshed each trading day. Minute data has a 60-day rolling retention window.
+    Data is ingested via an external ETL pipeline and stored in the TimescaleDB-backed PostgreSQL instance.
+  </p>
+
+  <h4>Can I use TradeCraft without AI features?</h4>
+  <p>
+    Yes. The AI Stock Screener has an <strong>AI Toggle</strong> that disables multi-agent analysis.
+    QuantGen can run manually written strategies without the code generator. The AI features require
+    Ollama with a compatible model to be running.
+  </p>
+
+  <h4>What happens if the LLM is not available?</h4>
+  <p>
+    The QuantGen code generator and AI screener gracefully degrade. You'll see a structured error
+    message indicating the LLM is unreachable. Non-AI workflows (manual backtests, non-AI screening,
+    sector scanning, Markov scanning with cached models) continue to work normally.
+  </p>
+
+  <h4>How do I save my work?</h4>
+  <ul>
+    <li><strong>QuantGen strategies</strong> — click "Save" or "Save As" in the Builder. They persist as <code>.py</code> files.</li>
+    <li><strong>Screener results</strong> — auto-saved to browser localStorage (24h expiry)</li>
+    <li><strong>Builder state</strong> — auto-saved to localStorage on every change</li>
+    <li><strong>Backend models</strong> — Markov XGBoost/LSTM models are persisted to <code>backend/models/markov/</code></li>
+  </ul>
+
+  <h4>How do I export data?</h4>
+  <ul>
+    <li><strong>Sector stocks → QuantGen</strong>: "Export N Tickers" button</li>
+    <li><strong>Screener results → QuantGen</strong>: "Export to QuantGen" button</li>
+    <li><strong>PDF report</strong>: available after screener run (download button)</li>
+    <li><strong>Strategy code</strong>: saved as <code>.py</code> files; copy from Monaco editor</li>
+    <li><strong>Backtest results</strong>: viewed in Dashboard; stats JSON available in collapsible section</li>
+  </ul>
+</section>
+
+<div class="last-updated">
+  TradeCraft User Manual &mdash; Last updated: June 14, 2026<br>
+  <span style="font-size:12px; opacity:0.6">
+    When new features are added, append documentation above the Future Features section
+    following the <code>appendix-item</code> template.
+  </span>
+</div>
+
+</main>
+</body>
+</html>

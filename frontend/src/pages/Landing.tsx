@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar } from 'lucide-react'
+import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar, BookOpen } from 'lucide-react'
 import { ThemeToggle } from '../components/ui'
 import { useTheme } from '../context/ThemeContext'
 
@@ -33,6 +33,16 @@ const tools = [
     link: '/earnings',
     stat: 'S&P 1500',
     detail: 'Earnings dates with EPS estimates and BMO/AMC timing',
+  },
+  {
+    id: 'markov',
+    title: 'Markov Chain Trader',
+    description: 'Regime-aware trading signals using statistical jump models and AI pattern recognition across 11 sector ETFs.',
+    icon: Gauge,
+    accent: '#10B981',
+    link: '/markov',
+    stat: '11 ETF regimes',
+    detail: 'XGBoost + regime detection with convergent signal engine',
   },
   {
     id: 'quantgen',
@@ -105,7 +115,32 @@ export default function Landing() {
           </div>
           <span style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>TradeCraft</span>
         </div>
-        <ThemeToggle variant="ghost" size="md" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <a
+              href="/user-manual.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="User Manual"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: colors.muted,
+                textDecoration: 'none',
+                border: `1px solid ${colors.border}`,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+              }}
+            >
+              <BookOpen style={{ width: 14, height: 14 }} />
+              Help
+            </a>
+            <ThemeToggle variant="ghost" size="md" />
+          </div>
       </div>
 
       {/* Hero */}
@@ -148,7 +183,7 @@ export default function Landing() {
           lineHeight: 1.7,
           transition: 'color 0.3s ease',
         }}>
-          Screen stocks with AI agents, analyze sector rotation patterns, and build backtested quantitative strategies — three tools, one platform, zero compromises.
+          Screen stocks with AI agents, analyze sector rotation patterns, detect market regimes, and build backtested quantitative strategies — five tools, one platform, zero compromises.
         </p>
 
         <div style={{
@@ -232,7 +267,7 @@ export default function Landing() {
             marginBottom: 12,
             letterSpacing: '-0.03em',
           }}>
-            Three tools, one workflow
+            Five tools, one workflow
           </h2>
           <p style={{ fontSize: 16, color: colors.muted }}>
             Each tool is purpose-built and works standalone or together.

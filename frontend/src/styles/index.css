@@ -401,3 +401,15 @@ button, a, input, textarea, select {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Markov scan progress animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.6); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

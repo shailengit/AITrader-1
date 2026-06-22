@@ -53,6 +53,7 @@ interface CandleStickChartProps {
   indicators?: Indicator[];
   height?: number;
   cutoffDate?: string; // mm/dd/yyyy or yyyy-mm-dd dashed vertical line
+  visibleRange?: { from: number; to: number };
 }
 
 /** Parse mm/dd/yyyy or yyyy-mm-dd to UTC timestamp in seconds. */
@@ -140,6 +141,7 @@ export function CandleStickChart({
   indicators = [],
   height = 400,
   cutoffDate,
+  visibleRange,
 }: CandleStickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -147,6 +149,22 @@ export function CandleStickChart({
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>>>({});
   const cutoffLineRef = useRef<VerticalLinePrimitive | null>(null);
+
+  const applyVisibleRange = () => {
+    if (!chartRef.current) return;
+    if (visibleRange?.from != null && visibleRange?.to != null) {
+      try {
+        chartRef.current.timeScale().setVisibleRange({
+          from: Math.floor(visibleRange.from) as Time,
+          to: Math.floor(visibleRange.to) as Time,
+        });
+        return;
+      } catch (err) {
+        console.error('Failed to set visible range:', err);
+      }
+    }
+    chartRef.current.timeScale().fitContent();
+  };
 
   // Initialize chart
   useEffect(() => {
@@ -278,7 +296,7 @@ export function CandleStickChart({
       volumeSeriesRef.current.setData(volData);
     }
 
-    chartRef.current?.timeScale().fitContent();
+    applyVisibleRange();
   }, [data]);
 
   // Update trade markers
@@ -350,8 +368,14 @@ export function CandleStickChart({
       }
     });
 
-    chartRef.current?.timeScale().fitContent();
+    applyVisibleRange();
   }, [indicators]);
+
+  // Re-apply visible range whenever the prop changes (e.g. returning to Dashboard)
+  useEffect(() => {
+    applyVisibleRange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRange?.from, visibleRange?.to]);
 
   // Draw dashed green vertical line at cutoff date using custom primitive
   useEffect(() => {

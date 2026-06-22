@@ -8,6 +8,7 @@ import {
   Trash2,
   Edit3,
   ArrowRight,
+  ArrowLeft,
   Plus,
   Calendar,
   CheckCircle2,
@@ -17,6 +18,7 @@ import {
   Library as LibraryIcon,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { clearAppReferrer } from '@/components/layout/Layout';
 
 interface Strategy {
   id: string;
@@ -138,13 +140,40 @@ export default function Library() {
                 Manage and organize your trading strategies
               </p>
             </div>
-            <NavLink
-              to="/quantgen/build"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'var(--accent)', color: '#000000' }}
-            >
-              <Plus size={15} />
-              New Strategy
-            </NavLink>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <NavLink
+                to="/quantgen/build"
+                onClick={() => clearAppReferrer()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--accent)' }}
+              >
+                <ArrowLeft size={15} />
+                Back to Builder
+              </NavLink>
+              <NavLink
+                to="/quantgen/build"
+                onClick={() => {
+                  try {
+                    const saved = localStorage.getItem('builderState');
+                    if (saved) {
+                      const state = JSON.parse(saved);
+                      delete state.code;
+                      delete state.strategyPrompt;
+                      delete state.currentFilename;
+                      delete state.optParams;
+                      delete state.output;
+                      delete state.structuredError;
+                      localStorage.setItem('builderState', JSON.stringify(state));
+                    }
+                    sessionStorage.removeItem('loadStrategy');
+                    clearAppReferrer();
+                  } catch {}
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 20px', borderRadius: '999px', fontSize: '13px', fontWeight: 600, textDecoration: 'none', backgroundColor: 'var(--accent)', color: '#000000' }}
+              >
+                <Plus size={15} />
+                New Strategy
+              </NavLink>
+            </div>
           </div>
 
           {/* Tab Switcher */}

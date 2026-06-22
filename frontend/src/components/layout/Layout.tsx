@@ -1,7 +1,8 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "../ui/ThemeToggle";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
+import { useEffect, useState } from "react";
 
 const pageTitles: Record<string, string> = {
   "/sectors": "Sector Rotation Scanner",
@@ -11,11 +12,45 @@ const pageTitles: Record<string, string> = {
   "/markov": "Markov Chain Trader",
 };
 
+const REFERRER_KEY = "tc_last_app_referrer";
+
+interface ReferrerInfo {
+  path: string;
+  label: string;
+}
+
+function getStoredReferrer(): ReferrerInfo | null {
+  try {
+    const raw = sessionStorage.getItem(REFERRER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.path && parsed?.label) return parsed as ReferrerInfo;
+  } catch {}
+  return null;
+}
+
+export function recordAppReferrer(path: string, label: string) {
+  try {
+    sessionStorage.setItem(REFERRER_KEY, JSON.stringify({ path, label }));
+  } catch {}
+}
+
+export function clearAppReferrer() {
+  try {
+    sessionStorage.removeItem(REFERRER_KEY);
+  } catch {}
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isSectorPage = location.pathname === "/sectors";
   const { isDarkMode } = useTheme();
+  const [referrer, setReferrer] = useState<ReferrerInfo | null>(null);
+
+  useEffect(() => {
+    setReferrer(getStoredReferrer());
+  }, [location.pathname]);
 
   // Theme-aware colors
   const colors = {
@@ -54,28 +89,92 @@ export default function Layout() {
         }}
       >
         {location.pathname !== "/" && (
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              backgroundColor: "transparent",
-              color: colors.muted,
-              fontSize: "14px",
-              fontWeight: 500,
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = colors.text)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = colors.muted)}
-          >
-            <ArrowLeft size={18} />
-            Home
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+            <button
+              onClick={() => {
+                clearAppReferrer();
+                navigate("/");
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: "transparent",
+                color: colors.muted,
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = colors.text)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = colors.muted)}
+            >
+              <ArrowLeft size={18} />
+              Home
+            </button>
+            {(location.pathname === "/quantgen/dashboard" || location.pathname === "/quantgen/library") && (
+              <button
+                onClick={() => {
+                  clearAppReferrer();
+                  navigate("/quantgen/build");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: `1px solid ${colors.border}`,
+                  cursor: "pointer",
+                  backgroundColor: "transparent",
+                  color: "#10B981",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <ArrowLeft size={18} />
+                Back to Builder
+              </button>
+            )}
+            {location.pathname === "/quantgen/build" && referrer && (
+              <button
+                onClick={() => {
+                  clearAppReferrer();
+                  navigate(referrer.path);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: `1px solid ${colors.border}`,
+                  cursor: "pointer",
+                  backgroundColor: "transparent",
+                  color: "#10B981",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <ArrowLeft size={18} />
+                Back to {referrer.label}
+              </button>
+            )}
+          </div>
         )}
         <div
           style={{
@@ -123,7 +222,9 @@ export default function Layout() {
                 transition: "color 0.3s ease",
               }}
             >
-              {pageTitles[location.pathname] || "TradeCraft"}
+              {pageTitles[location.pathname] || (location.pathname.startsWith("/quantgen")
+                ? "QuantGen Strategy Builder"
+                : "TradeCraft")}
             </h1>
             {isSectorPage && (
               <p
@@ -142,8 +243,31 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Theme Toggle */}
-        <div style={{ marginLeft: "auto" }}>
+        {/* Help + Theme Toggle */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <a
+            href="/user-manual.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="User Manual"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              color: colors.muted,
+              textDecoration: "none",
+              border: `1px solid ${colors.border}`,
+              transition: "all 0.2s ease",
+              cursor: "pointer",
+            }}
+          >
+            <BookOpen size={14} />
+            Help
+          </a>
           <ThemeToggle variant="ghost" size="md" />
         </div>
       </header>

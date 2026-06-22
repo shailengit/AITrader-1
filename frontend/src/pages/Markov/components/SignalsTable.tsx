@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { recordAppReferrer } from "../../../components/layout/Layout";
 
 interface Signal {
   ticker: string;
@@ -87,7 +88,10 @@ export default function SignalsTable({ signals, totalScanned, loading, isDarkMod
         </button>
         {exportUrl && (
           <button
-            onClick={() => window.open(exportUrl, "_blank")}
+            onClick={() => {
+              recordAppReferrer('/markov', 'Markov Chain Trader');
+              window.open(exportUrl, "_blank");
+            }}
             style={{
               marginLeft: "auto",
               padding: "6px 16px",

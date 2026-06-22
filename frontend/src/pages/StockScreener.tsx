@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useTheme } from "../context/ThemeContext";
+import { recordAppReferrer } from "../components/layout/Layout";
 import TerminalLog from "../components/screener/TerminalLog";
 import ChartModal from "../components/screener/ChartModal";
 
@@ -248,6 +249,7 @@ export default function StockScreener() {
   const exportToQuantGen = () => {
     const tickers = results.map((r) => r.ticker).join(",");
     const fromDate = cutoffDate || new Date().toISOString().split("T")[0];
+    recordAppReferrer('/screener', 'AI Stock Screener');
     navigate(
       `/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`,
     );
