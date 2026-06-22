@@ -46,6 +46,25 @@ frontend/dist/
 
 # Playwright
 .playwright-mcp/
+.playwright-cli/
+
+# Trained model artifacts (regenerable)
+backend/models/markov/*.pkl
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Scratch / experiment artifacts (one-off scripts, stale backups, macOS duplicates)
+*.deleted
+graphify-out/
+frontend/public/lastRunData.json
+strategies/supertrand.py
+strategies/ema.py 2
+frontend/src/pages/Landing 2.tsx
+backend/debug_regex.py
+backend/fix_optimization.py
+backend/fix_strategies.py
+backend/RESULTS.md
 
 # Superpowers
 .superpowers/

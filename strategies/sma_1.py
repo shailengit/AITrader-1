@@ -4,13 +4,13 @@ import numpy as np
 
 # Parameters
 fast_window = 5
-slow_window = 10
+slow_window = 20
 
 # Download data
 data = vbt.YFData.download(
     'CIEN',
-    start = '2026-05-09',
-    end = '2026-06-05'
+    start='2026-01-01',
+    end='2026-05-01'
 )
 
 # Get close price

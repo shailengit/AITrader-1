@@ -2,10 +2,10 @@ import vectorbt as vbt
 import pandas as pd
 import numpy as np
 
-# Parameters - scalar values for single backtest (use ranges for optimization)
-ema_window = 9          # EMA period
-sma_window = 20         # SMA period
-vol_window = 20         # Volume MA period
+# Parameters - Define ranges for optimization
+ema_windows = [5, 9, 12, 15, 20]      # Test multiple EMA periods
+sma_windows = [20, 30, 50, 100]       # Test multiple SMA periods  
+vol_windows = [10, 20, 30]            # Test multiple volume lookback periods
 
 ticker = 'AROC'
 start = '2024-01-01'
@@ -20,16 +20,17 @@ if data is None:
 close = data['Close']
 volume = data['Volume']
 
-# Calculate indicators with single parameters
-ema = vbt.MA.run(close, window=ema_window, ewm=True)
-sma = vbt.MA.run(close, window=sma_window)
-vol_ma = vbt.MA.run(volume, window=vol_window)
+# Calculate indicators - vectorbt will create all parameter combinations (grid)
+ema = vbt.MA.run(close, window=ema_windows, ewm=True)
+sma = vbt.MA.run(close, window=sma_windows)
+vol_ma = vbt.MA.run(volume, window=vol_windows)
 
-# Generate signals - single column, safe to use operators
+# Generate signals - automatically broadcasts across all parameter combinations
+# Shape will be: (n_timestamps, n_ema_windows × n_sma_windows × n_vol_windows)
 entries = ema.ma_above(sma.ma) & (volume > vol_ma.ma)
 exits = ema.ma_below(sma.ma) | (volume < vol_ma.ma)
 
-# Create portfolio
+# Create portfolio - now contains multiple columns (one per parameter combination)
 pf = vbt.Portfolio.from_signals(
     close,
     entries=entries,
@@ -41,35 +42,49 @@ pf = vbt.Portfolio.from_signals(
     freq='1d'
 )
 
-# === Results Analysis ===
-n_combos = pf.wrapper.shape[1] if len(pf.wrapper.shape) > 1 else 1
-print(f"Parameter set combinations tested: {n_combos}")
+# === Optimization Results Analysis ===
+print(f"Total combinations tested: {pf.wrapper.shape[1]}")
 print("-" * 50)
 
-# Get performance metrics
-stats = pf.stats()
-print(stats.to_string())
+# Get performance metrics for all combinations
+total_returns = pf.total_return()
+sharpe_ratios = pf.sharpe_ratio()
 
-# Key metrics
-total_return = pf.total_return()
-sharpe_ratio = pf.sharpe_ratio()
-max_dd = pf.max_drawdown()
+# Find best combination by total return
+best_idx = total_returns.idxmax()
+best_return = total_returns.max()
 
-print(f"\nTotal Return: {total_return:.2%}")
-print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-print(f"Max Drawdown: {max_dd:.2%}")
+print(f"Best Total Return: {best_return:.2%}")
+print(f"Best Sharpe Ratio: {sharpe_ratios[best_idx]:.2f}")
+print(f"Best Parameter Index: {best_idx}")
 
-# Trade analysis
-trades = pf.trades
-if len(trades) > 0:
-    print(f"\nTrade Statistics:")
-    print(f"  Total Trades: {len(trades)}")
-    print(f"  Win Rate: {trades.win_rate():.2%}")
-    print(f"  Avg Win: {trades.avg_win():.2%}")
-    print(f"  Avg Loss: {trades.avg_loss():.2%}")
-    print(f"  Best Trade: {trades.max_win():.2%}")
-    print(f"  Worst Trade: {trades.max_loss():.2%}")
-else:
-    print("\nNo trades were generated. Check signal logic.")
-    print(f"  Entries True: {entries.sum().item()}")
-    print(f"  Exits True: {exits.sum().item()}")
+# Extract parameter values for the best combination
+param_names = pf.split_param_names
+param_values = pf.split_param_values[best_idx]
+
+print(f"\nOptimal Parameters:")
+for name, value in zip(param_names, param_values):
+    print(f"  {name}: {value}")
+
+# Display all results as DataFrame
+results_df = pd.DataFrame({
+    'Total_Return': total_returns,
+    'Sharpe_Ratio': sharpe_ratios,
+    'Max_Drawdown': pf.max_drawdown()
+})
+
+# Sort by return and display top 10
+print("\nTop 10 Parameter Combinations:")
+print(results_df.sort_values('Total_Return', ascending=False).head(10).to_string())
+
+# Optional: Plot heatmap for 2 parameters (e.g., EMA vs SMA)
+if len(ema_windows) > 1 and len(sma_windows) > 1:
+    # Reshape returns for heatmap (taking first vol_window value as slice)
+    returns_matrix = total_returns.values.reshape(len(ema_windows), len(sma_windows), len(vol_windows))
+    returns_df = pd.DataFrame(
+        returns_matrix[:, :, 0],  # First vol_window combination
+        index=[f'EMA_{w}' for w in ema_windows],
+        columns=[f'SMA_{w}' for w in sma_windows]
+    )
+    print("\nReturns Matrix (EMA vs SMA) for first Vol MA window:")
+    print(returns_df.round(4))
