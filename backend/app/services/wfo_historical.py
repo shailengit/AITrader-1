@@ -308,7 +308,7 @@ def _optimize_on_window(
     output_buffer: io.StringIO
 ) -> Tuple[Optional[Dict], Optional[float]]:
     """Optimize strategy parameters on a single window."""
-    from app.services.data_service import SafeDataService
+    from app.services.data_service import SafeDataService, safe_get_data
 
     try:
         with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
@@ -317,6 +317,7 @@ def _optimize_on_window(
                 "pd": pd,
                 "np": np,
                 "DataService": SafeDataService,
+                "get_data": safe_get_data,
             }
             exec(code, exec_globals)
 
@@ -363,7 +364,7 @@ def _optimize_on_window(
 
 def _run_test_window(code: str, output_buffer: io.StringIO) -> Optional[Dict]:
     """Run strategy on test window with best parameters."""
-    from app.services.data_service import SafeDataService
+    from app.services.data_service import SafeDataService, safe_get_data
 
     try:
         with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
@@ -372,6 +373,7 @@ def _run_test_window(code: str, output_buffer: io.StringIO) -> Optional[Dict]:
                 "pd": pd,
                 "np": np,
                 "DataService": SafeDataService,
+                "get_data": safe_get_data,
             }
             exec(code, exec_globals)
 

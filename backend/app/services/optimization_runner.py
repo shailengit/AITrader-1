@@ -24,6 +24,8 @@ from app.services.true_wfo_implementation import (
     modify_code_dates_and_params
 )
 from app.services.executor import _apply_ticker_override
+from app.services.signal_extractor import extract_ticker_from_code
+from app.services.wfo_metrics import compute_ohlcv_from_data
 from typing import List, Optional
 
 
@@ -169,12 +171,13 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
         try:
             with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(output_buffer):
                 # Build execution globals with required imports
-                from app.services.data_service import SafeDataService
+                from app.services.data_service import SafeDataService, safe_get_data
                 exec_globals = {
                     "vbt": vbt,
                     "pd": pd,
                     "np": np,
                     "DataService": SafeDataService,
+                    "get_data": safe_get_data,
                 }
                 exec(modified_code, exec_globals)
 
@@ -274,11 +277,12 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                             for t, v in best_equity.items()
                         ]
 
-                        # Also set 'equity' in Dashboard format (time as string)
+                        # Also set 'equity' in Dashboard format (time as Unix timestamp)
                         result["equity"] = [
-                            {"time": str(t), "value": float(v)}
+                            {"time": t.timestamp(), "value": float(v)}
                             for t, v in best_equity.items()
                         ]
+
 
                         result["output"] += f"Equity curve extracted: {len(best_equity)} points\n"
                 except Exception as eq_err:
@@ -379,7 +383,8 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                                     pass
 
                                 # Benchmark drawdown series
-                                result["benchmark_drawdown"] = (bench_pf.drawdown() * 100).replace({np.nan: None}).to_dict()
+                                bench_dd = (bench_pf.drawdown() * 100).replace({np.nan: None})
+                                result["benchmark_drawdown"] = {str(k): v for k, v in bench_dd.to_dict().items()}
                                 result["output"] += "Benchmark stats extracted\n"
                     except Exception as bench_err:
                         result["output"] += f"Warning: Benchmark extraction failed: {bench_err}\n"
@@ -530,7 +535,23 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
 
                 # Extract OHLCV data if available
                 try:
-                    if 'data' in exec_globals:
+                    ohlcv_records = []
+
+                    # Primary: fetch from local data service using explicit code dates/ticker
+                    try:
+                        ticker = extract_ticker_from_code(code)
+                        dates = extract_dates_from_code(code)
+                        if ticker and dates:
+                            start_date, end_date = dates
+                            service_records = compute_ohlcv_from_data(ticker, start_date, end_date)
+                            if len(service_records) >= 2:
+                                ohlcv_records = service_records
+                                result["output"] += f"OHLCV data fetched from service: {len(ohlcv_records)} bars\n"
+                    except Exception as svc_err:
+                        result["output"] += f"Debug: OHLCV service fetch skipped: {svc_err}\n"
+
+                    # Fallback: extract from strategy's data variable
+                    if not ohlcv_records and 'data' in exec_globals:
                         d = exec_globals['data']
                         source_df = None
 
@@ -573,7 +594,6 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                                 if s_low is None: s_low = s_close
 
                                 idx = s_close.index
-                                ohlcv_records = []
 
                                 for i in range(len(idx)):
                                     try:
@@ -590,8 +610,10 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                                     except:
                                         continue
 
-                                result["ohlcv"] = ohlcv_records
                                 result["output"] += f"OHLCV data extracted: {len(ohlcv_records)} bars\n"
+
+                    if ohlcv_records:
+                        result["ohlcv"] = ohlcv_records
 
                 except Exception as ohlcv_err:
                     result["output"] += f"Warning: Could not extract OHLCV: {ohlcv_err}\n"
@@ -607,7 +629,8 @@ def run_optimization(code: str, strategy_params: dict, config: dict, tickers: Op
                     # Calculate drawdown
                     cummax = best_value.cummax()
                     drawdown = (best_value - cummax) / cummax * 100
-                    result["drawdown"] = drawdown.replace({np.nan: None}).to_dict()
+                    drawdown_clean = drawdown.replace({np.nan: None})
+                    result["drawdown"] = {str(k): v for k, v in drawdown_clean.to_dict().items()}
 
                 except Exception as dd_err:
                     result["output"] += f"Warning: Could not extract drawdown: {dd_err}\n"

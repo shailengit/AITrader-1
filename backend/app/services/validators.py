@@ -397,7 +397,7 @@ class RunRequest(BaseModel):
 class OptimizeRequest(BaseModel):
     """Validated request model for parameter optimization"""
     code: str = Field(..., min_length=50, max_length=MAX_CODE_LENGTH)
-    strategy_params: Dict[str, Any] = Field(..., min_length=1, max_length=10)
+    strategy_params: Dict[str, Any] = Field(..., min_length=0, max_length=10)
     config: Dict[str, Any] = Field(..., min_length=1)
 
     @validator('code')

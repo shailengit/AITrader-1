@@ -142,8 +142,8 @@ def run_continuous_true_wfo(
 
             with contextlib.redirect_stdout(output_buffer):
                 # Inject DataService into globals
-                from app.services.data_service import DataService
-                train_globals = {'DataService': DataService}
+                from app.services.data_service import DataService, safe_get_data
+                train_globals = {'DataService': DataService, 'get_data': safe_get_data}
                 exec(train_code, train_globals)
 
                 # Check for portfolio - could be named 'pf' or 'portfolio'
@@ -243,8 +243,8 @@ def run_continuous_true_wfo(
             )
 
             with contextlib.redirect_stdout(output_buffer):
-                from app.services.data_service import SafeDataService
-                train_globals = {'DataService': SafeDataService}
+                from app.services.data_service import SafeDataService, safe_get_data
+                train_globals = {'DataService': SafeDataService, 'get_data': safe_get_data}
                 exec(train_code_with_params, train_globals)
 
                 if 'entries' not in train_globals or 'exits' not in train_globals:

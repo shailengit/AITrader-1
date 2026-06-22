@@ -34,6 +34,9 @@ import numpy as np
 # Import indicator modules
 from app.services.indicator_detector import detect_indicators
 from app.services.indicator_extractor import extract_indicators
+from app.services.signal_extractor import extract_ticker_from_code
+from app.services.true_wfo_implementation import extract_dates_from_code
+from app.services.wfo_metrics import compute_ohlcv_from_data
 
 # Import Markov signal provider for regime-aware backtesting
 from app.services.markov.signal_provider import MarkovSignalProvider
@@ -53,7 +56,9 @@ FORBIDDEN_IMPORTS = [
 SAFE_MODULES = [
     'vectorbt', 'pandas', 'numpy', 'matplotlib', 'math',
     'datetime', 'time', 'random', 'itertools', 'functools',
-    'collections', 're', 'copy', 'app'
+    'collections', 're', 'copy', 'app',
+    'ta', 'ta.trend', 'ta.momentum', 'ta.volatility', 'ta.volume',
+    'pandas_ta',
 ]
 
 # Execution result dataclass
@@ -174,12 +179,13 @@ class CodeValidator:
             if not re.search(pattern, code, re.IGNORECASE):
                 missing_patterns.append(pattern)
 
-        # Check for data loading - either DataService (preferred) or YFData
+        # Check for data loading - DataService, get_data (convenience), or YFData
         has_data_service = re.search(r'DataService\.get_ohlcv_data', code) is not None
+        has_get_data = re.search(r'\bget_data\s*\(', code) is not None
         has_yfdata = re.search(r'vbt\.YFData\.download', code) is not None
 
-        if not has_data_service and not has_yfdata:
-            missing_patterns.append('DataService.get_ohlcv_data OR vbt.YFData.download')
+        if not has_data_service and not has_get_data and not has_yfdata:
+            missing_patterns.append('get_data() OR DataService.get_ohlcv_data OR vbt.YFData.download')
 
         if missing_patterns:
             raise ValidationError(
@@ -484,14 +490,21 @@ class StatsExtractor:
             except Exception as e:
                 logger.debug(f"Could not calculate benchmark Max Drawdown: {e}")
 
-            # Extract drawdown series
+            # Extract drawdown series as numeric Unix timestamps
             try:
                 strategy_dd = pf.drawdown() * 100
                 benchmark_dd = bench_pf.drawdown() * 100
 
-                # Use helper function to properly serialize (handles MultiIndex)
-                strategy_drawdown = _serialize_pandas_object(strategy_dd) if len(strategy_dd) > 0 else {}
-                benchmark_drawdown = _serialize_pandas_object(benchmark_dd) if len(benchmark_dd) > 0 else {}
+                def dd_to_ts_dict(dd: pd.Series) -> Dict[float, float]:
+                    if len(dd) == 0:
+                        return {}
+                    return {
+                        (k.timestamp() if hasattr(k, 'timestamp') else float(k)): (float(v) if pd.notna(v) else None)
+                        for k, v in dd.replace({np.nan: None}).items()
+                    }
+
+                strategy_drawdown = dd_to_ts_dict(strategy_dd)
+                benchmark_drawdown = dd_to_ts_dict(benchmark_dd)
 
                 return strategy_drawdown, benchmark_drawdown, bench_stats
             except Exception as e:
@@ -507,7 +520,7 @@ class EquityExtractor:
 
     @staticmethod
     def extract_equity_curve(pf) -> List[Dict[str, Any]]:
-        """Extract portfolio equity curve"""
+        """Extract portfolio equity curve as Unix timestamps."""
         try:
             value_data = pf.value()
             equity_data = []
@@ -520,9 +533,10 @@ class EquityExtractor:
 
             for ts, val in value_series.items():
                 try:
+                    t_numeric = ts.timestamp() if hasattr(ts, 'timestamp') else pd.to_datetime(ts).timestamp()
                     equity_data.append({
-                        "time": str(ts),
-                        "value": float(val)
+                        "time": float(t_numeric),
+                        "value": float(val) if pd.notna(val) else None
                     })
                 except Exception as e:
                     logger.debug(f"Error processing equity point: {e}")
@@ -594,12 +608,34 @@ class OHLCVExtractor:
             return df
 
     @staticmethod
-    def extract_ohlcv_data(exec_globals: Dict[str, Any], pf) -> List[Dict[str, Any]]:
-        """Extract OHLCV data with fallback logic"""
+    def extract_ohlcv_data(exec_globals: Dict[str, Any], pf, code: str = "") -> List[Dict[str, Any]]:
+        """Extract OHLCV data with fallback logic.
+
+        Prefers data fetched directly from the local data service using the
+        strategy's ticker and date range so the chart covers the full backtest
+        period. Falls back to the strategy's data variable or portfolio data.
+        """
         ohlcv_records = []
 
         try:
-            # Try to find and extract from data variable
+            # Primary: fetch from local DB using explicit code dates/ticker
+            if code:
+                try:
+                    ticker = extract_ticker_from_code(code)
+                    dates = extract_dates_from_code(code)
+                    if ticker and dates:
+                        start_date, end_date = dates
+                        service_records = compute_ohlcv_from_data(ticker, start_date, end_date)
+                        if len(service_records) >= 2:
+                            logger.info(
+                                "Fetched %d OHLCV records from data service for %s (%s to %s)",
+                                len(service_records), ticker, start_date, end_date,
+                            )
+                            return service_records
+                except Exception as e:
+                    logger.debug(f"Could not fetch OHLCV from data service: {e}")
+
+            # Fallback 1: Try to find and extract from data variable
             data_source = OHLCVExtractor.find_data_source(exec_globals)
 
             if data_source is not None:
@@ -611,7 +647,7 @@ class OHLCVExtractor:
                         logger.info(f"Extracted {len(ohlcv_records)} OHLCV records from data source")
                         return ohlcv_records
 
-            # Fallback: Extract from portfolio
+            # Fallback 2: Extract from portfolio
             if hasattr(pf, 'close'):
                 logger.info("Using portfolio close data as fallback")
                 ohlcv_records = OHLCVExtractor._extract_from_portfolio(pf)
@@ -954,7 +990,7 @@ def execute_strategy(code: str, tickers: Optional[List[str]] = None) -> Dict[str
 
         # Extract OHLCV data
         try:
-            ohlcv = OHLCVExtractor.extract_ohlcv_data(exec_globals, pf)
+            ohlcv = OHLCVExtractor.extract_ohlcv_data(exec_globals, pf, code)
         except Exception as e:
             logger.warning(f"OHLCV extraction failed: {e}")
             ohlcv = []
