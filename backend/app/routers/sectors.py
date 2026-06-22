@@ -4,7 +4,9 @@ Provides sector performance and stock leader data.
 Ported from Sector-Rotation-Scanner Express.js server.
 """
 
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import List, Optional, cast, Any
 from fastapi import APIRouter
@@ -61,6 +63,13 @@ class StockLeader(BaseModel):
     ref_date: Optional[str] = None
     forward_return: Optional[float] = None
     is_real_data: bool = True
+
+
+class CrossSectorLeader(StockLeader):
+    """Cross-sector momentum leader with sector name and multi-period performance."""
+    sector: str
+    perf_1m: float
+    perf_6m: float
 
 
 async def get_forward_return(ticker: str, from_date: str, holding_days: int = 30) -> Optional[float]:
@@ -137,6 +146,227 @@ async def get_ticker_performance(ticker: str, cutoff_date: Optional[str] = None)
         return None
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.debug("Error getting performance for %s: %s", ticker, e)
+        return None
+
+
+def _get_stock_perf_summary_sync(
+    ticker: str,
+    name: Optional[str],
+    sector: str,
+    cutoff_date: Optional[str] = None
+) -> Optional[dict]:
+    """Lightweight synchronous query for 1M/3M/6M performance and volume."""
+    try:
+        safe_table = get_safe_table_name(ticker)
+        if cutoff_date:
+            latest_cte = f'''
+                SELECT "Close", "Volume", "Date" FROM {safe_table}
+                WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1
+            '''
+        else:
+            latest_cte = f'''
+                SELECT "Close", "Volume", "Date" FROM {safe_table}
+                ORDER BY "Date" DESC LIMIT 1
+            '''
+
+        query = text(f'''
+            WITH latest AS ({latest_cte}),
+            one_month_ago AS (
+                SELECT "Close" FROM {safe_table}
+                WHERE "Date" <= (SELECT "Date" FROM latest) - INTERVAL '30 days'
+                ORDER BY "Date" DESC LIMIT 1
+            ),
+            three_months_ago AS (
+                SELECT "Close" FROM {safe_table}
+                WHERE "Date" <= (SELECT "Date" FROM latest) - INTERVAL '90 days'
+                ORDER BY "Date" DESC LIMIT 1
+            ),
+            six_months_ago AS (
+                SELECT "Close" FROM {safe_table}
+                WHERE "Date" <= (SELECT "Date" FROM latest) - INTERVAL '180 days'
+                ORDER BY "Date" DESC LIMIT 1
+            ),
+            avg_vol AS (
+                SELECT AVG("Volume") as vol_20d FROM (
+                    SELECT "Volume" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 20
+                ) v
+            )
+            SELECT
+                l."Close" as price,
+                l."Volume" as volume_today,
+                l."Date" as ref_date,
+                l."Close" / NULLIF((SELECT "Close" FROM one_month_ago), 0) - 1 as perf_1m,
+                l."Close" / NULLIF((SELECT "Close" FROM three_months_ago), 0) - 1 as perf_3m,
+                l."Close" / NULLIF((SELECT "Close" FROM six_months_ago), 0) - 1 as perf_6m,
+                v.vol_20d
+            FROM latest l, avg_vol v
+        ''')
+
+        params = {"cutoff_date": cutoff_date} if cutoff_date else {}
+        with engine.connect() as conn:
+            row = conn.execute(query, params).fetchone()
+
+        if row and row[0]:
+            return {
+                'ticker': ticker.upper(),
+                'name': name,
+                'sector': sector or 'Unknown',
+                'price': float(row[0]),
+                'volume_today': float(row[1]),
+                'ref_date': str(row[2]) if row[2] else None,
+                'perf_1m': float(row[3]) if row[3] else 0.0,
+                'perf_3m': float(row[4]) if row[4] else 0.0,
+                'perf_6m': float(row[5]) if row[5] else 0.0,
+                'volume_avg_20d': float(row[6]) if row[6] else 0.0,
+            }
+        return None
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Error getting performance summary for %s: %s", ticker, e)
+        return None
+
+
+def _get_stock_full_metrics_sync(
+    summary: dict,
+    cutoff_date: Optional[str] = None,
+    holding_days: int = 30
+) -> Optional[dict]:
+    """Fetch full technical metrics for a stock summary (Bollinger, SMAs, forward return)."""
+    try:
+        ticker = summary['ticker']
+        safe_table = get_safe_table_name(ticker)
+        if cutoff_date:
+            latest_cte = f'''
+                SELECT "Close", "Volume", "Date" FROM {safe_table}
+                WHERE "Date" <= :cutoff_date ORDER BY "Date" DESC LIMIT 1
+            '''
+        else:
+            latest_cte = f'''
+                SELECT "Close", "Volume", "Date" FROM {safe_table}
+                ORDER BY "Date" DESC LIMIT 1
+            '''
+
+        query = text(f'''
+            WITH latest AS ({latest_cte}),
+            ten_day_high AS (
+                SELECT MAX("High") as high_10d FROM (
+                    SELECT "High" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 10
+                ) t
+            ),
+            avg_vol AS (
+                SELECT AVG("Volume") as vol_20d FROM (
+                    SELECT "Volume" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 20
+                ) v
+            ),
+            sma_20 AS (
+                SELECT AVG("Close") as sma20 FROM (
+                    SELECT "Close" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 20
+                ) s
+            ),
+            sd_20 AS (
+                SELECT STDDEV("Close") as sd20 FROM (
+                    SELECT "Close" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 20
+                ) d
+            ),
+            sma_50 AS (
+                SELECT AVG("Close") as sma50 FROM (
+                    SELECT "Close" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 50
+                ) f
+            ),
+            sma_200 AS (
+                SELECT AVG("Close") as sma200 FROM (
+                    SELECT "Close" FROM {safe_table}
+                    WHERE "Date" <= (SELECT "Date" FROM latest)
+                    ORDER BY "Date" DESC LIMIT 200
+                ) h
+            )
+            SELECT
+                l."Close" as price,
+                l."Volume" as volume_today,
+                l."Date" as ref_date,
+                h.high_10d,
+                v.vol_20d,
+                sma_20.sma20,
+                sd_20.sd20,
+                sma_50.sma50,
+                sma_200.sma200
+            FROM latest l, ten_day_high h, avg_vol v, sma_20, sd_20, sma_50, sma_200
+        ''')
+
+        params = {"cutoff_date": cutoff_date} if cutoff_date else {}
+        with engine.connect() as conn:
+            row = conn.execute(query, params).fetchone()
+
+        if not row or not row[0]:
+            return None
+
+        price = float(row[0])
+        ref_date = str(row[2]) if row[2] else summary.get('ref_date')
+        high_10d = float(row[3])
+        volume_avg_20d = float(row[4])
+        sma20 = float(row[5])
+        sd20 = float(row[6])
+        sma50 = float(row[7]) if row[7] else None
+        sma200 = float(row[8]) if row[8] else None
+
+        bb_middle = sma20
+        bb_upper = sma20 + (2 * sd20)
+        bb_lower = sma20 - (2 * sd20)
+
+        forward = None
+        if ref_date:
+            forward_query = text(f'''
+                WITH from_price AS (
+                    SELECT "Close", "Date" FROM {safe_table}
+                    WHERE "Date" <= :from_date ORDER BY "Date" DESC LIMIT 1
+                ),
+                to_price AS (
+                    SELECT "Close" FROM {safe_table}
+                    WHERE "Date" >= (SELECT "Date" FROM from_price) + INTERVAL ':hold_days days'
+                    ORDER BY "Date" ASC LIMIT 1
+                )
+                SELECT
+                    (SELECT "Close" FROM to_price) / NULLIF((SELECT "Close" FROM from_price), 0) - 1 as forward_return
+            ''')
+            with engine.connect() as conn:
+                fwd = conn.execute(
+                    forward_query,
+                    {"from_date": ref_date, "hold_days": holding_days}
+                ).fetchone()
+            if fwd and fwd[0] is not None:
+                forward = float(fwd[0])
+
+        return {
+            **summary,
+            'price': price,
+            'volume_today': float(row[1]),
+            'ref_date': ref_date,
+            'perf_3m': summary.get('perf_3m', 0.0),
+            'sector_perf_3m': 0.0,
+            'volume_avg_20d': volume_avg_20d,
+            'high_10d': high_10d,
+            'bb_expanding': True,
+            'bb_upper': bb_upper,
+            'bb_middle': bb_middle,
+            'bb_lower': bb_lower,
+            'sma50': sma50,
+            'sma200': sma200,
+            'forward_return': forward,
+            'is_real_data': True,
+        }
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.debug("Error getting full metrics for %s: %s", summary.get('ticker'), e)
         return None
 
 
@@ -388,6 +618,68 @@ async def get_sector_stocks(
         ]
 
     return leaders
+
+
+@router.get("/top-momentum-leaders", response_model=List[CrossSectorLeader])
+async def get_top_momentum_leaders(
+    cutoff_date: Optional[str] = None,
+    holding_days: int = 30
+):
+    """
+    Get top 20 momentum leaders across all sectors.
+    Returns the highest 3-month performers regardless of sector.
+    """
+    try:
+        metadata_query = text('SELECT ticker, name, sector FROM stock_metadata')
+        with engine.connect() as conn:
+            result = conn.execute(metadata_query)
+            stocks = result.fetchall()
+
+        logger.info("Cross-sector scan: analyzing %d stocks", len(stocks))
+
+        # First pass: lightweight performance summary for all stocks (parallel threads)
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futures = [
+                loop.run_in_executor(
+                    executor,
+                    _get_stock_perf_summary_sync,
+                    stock[0],
+                    stock[1],
+                    stock[2],
+                    cutoff_date,
+                )
+                for stock in stocks
+            ]
+            summaries = await asyncio.gather(*futures)
+
+        valid = [s for s in summaries if s]
+        valid.sort(key=lambda x: x['perf_3m'], reverse=True)
+        top_candidates = valid[:20]
+
+        # Second pass: full technical metrics for top 20 only
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futures = [
+                loop.run_in_executor(
+                    executor,
+                    _get_stock_full_metrics_sync,
+                    summary,
+                    cutoff_date,
+                    holding_days,
+                )
+                for summary in top_candidates
+            ]
+            full_results = await asyncio.gather(*futures)
+
+        leaders = [leader for leader in full_results if leader]
+        leaders.sort(key=lambda x: x['perf_3m'], reverse=True)
+
+        logger.info("Returning %d cross-sector momentum leaders", len(leaders))
+        return leaders
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error("Error getting top momentum leaders: %s", e)
+        return []
 
 
 @router.get("/ohlcv/{ticker}", response_model=List[OHLCV])

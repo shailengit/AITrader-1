@@ -119,6 +119,7 @@ async def root():
             "health": "/api/health",
             "sectors": "/api/sectors",
             "stocks": "/api/stocks/{sector}",
+            "top_momentum_leaders": "/api/top-momentum-leaders",
             "screener": "/api/screener/scan",
             "earnings_calendar": "/api/earnings/calendar",
             "earnings_next": "/api/earnings/next/{ticker}",

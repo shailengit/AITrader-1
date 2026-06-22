@@ -31,3 +31,18 @@ def test_ohlcv_endpoint_rejects_injection(client):
     # Currently it will likely return 500 because ValueError is not caught
     # This is acceptable for now - the SQL injection is blocked
     assert response.status_code in [200, 500]
+
+
+def test_top_momentum_leaders_endpoint_shape(client):
+    """Verify top momentum leaders endpoint returns a valid list shape."""
+    response = client.get("/api/top-momentum-leaders")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) <= 20
+    if data:
+        leader = data[0]
+        assert "ticker" in leader
+        assert "sector" in leader
+        assert "perf_3m" in leader
+        assert "perf_1m" in leader
