@@ -8,13 +8,25 @@ Two tracks:
 Both produce 3-class signals: BUY (2), HOLD (1), SELL (0).
 """
 import logging
+import os
 import pickle
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 import pandas as pd
 import numpy as np
+import xgboost  # noqa: E402 — must be imported before torch (XGBoost 3.2.0 segfaults otherwise)
 import torch
+# Constrain PyTorch to single-threaded mode to prevent SIGSEGV crashes
+# on Apple Silicon arising from OpenMP parallelism in LSTM CPU kernels
+# (PyTorch 2.12.0 + macOS 15.7.4).  Multi-threaded LSTM training in a
+# thread-pool executor reliably triggers EXC_BAD_ACCESS / KERN_INVALID_ADDRESS
+# inside libiomp5 / OpenMP worker threads.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -92,8 +104,11 @@ class XGBoostRecognizer:
                 "random_state": kwargs.get("random_state", 42),
                 "verbosity": 0,
             }
-            self._model = xgb.XGBClassifier(**params)
-            self._model.fit(features.values, labels.values)
+            # Workaround: train on a local variable first, then assign to self
+            # (XGBoost 3.2.0 segfaults when fit() is called on self._model directly)
+            _model = xgb.XGBClassifier(**params)
+            _model.fit(features.values, labels.values)
+            self._model = _model
             self._is_trained = True
             logger.info(
                 f"XGBoostRecognizer trained for {self.ticker}: "

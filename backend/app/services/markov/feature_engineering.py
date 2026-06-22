@@ -153,7 +153,8 @@ def compute_etf_features(etf_ticker: str, start_date: str, end_date: str) -> Opt
 
 def compute_ticker_features(ticker: str, start_date: str, end_date: str,
                             buy_threshold: float = DEFAULT_BUY_THRESHOLD,
-                            sell_threshold: float = DEFAULT_SELL_THRESHOLD) -> Optional[Dict[str, Any]]:
+                            sell_threshold: float = DEFAULT_SELL_THRESHOLD,
+                            min_rows: int = 100) -> Optional[Dict[str, Any]]:
     """Compute full feature vector + labels for a ticker (used by Pattern Recognizer).
 
     Returns dict with:
@@ -161,6 +162,10 @@ def compute_ticker_features(ticker: str, start_date: str, end_date: str,
       - 'labels': pd.Series of 0/1/2 labels
       - 'has_microstructure': bool
       - 'ticker': str
+
+    Args:
+        min_rows: Minimum feature rows required. Use 100+ for training,
+                  1 for scanning (only the latest row is needed).
     """
     # Load daily data
     df_daily = DataService.get_ohlcv_data(ticker, start_date, end_date, frequency="daily")
@@ -172,12 +177,13 @@ def compute_ticker_features(ticker: str, start_date: str, end_date: str,
     volume = df_daily['Volume']
     returns = close.pct_change().dropna()
 
-    # Load 1-minute data for microstructure (required)
+    # Load 1-minute data for microstructure (optional)
     df_1m = DataService.get_ohlcv_data(ticker, start_date, end_date, frequency="minute")
     has_microstructure = df_1m is not None and len(df_1m) >= MIN_1M_DAYS * 390
-    if not has_microstructure:
-        logger.warning(f"Insufficient 1m data for {ticker} — skipping (microstructure required)")
-        return None
+    if has_microstructure:
+        logger.info(f"1m data available for {ticker}: {len(df_1m)} rows")
+    else:
+        logger.info(f"No 1m data for {ticker} — using daily features only")
 
     # Build feature DataFrame
     features = pd.DataFrame(index=close.index)
@@ -190,15 +196,21 @@ def compute_ticker_features(ticker: str, start_date: str, end_date: str,
     features['sortino_60'] = compute_sortino_ratio(returns, 60)
 
     # Feature B: Microstructure (from 1m data, resampled to daily)
-    close_1m = df_1m['Close']
-    rv = compute_realized_variance(close_1m)
-    rq = compute_realized_quarticity(close_1m)
-    sjv = compute_signed_jump_variation(close_1m)
+    if has_microstructure:
+        close_1m = df_1m['Close']
+        rv = compute_realized_variance(close_1m)
+        rq = compute_realized_quarticity(close_1m)
+        sjv = compute_signed_jump_variation(close_1m)
 
-    # Align microstructure to daily index
-    features['realized_variance'] = rv.reindex(features.index).ffill()
-    features['realized_quarticity'] = rq.reindex(features.index).ffill()
-    features['signed_jump_variation'] = sjv.reindex(features.index).ffill()
+        # Align microstructure to daily index
+        features['realized_variance'] = rv.reindex(features.index).ffill()
+        features['realized_quarticity'] = rq.reindex(features.index).ffill()
+        features['signed_jump_variation'] = sjv.reindex(features.index).ffill()
+    else:
+        # Fill with 0 so feature count stays consistent (13 columns)
+        features['realized_variance'] = 0.0
+        features['realized_quarticity'] = 0.0
+        features['signed_jump_variation'] = 0.0
 
     # Feature C: Technical
     features['rsi_14'] = compute_rsi(close, 14)
@@ -216,13 +228,13 @@ def compute_ticker_features(ticker: str, start_date: str, end_date: str,
     features = features.loc[valid_idx]
     labels = labels.loc[valid_idx]
 
-    if len(features) < 100:
+    if len(features) < min_rows:
         logger.warning(f"Too few valid feature rows for {ticker}: {len(features)}")
         return None
 
     return {
         'features': features,
         'labels': labels,
-        'has_microstructure': True,
+        'has_microstructure': has_microstructure,
         'ticker': ticker,
     }
