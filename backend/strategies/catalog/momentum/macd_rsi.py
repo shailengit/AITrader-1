@@ -5,9 +5,23 @@ Original: strategies/momentum/MACD+RSI.pine
 Entry: MACD crosses above signal line AND RSI was < oversold_level in last N candles
 Exit: MACD crosses below signal line AND RSI was > overbought_level in last N candles
 Stop: Fixed percentage stop loss from entry price
+
+Data: Loads from local PostgreSQL via get_data(ticker, start, end)
+Uses VBT built-in indicators for optimization/WFO compatibility.
 """
 import numpy as np
+import pandas as pd
 import vectorbt as vbt
+
+
+def _bc(s, ref):
+    """Broadcast to match reference shape for safe &/| with MultiIndex columns."""
+    if isinstance(s, pd.Series) and isinstance(ref, (pd.DataFrame, pd.Series)) and hasattr(ref, 'columns') and ref.columns.nlevels > 1:
+        return pd.DataFrame(np.broadcast_to(s.values[:, None], ref.shape), index=ref.index, columns=ref.columns)
+    if isinstance(s, pd.DataFrame) and isinstance(ref, pd.DataFrame):
+        if s.columns.nlevels != ref.columns.nlevels or s.columns.tolist() != ref.columns.tolist():
+            return pd.DataFrame(np.broadcast_to(s.values, ref.shape), index=ref.index, columns=ref.columns)
+    return s
 
 # ── Parameters (tunable by QuantGen optimizer) ──────────────────────────
 fast_length = 12          # MACD fast EMA period
@@ -19,28 +33,30 @@ rsi_overbought = 70       # RSI overbought threshold
 rsi_lookback = 5          # Check RSI condition over last N candles
 stop_loss_pct = 0.01      # 1% stop loss
 
-# ── Data Loading ────────────────────────────────────────────────────────
+# ── Ticker & Date Range (overridden by Builder UI) ───────────────────────
+ticker = 'AAPL'
+start = '2023-01-01'
+end = '2024-01-01'
+
+# ── Data Loading from PostgreSQL ────────────────────────────────────────
+data = get_data(ticker, start, end)
+ohlcv = data
 close = ohlcv['Close']
 
-# ── Indicator Computation ───────────────────────────────────────────────
-from ta.trend import MACD
-from ta.momentum import RSIIndicator
+# ── Indicator Computation (VBT built-in) ───────────────────────────────
+macd = vbt.MACD.run(close, fast_window=fast_length, slow_window=slow_length, signal_window=signal_length)
+macd_line = macd.macd
+signal_line = macd.signal
 
-macd = MACD(close, window_slow=slow_length, window_fast=fast_length, window_sign=signal_length)
-macd_line = macd.macd()
-signal_line = macd.macd_signal()
+rsi = vbt.RSI.run(close, window=rsi_length).rsi
 
-rsi = RSIIndicator(close, window=rsi_length).rsi()
-
-# ── Signal Generation (VectorBT-compatible) ─────────────────────────────
+# ── Signal Generation ───────────────────────────────────────────────────
 bull_cross = macd_line.vbt.crossed_above(signal_line)
 bear_cross = macd_line.vbt.crossed_below(signal_line)
 
-rsi_was_oversold = rsi.rolling(rsi_lookback).min() < rsi_oversold
-rsi_was_overbought = rsi.rolling(rsi_lookback).max() > rsi_overbought
+rsi_was_oversold = _bc(rsi.rolling(rsi_lookback).min() < rsi_oversold, bull_cross)
 
-entries = np.logical_and(bull_cross, rsi_was_oversold)
-
+entries = bull_cross & rsi_was_oversold
 exits = bear_cross
 
 # ── Portfolio ───────────────────────────────────────────────────────────
