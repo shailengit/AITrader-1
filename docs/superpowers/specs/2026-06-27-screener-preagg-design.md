@@ -88,7 +88,7 @@ name                 TEXT        — from stock_metadata
 ### Two design points worth flagging
 
 - **`unnest($1::text[]) WITH ORDINALITY`** preserves caller-supplied order, so response rows match input list order — important for the two-pass screener that pairs summary rows with full-metrics rows.
-- **`LATERAL` joins** let us dynamically reference the per-row ticker table. Per-ticker dynamic-table referencing requires either server-side functions or per-ticker string interpolation; we'll go with `get_safe_table_name`-validated `format()` SQL since the existing codebase already does this. The sanitizer gates injection.
+- **`LATERAL` joins** let us dynamically reference the per-row ticker table. The function builds one parameterized SQL string per call: the ticker table names are inlined via `format()` after `get_safe_table_name()` validates them, and every other value (`cutoff_date`, the ticker array itself) goes through SQLAlchemy bound parameters via `text()`. This matches the existing pattern in `sectors.py` (e.g., `get_ticker_performance`) and reuses the same sanitizer gate against SQL injection.
 
 ### Missing-table tolerance
 
