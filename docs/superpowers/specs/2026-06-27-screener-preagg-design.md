@@ -1,235 +1,203 @@
 # Screener / Scanner Pre-Aggregation Layer — Design Spec
 
 **Date:** 2026-06-27
-**Status:** Brainstorming → Spec (draft)
+**Status:** Shelved / back-burner
 **Owner:** TradeCraft backend
 **Related:** `backend/app/services/agno_screener.py`, `backend/app/routers/sectors.py`, `backend/app/services/data_service.py`
 
+> **Status note (2026-06-27):** The user asked to shelve this work for now. No code changes are planned against this spec. It is kept on disk as a reference for the "80% benefit, 20% risk" approach — a much smaller, evidence-based refactor than what was originally drafted. The original three-router fan-out (screener + sector scanner + top-20) with worker signature changes was deemed too aggressive. The reduced form below is what would actually be done if/when this is picked back up. **Do not start work on this without first running the profiling step in [Pre-flight: profile before optimizing](#pre-flight-profile-before-optimizing).**
+
 ## Context
 
-TradeCraft's screener (`backend/app/services/agno_screener.py`) and sector scanner (`backend/app/routers/sectors.py`) both pay the same per-ticker tax on every scan. The user asked whether postgres MCP / CLI tools would help; after exploration we concluded they cannot accelerate the runtime hot path (TA indicators run in pandas in workers, not as interactive LLM queries). The real win is a backend refactor: stop doing per-ticker SQL round-trips and per-worker engine spin-ups, and replace them with a single pre-aggregation query per scan.
+TradeCraft's screener (`backend/app/services/agno_screener.py`) and sector scanner (`backend/app/routers/sectors.py`) both pay the same per-ticker tax on every scan. A user asked whether postgres MCP / CLI tools would help; after exploration we concluded they cannot accelerate the runtime hot path (TA indicators run in pandas in workers, not as interactive LLM queries). The real win is a backend refactor.
 
-### Current behaviour
+The original brainstorm produced an aggressive plan: a single wide-CTE query per scan, plus a worker signature change in `agno_screener._worker_ta_analysis`, plus a refactor of all three sector scanner entry points. On review, that approach is **too much moving parts in one change** for unverified gains. It optimizes a presumed bottleneck ("~3,000+ raw SQL operations") that hasn't been measured. The TA math itself (pandas-ta) is untouched, so if pandas-ta is the actual bottleneck, none of this helps.
 
-**Screener** (`_worker_ta_analysis` in `backend/app/services/agno_screener.py`):
-- Each worker process opens its own SQLAlchemy engine + `QueuePool` (`create_engine(DB_URL, poolclass=QueuePool, pool_size=1)`) on every invocation.
-- Fetches the last 250 rows of OHLCV via `pd.read_sql(... LIMIT 250)`.
-- Calls `add_all_ta_features` (the `ta` library) — 30+ indicators computed in pandas.
-- Re-computes `sma_20`, `ema_9`, `high_52w`, `low_52w`, `volume_ma_50`, `volume_ratio`, `all_time_high`, `all_time_low`, `ath_proximity` per worker.
-- Runs in `ProcessPoolExecutor(max_workers=os.cpu_count())` — 8-10 worker processes per scan.
+This spec documents a much smaller alternative: **start with the cheapest, highest-confidence wins; gate everything else on real measurements.**
 
-**Sector scanner** (`get_sector_stocks` and `_get_stock_full_metrics_sync` in `backend/app/routers/sectors.py`):
-- For each stock in the sector (capped at 50), runs ~5-7 separate `with engine.connect()` blocks.
-- Top-20 momentum leaders uses a two-pass: lightweight summary → top-20 → full metrics. The full-metrics pass re-fetches data the lightweight pass already touched.
+## The 80/20 plan
 
-### Why it matters
+Three changes, in this order. **Each step is independent and shippable on its own.** Stop after any step if the next isn't justified by data.
 
-A full S&P 1500 scan touches **~3,000+ raw SQL operations** per scan, **~1,500 engine spin-ups**, and **duplicate Bollinger/SMA/SD math** across the screener and sector scanner. The screener in particular can't be cached aggressively because users pick arbitrary cutoffs and indicator parameters.
+1. **Step 1 — Shared connection pool for screener workers.** The current code creates a new SQLAlchemy engine with `QueuePool(pool_size=1)` per worker invocation. Fix that to reuse a single shared pool. Five-line change, no new SQL, no new test surface beyond "scan still works." If the bottleneck is connection setup, this alone may be the whole win.
+2. **Step 2 — `fetch_windowed_ohlcv_batch` for the sector scanner only.** A new utility in `data_service.py` that issues one SQL round-trip per scan, returning the windowed primitives the sector scanner needs. Refactor `get_sector_stocks` and `_get_stock_full_metrics_sync` to use it. **Do not touch the screener.** This keeps the highest-stakes code path (`agno_screener._worker_ta_analysis`) unchanged.
+3. **Step 3 — Measurement only.** Add a small `bench/` script that times the screener and sector scanner before and after Step 2. If the gain is < 2×, **stop**. The pre-aggregation complexity is not justified by < 2×.
 
-## Approach
+The original spec's wider scope (worker signature change, screener refactor, top-20 two-pass collapse) is **explicitly not in this version** and should be reconsidered only if a future profile shows it is needed.
 
-Introduce a single pre-aggregation query that, per scan, returns every requested ticker in one row carrying all the **windowed OHLCV primitives** the downstream code needs. pandas-ta still runs in Python on the 250-row window per ticker (that's the math layer we keep), but **all raw OHLCV fetching, window selection, and lookback math moves to one SQL round-trip per scan**.
+## Pre-flight: profile before optimizing
+
+**Required before Step 1.** We currently have no baseline. Without it, "this is faster" is a feeling, not a measurement.
+
+Add temporary timing logs (or a one-shot script) to capture:
+
+- Wall-clock for a full S&P 1500 screener scan (one sample run)
+- Wall-clock for `/api/stocks/XLK` and `/api/top-momentum-leaders`
+- SQLAlchemy event listener counting `engine.connect()` and query executions per scan
+- Time spent in `_worker_ta_analysis` per ticker (process spawn + setup + ta math)
+
+If the screener scan completes in < 10s and the sector scanner in < 2s, **the whole spec is unnecessary** — work on something else.
+
+## Step 1 — Shared connection pool
+
+**Goal:** Remove per-worker engine spin-up cost.
+
+**File:** `backend/app/services/agno_screener.py`
+
+**Current behaviour** (in `_worker_ta_analysis` or wherever the engine is created per-worker): `create_engine(DB_URL, poolclass=QueuePool, pool_size=1)`.
+
+**Proposed change:** Import a shared engine from `app.db.database` (which already exists, used by the rest of the backend). Delete the per-worker `create_engine` call. That's it.
+
+**Why this works:** `QueuePool` already supports concurrent connections across processes when the URL points to the same DB. The `pool_size=1` per worker is artificial; the real issue (if any) is that the engine is being *created* per task rather than *reused* per process.
+
+**Risk:** Very low. SQLAlchemy engines are designed to be long-lived. The only failure mode is if there's hidden global state in the existing engine — quick to check by running the existing test suite.
+
+**Verification:**
+
+- Run the existing screener tests.
+- Run one screener scan; confirm it still returns the same ticker set with the same numbers.
+- If we have timing logs from the pre-flight step, compare wall-clock.
+
+## Step 2 — `fetch_windowed_ohlcv_batch` (sector scanner only)
+
+**Goal:** Replace the 5–7 per-ticker `engine.connect()` blocks in the sector scanner with a single SQL round-trip per scan.
 
 ### Constraints
 
-- **TA indicators stay in Python.** `pandas-ta` / `ta` already does this efficiently on per-series data. Pushing 30+ indicators into SQL window functions is a separate, larger effort and out of scope.
-- **No schema change.** Pure Python-side refactor; no migrations, no new tables, no cron jobs.
-- **No API change.** Response shape of `/api/screener/scan`, `/api/stocks/{sector}`, `/api/top-momentum-leaders` is byte-identical.
+- **No schema change.** Pure Python-side refactor.
+- **No API change.** Response shape of `/api/stocks/{sector}` and `/api/top-momentum-leaders` is byte-identical.
+- **Screener is out of scope.** This PR does not touch `agno_screener.py`.
 - **Preserve mock-data fallbacks.** Existing branches that return mock data when the DB is unavailable stay in place.
 
-## Architecture
+### What this is
 
-Three layers, each with a single responsibility:
+A single new function in `backend/app/services/data_service.py`:
 
-### 1. `app/services/data_service.py:fetch_windowed_ohlcv_batch(tickers, cutoff_date)` (new function)
+```python
+def fetch_windowed_ohlcv_batch(
+    tickers: List[str],
+    cutoff_date: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """One SQL round-trip returning one row per ticker with windowed OHLCV primitives.
 
-- Takes a list of tickers + optional cutoff date.
-- Issues **one SQL query** using `unnest($1::text[])` with a CTE that returns one row per ticker containing every windowed primitive the screener/scanner need.
-- Returns a list of dicts (one per ticker) that downstream code consumes directly.
-- Reuses the existing engine from `app/db/database.py` (no new pool).
-- Per-ticker table sanitization via existing `get_safe_table_name()`.
-
-### 2. `app/services/agno_screener.py:_worker_ta_analysis` (refactor)
-
-- Stop opening its own engine per worker.
-- Accept the pre-aggregated row dict as input.
-- Keep `add_all_ta_features` and `custom_ema_pct_change` as-is (the 30-indicator pandas compute we explicitly preserve).
-- Stop computing `sma_20`, `high_52w`, `avg_vol_50`, `ath`, `atl` separately — these come from the pre-aggregated row.
-- Keep the 250-row `pd.read_sql` for the TA math, **but reuse the shared engine** instead of spinning up a new one.
-
-### 3. `backend/app/routers/sectors.py:_get_stock_full_metrics_sync` and `get_sector_stocks` (refactor)
-
-- Replace the 5-7 per-ticker `engine.connect()` blocks with one call to `fetch_windowed_ohlcv_batch`.
-- Top-20's two-pass structure collapses into one pass — the lightweight summary and full-metrics queries become the same call.
-
-## SQL CTE shape (concrete)
-
-One query, one row per ticker, with these columns:
-
-```
-latest_date          DATE        — most recent trading day on or before cutoff
-latest_close         NUMERIC     — close on latest_date
-latest_volume        BIGINT      — volume on latest_date
-ref_date             DATE        — actual anchor used (may differ from cutoff if no trading day on cutoff)
-ref_close            NUMERIC     — close on ref_date (= latest when cutoff is null)
-ref_volume           BIGINT      — volume on ref_date
-sma_20               NUMERIC     — 20-day SMA of close ending on ref_date
-sd_20                NUMERIC     — 20-day sample stdev of close (for Bollinger)
-sma_50               NUMERIC     — 50-day SMA of close ending on ref_date
-sma_200              NUMERIC     — 200-day SMA of close ending on ref_date (NULL if insufficient history)
-high_10d             NUMERIC     — max("High") over the 10 days ending on ref_date
-avg_vol_20d          NUMERIC     — avg("Volume") over the 20 days ending on ref_date
-close_3m_ago         NUMERIC     — close on the closest trading day ~90 days before ref_date
-close_6m_ago         NUMERIC     — close on the closest trading day ~180 days before ref_date
-sector               TEXT        — from stock_metadata
-name                 TEXT        — from stock_metadata
+    Returns a list of dicts (one per ticker, in input order via ORDINALITY).
+    Missing-table tickers return a row with NULL columns — no exception raised.
+    """
 ```
 
-### Two design points worth flagging
+It uses `unnest($1::text[]) WITH ORDINALITY` plus `LATERAL` joins to a per-ticker table query, returning columns the sector scanner already needs:
 
-- **`unnest($1::text[]) WITH ORDINALITY`** preserves caller-supplied order, so response rows match input list order — important for the two-pass screener that pairs summary rows with full-metrics rows.
-- **`LATERAL` joins** let us dynamically reference the per-row ticker table. The function builds one parameterized SQL string per call: the ticker table names are inlined via `format()` after `get_safe_table_name()` validates them, and every other value (`cutoff_date`, the ticker array itself) goes through SQLAlchemy bound parameters via `text()`. This matches the existing pattern in `sectors.py` (e.g., `get_ticker_performance`) and reuses the same sanitizer gate against SQL injection.
+```
+latest_date, latest_close, latest_volume,
+ref_date, ref_close, ref_volume,
+sma_20, sd_20, sma_50, sma_200,
+high_10d, avg_vol_20d,
+close_3m_ago, close_6m_ago,
+sector, name
+```
+
+### Why LATERAL + format() on table names is acceptable here
+
+The ticker table names are inlined via `format()` **after** `get_safe_table_name()` validates them. Every other value (`cutoff_date`, the ticker array itself) goes through SQLAlchemy bound parameters via `text()`. This matches the existing pattern in `sectors.py` (e.g., `get_ticker_performance`) and reuses the same sanitizer gate against SQL injection. It is not a new pattern; it is the existing one consolidated into one query.
 
 ### Missing-table tolerance
 
-`fetch_windowed_ohlcv_batch` uses `LEFT JOIN ... ON TRUE` semantics for each per-ticker lookup. If a ticker's table doesn't exist (delisted ticker), its row returns with NULL columns. The downstream `_worker_ta_analysis` already filters `df.empty or len(df) < 50`, so it gracefully drops them. No exceptions raised for missing tables.
+`LEFT JOIN ... ON TRUE` semantics for each per-ticker lookup. If a ticker's table doesn't exist (delisted ticker), its row returns with NULL columns. The downstream code already tolerates NULL/short data — no exceptions raised.
 
-## Worker refactor
+### What changes in `sectors.py`
 
-`_worker_ta_analysis` signature becomes:
+**Refactor these two functions:**
 
-```python
-def _worker_ta_analysis(
-    ticker: str,
-    preagg: Dict[str, Any],         # NEW: row from fetch_windowed_ohlcv_batch
-    df: pd.DataFrame,               # EXISTING: 250-row OHLCV window for TA math
-    requested_indicators: List[str],
-    cutoff_date: Optional[str],
-    custom_params: ...
-) -> Optional[Dict]:
-```
+- `get_sector_stocks` — replace per-stock loops with one `fetch_windowed_ohlcv_batch` call.
+- `_get_stock_full_metrics_sync` — same treatment in the top-20 second pass.
 
-- Stop spawning a per-worker SQLAlchemy engine.
-- Stop computing `sma_20`, `high_52w`, `avg_vol_50`, `ath`, `atl` separately.
-- Keep `add_all_ta_features` and `custom_ema_pct_change` as-is.
-- Reuse the shared engine from `data_service.py` for the 250-row pandas-ta fetch (passed in or imported as a module-level singleton).
+**Do not refactor:** `_get_stock_perf_summary_sync` (the top-20 lightweight first pass) **unless** the two-pass structure can be collapsed without risk. If it can, the win is real (one round-trip per scan instead of two). If it can't, leave it alone.
 
-**Net win per scan:**
-- ~1,500 fewer engine spin-ups + disposals.
-- ~1,500 × ~6 fewer DB round-trips.
-- No duplicate SMA/SD/avg-volume math.
+The two-pass collapse is the only design call worth a second look. Default is "do it, it's strictly better"; revisit if tests fail.
 
-## Data flow
+### What does NOT change
 
-### Screener
+- `_worker_ta_analysis` — untouched. Worker signature stays exactly as it is today.
+- Screener response shape — untouched.
+- The top-20 lightweight first pass — untouched (unless two-pass collapse is safe; see above).
+- `get_forward_return`, `get_buy_and_hold_since`, `get_ticker_performance` — untouched. These are short-window targeted queries; the pre-aggregation layer doesn't help them.
 
-```
-POST /api/screener/scan
-  └─ agno_screener.technical_screener()
-       ├─ 1) fetch_windowed_ohlcv_batch(all_tickers, cutoff_date)         ← NEW: 1 SQL query
-       │       → [{ticker, latest_close, sma_20, sd_20, ref_close, ...}, ...]
-       │
-       ├─ 2) ProcessPoolExecutor distributes per-ticker TA compute        ← unchanged math layer
-       │       └─ _worker_ta_analysis(preagg_row, df_250, ...)
-       │
-       └─ 3) Merge + score (compute_filter_match_bonus, base_setup_breakdown)
-              → results (unchanged shape)
-```
+### Forward return and hold-since are still separate
 
-### Sector scanner
+The pre-aggregation is for windowed primitives (sma_20, sd_20, close_3m_ago, etc.). `get_forward_return` and `get_buy_and_hold_since` remain targeted per-stock queries because they need very specific date windows (e.g., close on `ref_date + 30d`). Trying to fold them into the same CTE complicates the SQL for marginal gain.
 
-```
-GET /api/stocks/XLK
-  └─ get_sector_stocks()
-       ├─ 1) fetch_windowed_ohlcv_batch(sector_tickers, cutoff_date)      ← NEW: 1 SQL query
-       │
-       ├─ 2) For each stock: derive Bollinger from CTE's sma_20/sd_20     ← no second query
-       │   (outperformance check uses CTE's perf_3m columns directly)
-       │
-       └─ 3) For stocks that pass filter: forward_return + hold_since_as_of
-              (these still need targeted SQL — short windows, optional follow-up)
-```
+## Step 3 — Measure
 
-### Top-20 momentum leaders
+After Step 2 lands:
 
-```
-GET /api/top-momentum-leaders
-  └─ get_top_momentum_leaders()
-       ├─ 1) fetch_windowed_ohlcv_batch(all_tickers, cutoff_date)        ← NEW: 1 SQL query
-       │
-       ├─ 2) Sort by perf_3m desc, take top 20                            ← in-memory
-       │
-       └─ 3) For each top-20: forward_return + hold_since_as_of
-              (these still need targeted SQL — single-stock queries)
-```
+- Re-run the timing logs from the pre-flight step.
+- Compare sector scanner wall-clock and SQLAlchemy event counts.
+- **If improvement is < 2×:** document the result in this spec file under a "Results" section, declare done, and move on.
+- **If improvement is ≥ 2×:** the approach is validated. The screener refactor (original spec, Section 5 of the first draft) is now evidence-justified and can be considered for a separate PR.
 
-The two-pass structure collapses because the lightweight summary and full-metrics queries become the same call.
+## What this spec is NOT
 
-## Error handling
+To be explicit about what is **out of scope** for this reduced plan:
 
-- **Empty ticker list:** `fetch_windowed_ohlcv_batch` returns `[]`.
-- **Invalid ticker:** existing `get_safe_table_name()` raises `ValueError` for malformed tickers — propagated to caller.
-- **Missing table for a ticker (delisted):** row with NULL columns returned; no exception raised.
-- **Database unavailable:** all callers fall back to mock-data branches that already exist in `screener.py` and `sectors.py`.
-- **Cutoff date is None:** CTE falls back to "latest available close" for both `latest_*` and `ref_*` columns; downstream code already tolerates this.
-- **Worker crash mid-scan:** existing `ProcessPoolExecutor` already swallows per-task exceptions and returns None for that ticker.
+- **Screener refactor.** `agno_screener._worker_ta_analysis` and the ProcessPoolExecutor fan-out are unchanged. The original spec proposed changing the worker signature to take a pre-aggregated row; that change is not in this version.
+- **Top-20 two-pass collapse.** Only attempted if it can be done without touching the lightweight pass's return contract.
+- **Precomputed `daily_indicators` table** populated by cron or trigger. Bigger, longer spec — separate effort if ever needed.
+- **Async SQLAlchemy (asyncpg)** across FastAPI handlers. Separate effort.
+- **Pushing TA indicators into SQL window functions.** Would require rewriting ~30 indicators as window functions and maintaining them in two places.
+- **Markov and QuantGen refactor.** They have similar patterns but are not called from the screener/scanner; separate effort if ever needed.
 
 ## Testing
 
-### New unit tests (`backend/tests/services/test_preagg.py`)
+### Step 1
 
-- Empty ticker list returns `[]`.
-- Single ticker returns correct row with all 17+ columns populated.
-- Invalid ticker (sanitizer-rejected) raises `ValueError`.
-- Missing table for a delisted ticker → row with NULL columns (no exception).
-- Cutoff date honored: ref_* columns point to closest trading day on or before cutoff.
-- Result order matches input order (ORDINALITY preserved).
+- Existing screener tests pass.
+- One manual screener scan returns the same ticker set + numbers as before.
 
-### Existing tests
+### Step 2
 
-- `backend/tests/test_sectors.py` shape assertions continue to pass — response shape doesn't change, only the internals.
-- Existing screener tests (if any) continue to pass for the same reason.
+- New `backend/tests/services/test_preagg.py` (~50 lines):
+  - Empty ticker list returns `[]`.
+  - Single ticker returns correct row with all 17+ columns populated.
+  - Invalid ticker (sanitizer-rejected) raises `ValueError`.
+  - Missing table for a delisted ticker → row with NULL columns (no exception).
+  - Cutoff date honored: `ref_*` columns point to closest trading day on or before cutoff.
+  - Result order matches input order (ORDINALITY preserved).
+- Existing `backend/tests/test_sectors.py` shape assertions continue to pass — response shape doesn't change, only the internals.
 
-### Optional manual performance regression
+### Step 3
 
-Time a screener scan against the 1,500-ticker universe before and after; target:
-- **≥ 4× wall-clock improvement** on the same hardware.
-- **≥ 80% reduction in DB round-trips** (measured via SQLAlchemy event listener).
-
-This is a manual check, not a CI gate — included as a way to validate the refactor landed the intended win.
+- Manual `bench/` script captures before/after wall-clock and SQLAlchemy event counts. Documented in this spec's "Results" section.
 
 ## Backward compatibility
 
-- No API shape change.
+- No API shape change (screener or sector scanner).
 - No schema change.
-- Pure Python-side refactor; deployable as a normal commit.
-- Roll-back: revert the PR.
-- Existing cache (`backend/app/services/cache.py`) untouched — pre-aggregation is orthogonal to caching.
-
-## Out of scope (called out for honesty)
-
-- **Precomputed `daily_indicators` table** populated by cron or trigger. Bigger, longer spec — separate effort.
-- **Async SQLAlchemy (asyncpg)** across FastAPI handlers. Separate effort.
-- **Pushing TA indicators into SQL window functions.** Would require rewriting ~30 indicators as window functions and maintaining them in two places.
-- **Markov and QuantGen optimizer refactor.** They have similar patterns but are not called from screener/scanner; separate effort if you want them.
+- Step 1 is a single-line import swap in `agno_screener.py`.
+- Step 2 changes internals only; response shape preserved.
+- Roll-back: revert the commit.
 
 ## Critical files
 
-- `backend/app/services/data_service.py` — add `fetch_windowed_ohlcv_batch`.
-- `backend/app/services/agno_screener.py` — refactor `_worker_ta_analysis`, update call site in `technical_screener`.
-- `backend/app/routers/sectors.py` — refactor `get_sector_stocks` and `_get_stock_full_metrics_sync`; collapse top-20 two-pass.
-- `backend/tests/services/test_preagg.py` — new test file (~50 lines).
+- `backend/app/services/agno_screener.py` — Step 1: swap per-worker engine for shared engine.
+- `backend/app/services/data_service.py` — Step 2: add `fetch_windowed_ohlcv_batch`.
+- `backend/app/routers/sectors.py` — Step 2: refactor `get_sector_stocks` and `_get_stock_full_metrics_sync`.
+- `backend/tests/services/test_preagg.py` — Step 2: new test file.
 - `backend/tests/test_sectors.py` — confirm existing shape assertions still pass.
+- `bench/screener_timing.py` (new) — Step 3: timing script.
 
 ## Verification
 
-1. Restart backend (`cd backend && ./venv/bin/python -m app.main`).
-2. Run `cd backend && ./venv/bin/python -m pytest tests/ -q` — all existing tests pass.
-3. Run new `backend/tests/services/test_preagg.py` — all pass.
-4. Time a full screener scan (manually trigger via the frontend or `curl POST /api/screener/scan` with a saved screen). Compare to baseline. Target ≥ 4× improvement.
-5. Trigger `/api/stocks/XLK` and `/api/top-momentum-leaders` — response shapes unchanged; latencies improved.
-6. SQLAlchemy event listener log shows ~80% fewer queries per scan.
+1. **Pre-flight (required):** Add timing logs / run a one-shot timing script. Capture wall-clock for screener scan, sector scan, top-20. If screener < 10s and sector < 2s, stop and delete this spec.
+2. **Step 1:**
+   - Restart backend; run screener tests.
+   - Time one scan before and after; record the delta.
+3. **Step 2:**
+   - Restart backend; run `pytest tests/ -q`.
+   - Run new `test_preagg.py`; all pass.
+   - Time one `/api/stocks/XLK` and one `/api/top-momentum-leaders` before and after; record the delta.
+   - SQLAlchemy event listener log shows fewer round-trips.
+4. **Step 3:** Write the timing results into a "Results" section in this file. If < 2× gain, declare done. If ≥ 2×, the approach is validated and the screener can be considered in a future PR.
 
 ## Implementation plan
 
-This spec will be handed to the writing-plans skill to produce a detailed implementation plan with task breakdowns and dependencies.
+When this is picked up, the writing-plans skill will produce a task-by-task plan with dependencies. The plan should respect the three-step ordering: each step lands on its own commit, with tests + measurement, before the next step starts.
