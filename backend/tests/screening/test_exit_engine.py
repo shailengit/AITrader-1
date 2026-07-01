@@ -10,6 +10,9 @@ from app.services.backtest.exit_engine import (
     evaluate_take_profit,
     evaluate_trailing_stop,
     evaluate_trend_break,
+    ExitConfig,
+    TradeResult,
+    simulate_position,
 )
 
 
@@ -104,3 +107,86 @@ def test_trend_break_no_trigger_when_close_stays_above_sma():
     bars = _bars(closes)
     state = PositionState(entry_price=100.0, high_water_mark=100.0, mfe_pct=0.0, mae_pct=0.0)
     assert evaluate_trend_break(bars, state, sma_n=20) is None
+
+
+def test_simulate_position_stop_loss_fires_first():
+    # entry 100, day 0: +2% (no trigger), day 1: -10% (stop_loss fires before take_profit would on day 3)
+    closes = [100.0, 102.0, 90.0, 130.0]
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.08, take_profit_pct=0.20,
+        trailing_stop_pct=0.0, trend_break_sma=0, max_holding_days=0,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    assert t.exit_reason == "stop_loss"
+    assert t.exit_price == 90.0
+    assert t.pnl_pct == pytest.approx(-0.10, abs=1e-6)
+    assert t.pnl_dollars == pytest.approx(-500.0, abs=1e-6)
+    assert t.holding_days == 2  # day index 2 in the walk (entry at idx 0)
+
+
+def test_simulate_position_take_profit_fires():
+    closes = [100.0, 110.0, 125.0, 130.0]
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.08, take_profit_pct=0.20,
+        trailing_stop_pct=0.0, trend_break_sma=0, max_holding_days=0,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    assert t.exit_reason == "take_profit"
+    assert t.exit_price == 125.0
+    assert t.pnl_pct == pytest.approx(0.25, abs=1e-6)
+
+
+def test_simulate_position_trend_break_only():
+    closes = [100.0] * 20 + [110.0] * 5 + [95.0, 90.0]
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.0, take_profit_pct=0.0,
+        trailing_stop_pct=0.0, trend_break_sma=20, max_holding_days=0,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    assert t.exit_reason == "trend_break"
+
+
+def test_simulate_position_max_lookback_forces_exit():
+    closes = [100.0 + 0.01 * i for i in range(30)]   # monotonic up, no other rule fires
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.0, take_profit_pct=0.0,
+        trailing_stop_pct=0.0, trend_break_sma=0, max_holding_days=10,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    assert t.exit_reason == "max_lookback"
+    # holding_days = exit_idx (entry at idx 0, exit at idx 9 → 9 bars held)
+    assert t.holding_days == 9
+    assert t.exit_price == pytest.approx(100.09, abs=1e-6)
+
+
+def test_simulate_position_no_rules_uses_max_lookback_zero_as_data_unavailable():
+    closes = [100.0, 101.0, 102.0]
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.0, take_profit_pct=0.0,
+        trailing_stop_pct=0.0, trend_break_sma=0, max_holding_days=0,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    # No rules and no max_lookback → engine should not crash; either
+    # exit at last bar with reason 'max_lookback' (length-based) or 'data_unavailable'.
+    # The contract chosen here: if max_lookback == 0, exit at the last bar with
+    # reason 'max_lookback' (the orchestrator treats it as "use the data we have").
+    assert t.exit_reason in ("max_lookback", "data_unavailable")
+    assert t.exit_idx == len(bars) - 1
+
+
+def test_simulate_position_tracks_mfe_mae():
+    closes = [100.0, 120.0, 110.0, 95.0, 80.0]
+    bars = _bars(closes)
+    cfg = ExitConfig(
+        stop_loss_pct=0.50, take_profit_pct=0.0,   # only stop would fire at -50% but max drop is -20%
+        trailing_stop_pct=0.0, trend_break_sma=0, max_holding_days=0,
+    )
+    t = simulate_position("AAPL", bars, entry_price=100.0, dollars=5_000.0, config=cfg)
+    # No stop/take fires, so walk reaches end → mfe = 0.20, mae = -0.20
+    assert t.mfe_pct == pytest.approx(0.20, abs=1e-6)
+    assert t.mae_pct == pytest.approx(-0.20, abs=1e-6)
