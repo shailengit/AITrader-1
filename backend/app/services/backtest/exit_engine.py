@@ -61,3 +61,42 @@ def evaluate_take_profit(
         if close >= threshold:
             return ExitSignal(exit_idx=i, reason="take_profit", exit_price=float(close))
     return None
+
+
+def evaluate_trailing_stop(
+    bars: pd.DataFrame, state: PositionState, pct: float
+) -> Optional[ExitSignal]:
+    """Return ExitSignal on the first bar where close drops by pct from its
+    running high-water mark (entry_price updated to each new high).
+    """
+    if pct <= 0:
+        return None
+    hwm = state.entry_price
+    for i, close in enumerate(bars["Close"]):
+        if close > hwm:
+            hwm = float(close)
+        if hwm > 0 and (hwm - close) / hwm >= pct:
+            return ExitSignal(exit_idx=i, reason="trailing_stop", exit_price=float(close))
+    return None
+
+
+def evaluate_trend_break(
+    bars: pd.DataFrame, state: PositionState, sma_n: int
+) -> Optional[ExitSignal]:
+    """Return ExitSignal on the first bar where close < SMA(sma_n) computed
+    on all bars up to and including the current bar.
+
+    Note: we use the *full* rolling window, not just bars since entry, so the
+    SMA is well-formed immediately after the warmup (window-1) bars. The
+    orchestrator is responsible for slicing the input bars to start at entry.
+    """
+    if sma_n < 2:
+        return None
+    sma = bars["Close"].rolling(window=sma_n).mean()
+    for i in range(len(bars)):
+        v = sma.iloc[i]
+        if pd.notna(v) and bars["Close"].iloc[i] < v:
+            return ExitSignal(
+                exit_idx=i, reason="trend_break", exit_price=float(bars["Close"].iloc[i])
+            )
+    return None
