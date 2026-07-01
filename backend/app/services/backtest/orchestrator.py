@@ -99,19 +99,26 @@ def get_ohlcv_for_backtest(ticker: str, start_date, end_date) -> pd.DataFrame:
 
 
 def get_spy_bars(start_date, end_date) -> pd.DataFrame:
-    """Fetch SPY bars over the backtest window. Same shape as ticker bars."""
+    """Fetch SPY bars over the backtest window. Tries multiple tickers/cases
+    (the existing backtest-hold endpoint tries "SPY" then "spy") and returns
+    an empty DataFrame on miss — the alpha helper treats empty SPY as 0%.
+    """
     from app.services.data_service import get_data
-    df = get_data(
-        ticker="SPY",
-        start_date=start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),
-        end_date=end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
-        frequency="daily",
-    )
-    if df is None or df.empty:
-        return pd.DataFrame()
-    if "Date" not in df.columns and df.index.name == "Date":
-        df = df.reset_index()
-    return df.reset_index(drop=True)
+    start_str = start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date)
+    end_str = end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date)
+    for ticker in ("SPY", "spy", "SPY_PROXY"):
+        try:
+            df = get_data(ticker=ticker, start_date=start_str, end_date=end_str, frequency="daily")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.debug("SPY fetch failed for %s: %s", ticker, exc)
+            df = None
+        if df is None or df.empty:
+            continue
+        if "Date" not in df.columns and df.index.name == "Date":
+            df = df.reset_index()
+        return df.reset_index(drop=True)
+    logger.warning("SPY data unavailable for backtest window %s..%s; alpha will be 0", start_str, end_str)
+    return pd.DataFrame()
 
 
 # ---------------------------------------------------------------------------
