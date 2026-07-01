@@ -25,6 +25,8 @@ from app.services.agno_screener import (
     parse_quant_filters
 )
 from app.services.pdf_generator import generate_screener_report
+from app.services.screening.chart_data import get_chart_data
+from app.utils.security import get_safe_table_name, sanitize_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,14 @@ scan_queues: Dict[str, asyncio.Queue] = {}
 # Models
 # =============================================================================
 
+class CustomCompositeDef(BaseModel):
+    """User-defined composite metric combining two indicators."""
+    name: str
+    left_indicator: str
+    right_indicator: str
+    operation: Literal["add", "subtract", "multiply", "divide", "ratio_pct"]
+
+
 class ScanRequest(BaseModel):
     """Scan request model."""
     mode: Literal["dormant_giant", "quant_strategy"] = "dormant_giant"
@@ -51,6 +61,7 @@ class ScanRequest(BaseModel):
     max_results: int = 50
     filters: Optional[Dict[str, Any]] = None
     base_weight: Optional[int] = 60  # 0-100, percent weight for base setup score in quant strategy
+    custom_composites: Optional[List[CustomCompositeDef]] = None  # User-defined composite metrics
 
 
 class ScanResult(BaseModel):
@@ -92,6 +103,54 @@ class ParseFiltersResponse(BaseModel):
     """Response containing parsed QuantFilters."""
     filters: Dict[str, Any]
     raw_prompt: str
+
+
+# =============================================================================
+# Backtest Hold Models
+# =============================================================================
+
+class BacktestHoldRequest(BaseModel):
+    """Buy-and-hold backtest request."""
+    tickers: List[str]
+    as_of_date: str  # ISO date string, e.g. "2024-01-15"
+
+
+class TickerBacktestResult(BaseModel):
+    """Single ticker backtest result."""
+    ticker: str
+    buy_price: float
+    current_price: float
+    return_pct: float
+    buy_date: str
+
+
+class BacktestAggregate(BaseModel):
+    """Aggregate statistics across tickers."""
+    avg_return_pct: float
+    median_return_pct: float
+    best: Dict[str, Any]  # {"ticker": str, "return_pct": float}
+    worst: Dict[str, Any]
+    equal_weight_portfolio_return_pct: float
+
+
+class BenchmarkResult(BaseModel):
+    """SPY benchmark result."""
+    ticker: str = "SPY"
+    buy_price: float
+    current_price: float
+    return_pct: float
+
+
+class BacktestHoldResponse(BaseModel):
+    """Buy-and-hold backtest response."""
+    as_of_date: str
+    as_of_actual: str  # closest trading day on or before as_of_date
+    latest_date: str
+    days_held: int
+    ticker_results: List[TickerBacktestResult]
+    aggregate: BacktestAggregate
+    benchmark: BenchmarkResult
+    alpha_pct: float
 
 
 # =============================================================================
@@ -432,6 +491,297 @@ async def screener_health():
 
 
 # =============================================================================
+# Chart Data Endpoint
+# =============================================================================
+
+@router.get("/chart-data/{ticker}")
+async def chart_data(
+    ticker: str,
+    indicators: str = "",
+    days: int = 250,
+    overrides: str = "",
+):
+    """
+    Fetch OHLCV bars for a single ticker, with the requested indicator time
+    series embedded per-bar. Powers the per-row Chart button in the Custom
+    Screener — the scan result row carries current snapshot values, but the
+    chart needs the historical series so the user can visually inspect the
+    indicator at and around the as-of-date.
+
+    Query params:
+        ticker:     Ticker symbol (will be sanitized).
+        indicators: Comma-separated backend column names (e.g. "ema_20,sma_200").
+                    Each must exist in INDICATOR_REGISTRY or be auto-produced
+                    by add_all_ta_features. Unknown columns are silently
+                    dropped (the chart simply shows no overlay for them).
+        days:       Calendar days of history (default 250). Lower than ~200
+                    will produce unusable SMA/EMA 200 values. There is no
+                    hard upper bound; pass a very large value (e.g. 10000)
+                    to fetch the full history for a long-listed ticker.
+        overrides:  Optional JSON object mapping column → custom params for
+                    indicators that need non-default parameters. Example:
+                    `overrides={"ema_20":{"window":200}}` requests a 200-
+                    period EMA rooted at the `ema_20` indicator. Each
+                    (column, params) pair gets a unique payload key in the
+                    output (`<column>__<sig>`) so the frontend can render
+                    both side by side.
+
+    Returns: List of {time, open, high, low, close, volume, indicators: {...}}
+    bars ordered oldest-first. Empty list when the ticker has no data. The
+    `indicators` dict is keyed by `<column>` for default-param requests and
+    `<column>__<sig>` for override requests, so callers must look up by
+    the same key they requested.
+    """
+    try:
+        safe = sanitize_ticker(ticker)
+        if not safe:
+            raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+
+    indicator_list = [c.strip() for c in indicators.split(",") if c.strip()]
+
+    overrides_map: Dict[str, Dict[str, Any]] = {}
+    if overrides:
+        try:
+            parsed = json.loads(overrides)
+            if not isinstance(parsed, dict):
+                raise ValueError("overrides must be a JSON object")
+            for col, params in parsed.items():
+                if not isinstance(params, dict):
+                    continue
+                # Coerce numeric values to int where possible — query params
+                # arrive as strings otherwise.
+                cleaned: Dict[str, Any] = {}
+                for k, v in params.items():
+                    if isinstance(v, (int, float)):
+                        cleaned[k] = int(v) if float(v).is_integer() else v
+                    elif isinstance(v, str):
+                        try:
+                            cleaned[k] = int(v)
+                        except ValueError:
+                            try:
+                                cleaned[k] = float(v)
+                            except ValueError:
+                                cleaned[k] = v
+                    else:
+                        cleaned[k] = v
+                overrides_map[col] = cleaned
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid overrides JSON: {exc}"
+            ) from exc
+
+    bars = await run_in_threadpool(
+        get_chart_data, ticker, indicator_list, days, overrides_map
+    )
+    return bars or []
+
+
+# =============================================================================
+# Backtest Hold Endpoint
+# =============================================================================
+
+@router.post("/backtest-hold", response_model=BacktestHoldResponse)
+async def backtest_hold(request: BacktestHoldRequest):
+    """
+    Buy-and-hold backtest from as_of_date to latest available date.
+
+    Synchronous, stateless -- no scan_id needed.
+    For each ticker, finds the closest trading day on or before as_of_date,
+    records the buy price, then compares against the latest available close.
+    Includes SPY benchmark and alpha calculation.
+    """
+    from datetime import datetime, date
+
+    # 1. Validate inputs
+    if not request.tickers:
+        raise HTTPException(status_code=400, detail="tickers required")
+
+    as_of = datetime.strptime(request.as_of_date, "%Y-%m-%d").date()
+    if as_of > date.today():
+        raise HTTPException(status_code=400, detail="as_of_date must be on or before today")
+
+    # 2. Get latest available date from database
+    from app.db import database
+    from sqlalchemy import text
+
+    with database.engine.connect() as conn:
+        latest_result = conn.execute(text('SELECT MAX("Date") FROM aapl'))
+        latest_date = latest_result.scalar()
+
+    if latest_date is None:
+        raise HTTPException(status_code=500, detail="Could not determine latest trading date")
+
+    # 3. For each ticker, get buy price and current price
+    from app.utils.security import get_safe_table_name
+
+    ticker_results = []
+    for ticker in request.tickers:
+        try:
+            safe_table = get_safe_table_name(ticker)
+        except ValueError:
+            continue  # Skip invalid tickers
+
+        with database.engine.connect() as conn:
+            # Buy price: closest trading day on or before as_of_date
+            buy_query = text(
+                f'SELECT "Date", "Close" FROM "{safe_table}" WHERE "Date" <= :as_of ORDER BY "Date" DESC LIMIT 1'
+            )
+            buy_result = conn.execute(buy_query, {"as_of": request.as_of_date}).fetchone()
+
+            # Current price: latest available
+            current_query = text(f'SELECT "Date", "Close" FROM "{safe_table}" ORDER BY "Date" DESC LIMIT 1')
+            current_result = conn.execute(current_query).fetchone()
+
+        if buy_result is None or current_result is None:
+            continue
+
+        buy_price = float(buy_result[1])
+        current_price = float(current_result[1])
+        buy_date = str(buy_result[0])[:10]  # Trim time component if present
+
+        if buy_price > 0:
+            return_pct = round((current_price - buy_price) / buy_price * 100, 2)
+        else:
+            return_pct = 0.0
+
+        ticker_results.append({
+            "ticker": ticker.upper(),
+            "buy_price": round(buy_price, 2),
+            "current_price": round(current_price, 2),
+            "return_pct": return_pct,
+            "buy_date": buy_date,
+        })
+
+    # 4. Compute aggregate stats
+    if ticker_results:
+        returns = [r["return_pct"] for r in ticker_results]
+        avg_return = round(sum(returns) / len(returns), 2)
+        sorted_returns = sorted(ticker_results, key=lambda r: r["return_pct"], reverse=True)
+        median_return = round(sorted(returns)[len(returns) // 2], 2)
+        best = {"ticker": sorted_returns[0]["ticker"], "return_pct": sorted_returns[0]["return_pct"]}
+        worst = {"ticker": sorted_returns[-1]["ticker"], "return_pct": sorted_returns[-1]["return_pct"]}
+        portfolio_return = round(sum(returns) / len(returns), 2)  # Equal-weighted
+    else:
+        avg_return = 0.0
+        median_return = 0.0
+        best = {"ticker": "", "return_pct": 0.0}
+        worst = {"ticker": "", "return_pct": 0.0}
+        portfolio_return = 0.0
+
+    # 5. SPY benchmark (table may not exist in all databases)
+    try:
+        with database.engine.connect() as conn:
+            # Try uppercase first (PostgreSQL convention in this DB), then lowercase
+            spy_buy = None
+            spy_current = None
+            for spy_table in ('"SPY"', '"spy"'):
+                try:
+                    spy_buy = conn.execute(
+                        text(f'SELECT "Date", "Close" FROM {spy_table} WHERE "Date" <= :as_of ORDER BY "Date" DESC LIMIT 1'),
+                        {"as_of": request.as_of_date}
+                    ).fetchone()
+                    if spy_buy:
+                        break
+                except Exception:
+                    continue
+            for spy_table in ('"SPY"', '"spy"'):
+                try:
+                    spy_current = conn.execute(
+                        text(f'SELECT "Date", "Close" FROM {spy_table} ORDER BY "Date" DESC LIMIT 1')
+                    ).fetchone()
+                    if spy_current:
+                        break
+                except Exception:
+                    continue
+
+        if spy_buy and spy_current and float(spy_buy[1]) > 0:
+            spy_return = round((float(spy_current[1]) - float(spy_buy[1])) / float(spy_buy[1]) * 100, 2)
+        else:
+            spy_return = 0.0
+    except Exception:
+        logger.warning("SPY table not available, skipping benchmark")
+        spy_return = 0.0
+        spy_buy = None
+        spy_current = None
+
+    # 6. Alpha
+    alpha = round(portfolio_return - spy_return, 2)
+
+    # 7. Days held
+    as_of_actual = ticker_results[0]["buy_date"] if ticker_results else request.as_of_date
+    latest_date_dt = latest_date.date() if isinstance(latest_date, datetime) else latest_date
+    as_of_actual_dt = datetime.strptime(as_of_actual, "%Y-%m-%d").date()
+    days_held = (latest_date_dt - as_of_actual_dt).days if ticker_results else 0
+
+    return BacktestHoldResponse(
+        as_of_date=request.as_of_date,
+        as_of_actual=as_of_actual,
+        latest_date=str(latest_date),
+        days_held=days_held,
+        ticker_results=[TickerBacktestResult(**r) for r in ticker_results],
+        aggregate=BacktestAggregate(
+            avg_return_pct=avg_return,
+            median_return_pct=median_return,
+            best=best,
+            worst=worst,
+            equal_weight_portfolio_return_pct=portfolio_return,
+        ),
+        benchmark=BenchmarkResult(
+            ticker="SPY",
+            buy_price=round(float(spy_buy[1]), 2) if spy_buy else 0.0,
+            current_price=round(float(spy_current[1]), 2) if spy_current else 0.0,
+            return_pct=spy_return,
+        ),
+        alpha_pct=alpha,
+    )
+
+
+# =============================================================================
+# Screener-driven exit backtest (POST /api/screener/backtest-exit)
+# =============================================================================
+
+from app.services.backtest.schemas import (  # noqa: E402  (placed here so file-local imports stay grouped)
+    BacktestExitRequest,
+    BacktestExitResponse,
+    DEFAULT_TOTAL_CAPITAL,
+)
+
+
+@router.post("/backtest-exit", response_model=BacktestExitResponse)
+def backtest_exit(req: BacktestExitRequest) -> BacktestExitResponse:
+    """Run a screener at an as-of date, pick top N, simulate each position
+    independently with the user-configured exit rules, and return the
+    per-trade ledger, summary stats, equity curve, and SPY alpha.
+
+    This is a stub in Task 9; the real orchestration is wired in Task 10.
+    """
+    return BacktestExitResponse(
+        config={
+            "as_of_date": req.as_of_date.isoformat(),
+            "top_n": req.top_n,
+            "sizing": req.sizing.model_dump(),
+            "exit_rules": req.exit_rules.model_dump(),
+            "total_capital": DEFAULT_TOTAL_CAPITAL,
+        },
+        warnings=[],
+        per_trade=[],
+        summary={
+            "total_return_pct": 0.0, "annualized_return_pct": 0.0,
+            "sharpe": 0.0, "sortino": 0.0, "max_drawdown_pct": 0.0,
+            "win_rate_pct": 0.0, "profit_factor": 0.0,
+            "avg_winner_pct": 0.0, "avg_loser_pct": 0.0,
+            "avg_holding_days": 0.0,
+            "n_trades": 0, "n_winners": 0, "n_losers": 0,
+        },
+        equity_curve=[],
+        drawdown_curve=[],
+        benchmark={"spy_return_pct": 0.0, "alpha_pct": 0.0, "spy_equity_curve": []},
+    )
+
+
+# =============================================================================
 # Background task
 # =============================================================================
 
@@ -499,6 +849,9 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                     )
                 )
             else:
+                custom_composites_list = None
+                if request.custom_composites:
+                    custom_composites_list = [c.model_dump() for c in request.custom_composites]
                 result = await run_in_threadpool(
                     lambda: run_quant_strategy_screener(
                         prompt=request.prompt or "Find me candidates for a high-growth breakout. Technically, they should be in a Volatility Squeeze (volatility_bbw). Fundamentally, they must have positive QoQ revenue growth.",
@@ -506,7 +859,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         progress_callback=update_progress,
                         log_callback=update_logs,
                         filters=request.filters,
-                        base_weight=request.base_weight
+                        base_weight=request.base_weight,
+                        custom_composites=custom_composites_list
                     )
                 )
         else:
