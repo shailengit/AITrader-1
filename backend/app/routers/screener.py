@@ -754,31 +754,9 @@ def backtest_exit(req: BacktestExitRequest) -> BacktestExitResponse:
     """Run a screener at an as-of date, pick top N, simulate each position
     independently with the user-configured exit rules, and return the
     per-trade ledger, summary stats, equity curve, and SPY alpha.
-
-    This is a stub in Task 9; the real orchestration is wired in Task 10.
     """
-    return BacktestExitResponse(
-        config={
-            "as_of_date": req.as_of_date.isoformat(),
-            "top_n": req.top_n,
-            "sizing": req.sizing.model_dump(),
-            "exit_rules": req.exit_rules.model_dump(),
-            "total_capital": DEFAULT_TOTAL_CAPITAL,
-        },
-        warnings=[],
-        per_trade=[],
-        summary={
-            "total_return_pct": 0.0, "annualized_return_pct": 0.0,
-            "sharpe": 0.0, "sortino": 0.0, "max_drawdown_pct": 0.0,
-            "win_rate_pct": 0.0, "profit_factor": 0.0,
-            "avg_winner_pct": 0.0, "avg_loser_pct": 0.0,
-            "avg_holding_days": 0.0,
-            "n_trades": 0, "n_winners": 0, "n_losers": 0,
-        },
-        equity_curve=[],
-        drawdown_curve=[],
-        benchmark={"spy_return_pct": 0.0, "alpha_pct": 0.0, "spy_equity_curve": []},
-    )
+    from app.services.backtest.orchestrator import run_backtest
+    return run_backtest(req)
 
 
 # =============================================================================
