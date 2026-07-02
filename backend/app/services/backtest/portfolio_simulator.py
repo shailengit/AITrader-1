@@ -186,6 +186,7 @@ def compute_summary(
 def compute_spy_alpha(
     equity_curve: List[Dict[str, Any]],
     spy_bars: pd.DataFrame,
+    trades: List[TradeResult],
     total_capital: float,
 ) -> Dict[str, Any]:
     """Compare the portfolio equity curve to a buy-and-hold of SPY over the
@@ -217,9 +218,16 @@ def compute_spy_alpha(
     ]
     spy_return_pct = (float(spy["nav"].iloc[-1]) - total_capital) / total_capital * 100
 
+    # Portfolio return: use the per-trade total_pnl / total_capital from the
+    # summary, not the raw equity_curve endpoints. The equity curve tracks
+    # only the *open-position* MTM slice (no forward-fill, no cash recycling),
+    # so its endpoints are not comparable to a normalized SPY buy-and-hold
+    # starting at `total_capital`. The summary's total_return_pct is the
+    # apples-to-apples figure: it sums every trade's pnl_dollars (realized
+    # P&L) against the $100k pool.
     portfolio_return_pct = (
-        (equity_curve[-1]["value"] - equity_curve[0]["value"]) / equity_curve[0]["value"] * 100
-        if equity_curve[0]["value"] > 0
+        sum(t.pnl_dollars for t in trades) / total_capital * 100
+        if total_capital
         else 0.0
     )
     return {

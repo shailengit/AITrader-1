@@ -224,7 +224,7 @@ def run_backtest(req: BacktestExitRequest) -> BacktestExitResponse:
 
     # SPY alpha
     spy_bars = get_spy_bars(req.as_of_date, end_date)
-    benchmark = sim.compute_spy_alpha(equity_curve, spy_bars, total_capital=DEFAULT_TOTAL_CAPITAL)
+    benchmark = sim.compute_spy_alpha(equity_curve, spy_bars, trades, total_capital=DEFAULT_TOTAL_CAPITAL)
 
     # Build per_trade response entries
     sector_by_ticker = {c["ticker"]: c.get("sector") for c in candidates}

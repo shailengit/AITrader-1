@@ -10,7 +10,7 @@ from app.services.backtest.portfolio_simulator import (
     compute_summary,
     compute_spy_alpha,
 )
-from app.services.backtest.exit_engine import ExitConfig
+from app.services.backtest.exit_engine import ExitConfig, TradeResult
 
 
 def _bars(closes, start="2024-01-01"):
@@ -148,9 +148,17 @@ def test_compute_spy_alpha_simple():
         "Date": pd.date_range(start_dt, end_dt, freq="D"),
         "Close": [400.0, 410.0, 420.0],   # +5% over 3 days
     })
-    out = compute_spy_alpha(eq, spy, total_capital=100_000.0)
+    # Trades that produced +10% portfolio return on $100k:
+    # two trades of $50k each, +20% and 0% (avg +10% → +$10k total).
+    trades = [
+        TradeResult("A", "2024-01-01", 100.0, "2024-01-03", 120.0,
+                    "take_profit", 2, 10_000.0, 0.20, 0.20, -0.05, 2),
+        TradeResult("B", "2024-01-01", 100.0, "2024-01-03", 100.0,
+                    "max_lookback", 2, 0.0, 0.0, 0.05, -0.05, 2),
+    ]
+    out = compute_spy_alpha(eq, spy, trades, total_capital=100_000.0)
     assert out["spy_return_pct"] == pytest.approx(5.0, abs=1e-6)
-    # portfolio +10%, SPY +5% → alpha = +5%
+    # portfolio +10% (sum pnl_dollars 10000 / 100k = 10%), SPY +5% → alpha = +5%
     assert out["alpha_pct"] == pytest.approx(5.0, abs=1e-6)
     assert len(out["spy_equity_curve"]) == 3
     assert out["spy_equity_curve"][0]["value"] == pytest.approx(100_000.0)
@@ -168,7 +176,13 @@ def test_compute_spy_alpha_negative_alpha():
         "Date": pd.date_range(start_dt, end_dt, freq="D"),
         "Close": [400.0, 405.0, 410.0],   # +2.5%
     })
-    out = compute_spy_alpha(eq, spy, total_capital=100_000.0)
+    # Trades that produced -7.5% portfolio return on $100k:
+    # one trade $50k at -15% → -$7500.
+    trades = [
+        TradeResult("A", "2024-01-01", 100.0, "2024-01-03", 85.0,
+                    "stop_loss", 2, -7_500.0, -0.15, -0.05, -0.15, 2),
+    ]
+    out = compute_spy_alpha(eq, spy, trades, total_capital=100_000.0)
     assert out["spy_return_pct"] == pytest.approx(2.5, abs=1e-6)
-    # portfolio -5%, SPY +2.5% → alpha = -7.5
-    assert out["alpha_pct"] == pytest.approx(-7.5, abs=1e-6)
+    # portfolio -7.5% (sum pnl_dollars -7500 / 100k = -7.5%), SPY +2.5% → alpha = -10%
+    assert out["alpha_pct"] == pytest.approx(-10.0, abs=1e-6)
