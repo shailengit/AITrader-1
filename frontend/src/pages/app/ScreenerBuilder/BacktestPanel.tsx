@@ -94,6 +94,12 @@ interface BacktestExitResponse {
 interface BacktestPanelProps {
   tickers: string[];
   asOfDate: string; // ISO date string, e.g. "2024-01-15"
+  customFilters?: Record<string, any>; // Flat backend-format filters from the user's
+                                       // current Custom Screener. Required when the
+                                       // user picks Screener="Custom" in this panel;
+                                       // without it, the backend runs the custom
+                                       // screener with no filter set and returns
+                                       // a totally different stock list.
   onClose?: () => void;
 }
 
@@ -122,7 +128,7 @@ function isFutureDate(isoDate: string): boolean {
 // BacktestPanel
 // ---------------------------------------------------------------------------
 
-export default function BacktestPanel({ tickers, asOfDate }: BacktestPanelProps) {
+export default function BacktestPanel({ tickers, asOfDate, customFilters }: BacktestPanelProps) {
   const { isDarkMode } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -193,6 +199,20 @@ export default function BacktestPanel({ tickers, asOfDate }: BacktestPanelProps)
   const runExitBacktest = useCallback(async () => {
     setExitLoading(true);
     setExitError(null);
+    // If the user picked "Custom" but the parent never threaded the
+    // current screener's filter set down to us, refuse to run with a
+    // clear message. Without this guard, the backend would run the
+    // custom screener with an empty filter set and return an unrelated
+    // batch of stocks.
+    if (exitScreenerKind === "custom" && (!customFilters || Object.keys(customFilters).length === 0)) {
+      setExitLoading(false);
+      setExitError("Custom Screener requires at least one filter in the main builder. Add a filter to the screener above before running With Exit Rules.");
+      return;
+    }
+    const screenerPayload =
+      exitScreenerKind === "custom"
+        ? { kind: "custom", filters: customFilters ?? {} }
+        : { kind: "dormant_giant" };
     try {
       const res = await fetch("/api/screener/backtest-exit", {
         method: "POST",
@@ -201,7 +221,7 @@ export default function BacktestPanel({ tickers, asOfDate }: BacktestPanelProps)
           as_of_date: asOfDate,
           top_n: exitTopN,
           sizing: { mode: "equal_weight" },
-          screener: { kind: exitScreenerKind },
+          screener: screenerPayload,
           exit_rules: exitRules,
         }),
       });
@@ -216,7 +236,7 @@ export default function BacktestPanel({ tickers, asOfDate }: BacktestPanelProps)
     } finally {
       setExitLoading(false);
     }
-  }, [asOfDate, exitTopN, exitScreenerKind, exitRules]);
+  }, [asOfDate, exitTopN, exitScreenerKind, exitRules, customFilters]);
 
   // Validation
   const noTickers = tickers.length === 0;

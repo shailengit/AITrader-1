@@ -1207,6 +1207,7 @@ export default function ScreenerBuilder() {
                 <BacktestPanel
                   tickers={scanResults.map((r) => r.ticker)}
                   asOfDate={cutoffDate}
+                  customFilters={convertFiltersToBackend(filters)}
                 />
               </div>
             )}
