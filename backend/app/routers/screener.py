@@ -685,6 +685,9 @@ async def backtest_hold(request: BacktestHoldRequest):
                     if spy_buy:
                         break
                 except Exception:
+                    # A missing table aborts the current transaction in psycopg2;
+                    # rollback so the next try can run in a fresh transaction.
+                    conn.rollback()
                     continue
             for spy_table in ('"SPY"', '"spy"'):
                 try:
@@ -694,6 +697,7 @@ async def backtest_hold(request: BacktestHoldRequest):
                     if spy_current:
                         break
                 except Exception:
+                    conn.rollback()
                     continue
 
         if spy_buy and spy_current and float(spy_buy[1]) > 0:
