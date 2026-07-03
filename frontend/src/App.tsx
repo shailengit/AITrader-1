@@ -26,7 +26,7 @@ function App() {
               </ErrorBoundary>
             } />
             <Route path="screener" element={
-              <Navigate to="screener/build" replace />
+              <Navigate to="/screener/build" replace />
             } />
             <Route path="screener/build" element={
               <ErrorBoundary>
