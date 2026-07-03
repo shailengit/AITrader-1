@@ -26,6 +26,7 @@ from app.services.agno_screener import (
 )
 from app.services.pdf_generator import generate_screener_report
 from app.services.screening.chart_data import get_chart_data
+from app.services.screening.ticker_detail import get_ticker_detail
 from app.utils.security import get_safe_table_name, sanitize_ticker
 
 logger = logging.getLogger(__name__)
@@ -883,3 +884,48 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
         await asyncio.sleep(2.0)
         if scan_id in scan_queues:
             del scan_queues[scan_id]
+
+
+# =============================================================================
+# Ticker Detail Endpoint (powers TickerDetailDrawer in the Custom Screener)
+# =============================================================================
+
+@router.get("/ticker/{ticker}")
+async def ticker_detail(
+    ticker: str,
+    as_of_date: str = "",
+):
+    """
+    Return the full TickerDetail payload for one ticker — fundamentals,
+    indicator snapshot, and next earnings event. Powers the on-demand row
+    click in the Custom Screener results table.
+
+    Query params:
+        ticker:     Ticker symbol (sanitized).
+        as_of_date: YYYY-MM-DD cutoff (optional). If absent, the most recent
+                    bar date is used.
+
+    Returns: TickerDetail dict (see app.services.screening.ticker_detail).
+
+    Errors:
+        400 VALIDATION_ERROR — malformed ticker string.
+        404 DATA_NOT_FOUND   — no data for this ticker on the as-of date.
+    """
+    try:
+        safe = sanitize_ticker(ticker)
+        if not safe:
+            raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+
+    from app.exceptions import DataNotFoundError  # local import: keeps top tidy
+
+    try:
+        return await run_in_threadpool(
+            get_ticker_detail, safe, as_of_date or None
+        )
+    except DataNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc) or "No data for ticker",
+        ) from exc
