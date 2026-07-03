@@ -22,7 +22,6 @@ from app.services.agno_screener import (
     run_dormant_giant_screener_with_ai,
     run_quant_strategy_screener,
     run_quant_strategy_screener_with_ai,
-    parse_quant_filters
 )
 from app.services.pdf_generator import generate_screener_report
 from app.services.screening.chart_data import get_chart_data
@@ -93,17 +92,6 @@ class ScanStatus(BaseModel):
     results: Optional[List[Dict]] = None
     ai_report: Optional[str] = None
     error: Optional[str] = None
-
-
-class ParseFiltersRequest(BaseModel):
-    """Request to parse a natural language prompt into structured filters."""
-    prompt: str
-
-
-class ParseFiltersResponse(BaseModel):
-    """Response containing parsed QuantFilters."""
-    filters: Dict[str, Any]
-    raw_prompt: str
 
 
 # =============================================================================
@@ -201,26 +189,6 @@ async def get_screener_modes():
             }
         ]
     }
-
-
-@router.post("/parse-filters", response_model=Dict[str, Any])
-async def parse_filters(request: ParseFiltersRequest):
-    """
-    Parse a natural language prompt into structured QuantFilters.
-
-    Uses a lightweight LLM call to extract filter criteria from the user's directive.
-    Returns the parsed filters for frontend review and editing.
-    """
-    try:
-        filters = await run_in_threadpool(lambda: parse_quant_filters(request.prompt))
-        return {
-            "filters": filters,
-            "raw_prompt": request.prompt,
-            "message": "Filters parsed successfully. Review and edit before scanning."
-        }
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Filter parsing failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Filter parsing failed: {str(e)}") from e
 
 
 @router.post("/scan", response_model=Dict[str, Any])

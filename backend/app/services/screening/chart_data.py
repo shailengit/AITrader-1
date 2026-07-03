@@ -34,9 +34,9 @@ from ta import add_all_ta_features
 
 from app.services.agno_screener import (
     DB_URL,
-    INDICATOR_REGISTRY,
     _recompute_indicator,
 )
+from app.services.screening.indicators import INDICATOR_REGISTRY
 from app.utils.security import get_safe_table_name
 
 logger = logging.getLogger(__name__)
