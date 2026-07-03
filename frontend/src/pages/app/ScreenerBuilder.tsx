@@ -18,6 +18,12 @@ import { useComposites } from '../../hooks/useComposites';
 import { useMacros } from '../../hooks/useMacros';
 import { decodeShareUrl } from '../../lib/shareCodec';
 import { getFilterByKey, type FilterSpec } from '../../data/filterCatalog';
+import {
+  getColumnsForFilters,
+  type ResultsColumn,
+} from '../../data/filterCatalog';
+import type { IndicatorDescriptor } from '../../types/indicators';
+import TickerDetailDrawer from './ScreenerBuilder/TickerDetailDrawer';
 import GroupHeader from './ScreenerBuilder/GroupHeader';
 import FilterRow from './ScreenerBuilder/FilterRow';
 import FilterPicker from './ScreenerBuilder/FilterPicker';
@@ -186,10 +192,50 @@ function convertFiltersToBackend(filters: FilterGroup): Record<string, any> {
 export default function ScreenerBuilder() {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { savePreset } = useScreens();
   const { composites } = useComposites();
   const { macros, saveMacro } = useMacros();
+
+  // Drawer state — ticker detail card. Synced to ?ticker= URL param.
+  const [drawerTicker, setDrawerTicker] = useState<string | null>(null);
+
+  // URL → drawer sync on mount / external nav.
+  useEffect(() => {
+    const fromUrl = searchParams.get('ticker');
+    if (fromUrl && fromUrl.toUpperCase() !== drawerTicker) {
+      setDrawerTicker(fromUrl.toUpperCase());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const openTicker = useCallback(
+    (t: string) => {
+      const upper = t.toUpperCase();
+      setDrawerTicker(upper);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('ticker', upper);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const closeDrawer = useCallback(() => {
+    setDrawerTicker(null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('ticker');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   // ── State ──────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterGroup>({
@@ -350,6 +396,23 @@ export default function ScreenerBuilder() {
 
     return filters;
   }, [composites, macros]);
+
+  // Indicator list for the drawer's chart overlay set. Mirrors the
+  // filterColumns derivation in ResultsPanel so the drawer's chart shows
+  // the same overlays the user filtered on.
+  const filterColumns: ResultsColumn[] = useMemo(
+    () => getColumnsForFilters(filters.conditions as unknown as FilterCondition[]),
+    [filters.conditions],
+  );
+  const chartIndicators: IndicatorDescriptor[] = useMemo(
+    () =>
+      filterColumns.map((col) => ({
+        id: col.payloadKey,
+        label: col.header,
+        params: col.params,
+      })),
+    [filterColumns],
+  );
 
   // ── Filter operations ──────────────────────────────────
   const addCondition = () => {
@@ -1201,6 +1264,7 @@ export default function ScreenerBuilder() {
                 // Toggle the inline backtest panel (Buy & Hold + With Exit Rules)
                 setBacktestExpanded((v) => !v);
               }}
+              onTickerClick={openTicker}
             />
             {backtestExpanded && cutoffDate && (
               <div style={{ marginTop: 16 }}>
@@ -1291,6 +1355,19 @@ export default function ScreenerBuilder() {
       <CompositeBuilder
         open={compositeOpen}
         onOpenChange={setCompositeOpen}
+      />
+
+      <TickerDetailDrawer
+        ticker={drawerTicker}
+        asOfDate={cutoffDate}
+        indicators={chartIndicators}
+        onClose={closeDrawer}
+        onExportToLab={(t) => {
+          // Pre-fill Lab with just this ticker and the current as-of date.
+          const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
+          navigate(`/app/lab/build?tickers=${encodeURIComponent(t)}&from_date=${fromDate}`);
+          closeDrawer();
+        }}
       />
     </div>
   );
