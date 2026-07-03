@@ -800,9 +800,6 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                     )
                 )
             else:
-                custom_composites_list = None
-                if request.custom_composites:
-                    custom_composites_list = [c.model_dump() for c in request.custom_composites]
                 result = await run_in_threadpool(
                     lambda: run_quant_strategy_screener(
                         prompt=request.prompt or "Find me candidates for a high-growth breakout. Technically, they should be in a Volatility Squeeze (volatility_bbw). Fundamentally, they must have positive QoQ revenue growth.",
@@ -811,7 +808,6 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         log_callback=update_logs,
                         filters=request.filters,
                         base_weight=request.base_weight,
-                        custom_composites=custom_composites_list
                     )
                 )
         else:
