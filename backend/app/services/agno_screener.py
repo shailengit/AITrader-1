@@ -681,10 +681,16 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                     res[col] = latest[col]
 
         # Enrich with price stats
-        res['sma_20'] = round(float(df['Close'].rolling(window=20).mean().iloc[-1]), 2)
-        res['ema_9'] = round(float(df['Close'].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
-        res['high_52w'] = round(float(df['High'].tail(252).max()), 2)
-        res['low_52w'] = round(float(df['Low'].tail(252).min()), 2)
+        def _safe_round(series, ndigits=2):
+            v = series.iloc[-1] if len(series) else float('nan')
+            return None if pd.isna(v) else round(float(v), ndigits)
+        res['sma_20'] = _safe_round(df['Close'].rolling(window=20).mean())
+        res['sma_50'] = _safe_round(df['Close'].rolling(window=50).mean())
+        res['sma_100'] = _safe_round(df['Close'].rolling(window=100).mean())
+        res['sma_200'] = _safe_round(df['Close'].rolling(window=200).mean())
+        res['ema_9'] = _safe_round(df['Close'].ewm(span=9, adjust=False).mean())
+        res['high_52w'] = round(float(df['High'].tail(252).max()), 2) if len(df) else None
+        res['low_52w'] = round(float(df['Low'].tail(252).min()), 2) if len(df) else None
 
         # Volume ratio vs 50-day average + raw volume stats
         try:
