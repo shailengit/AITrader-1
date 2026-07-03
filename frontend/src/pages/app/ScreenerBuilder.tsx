@@ -24,6 +24,7 @@ import {
 } from '../../data/filterCatalog';
 import type { IndicatorDescriptor } from '../../types/indicators';
 import TickerDetailDrawer from './ScreenerBuilder/TickerDetailDrawer';
+import TemplateChips from './ScreenerBuilder/TemplateChips';
 import GroupHeader from './ScreenerBuilder/GroupHeader';
 import FilterRow from './ScreenerBuilder/FilterRow';
 import FilterPicker from './ScreenerBuilder/FilterPicker';
@@ -879,6 +880,19 @@ export default function ScreenerBuilder() {
             </button>
           </div>
         </div>
+
+        {/* ── Template chips strip ──────────────────────── */}
+        <TemplateChips
+          onLoad={(tpl) => {
+            setFilters(tpl.filters);
+            setScreenName(tpl.name);
+            if (tpl.sort?.by) setSortBy(tpl.sort.by);
+            if (tpl.sort?.order) setSortOrder(tpl.sort.order);
+            if (tpl.maxResults) setMaxResults(tpl.maxResults);
+            if (tpl.useAi !== undefined) setUseAi(tpl.useAi);
+          }}
+          activeFilters={filters}
+        />
 
         {/* ── Filter builder ──────────────────────────────── */}
         <div
