@@ -919,10 +919,11 @@ async def ticker_detail(
         raise HTTPException(status_code=400, detail="Invalid ticker symbol")
 
     from app.exceptions import DataNotFoundError  # local import: keeps top tidy
+    from app.services.screening import ticker_detail as _td_module  # late-bound for tests
 
     try:
         return await run_in_threadpool(
-            get_ticker_detail, safe, as_of_date or None
+            _td_module.get_ticker_detail, safe, as_of_date or None
         )
     except DataNotFoundError as exc:
         raise HTTPException(
