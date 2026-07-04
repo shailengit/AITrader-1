@@ -665,7 +665,7 @@ export default function ScreenerBuilder() {
   const exportToLab = () => {
     const tickers = scanResults.map((r) => r.ticker).join(',');
     const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
-    navigate(`/app/lab/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`);
+    navigate(`/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`);
   };
 
   // ── Render ──────────────────────────────────────────────
@@ -1386,7 +1386,7 @@ export default function ScreenerBuilder() {
         onExportToLab={(t) => {
           // Pre-fill Lab with just this ticker and the current as-of date.
           const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
-          navigate(`/app/lab/build?tickers=${encodeURIComponent(t)}&from_date=${fromDate}`);
+          navigate(`/quantgen/build?tickers=${encodeURIComponent(t)}&from_date=${fromDate}`);
           closeDrawer();
         }}
       />
