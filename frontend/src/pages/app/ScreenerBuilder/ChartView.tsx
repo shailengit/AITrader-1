@@ -6,6 +6,7 @@ import type { TickerDetail } from '../../../components/shared/TickerMetadataPane
 import {
   catalogEntryToColumn,
   catalogParamsToBackendParams,
+  chartPayloadKey,
 } from '../../../data/indicatorMap';
 import type { IndicatorDescriptor } from '../../../types/indicators';
 import { CandleStickChart } from '../../../components/quantgen';
@@ -180,7 +181,10 @@ export default function ChartView() {
     const cols: string[] = [];
     const overrides: Record<string, Record<string, number>> = {};
     for (const ov of overlays) {
-      // Resolve id → column + params
+      // Resolve id → column + params. The id may be:
+      //  - a catalog id (`ta__<Name>__<sig>`) — translate the catalog name
+      //    to its backend column via `catalogEntryToColumn`.
+      //  - a plain backend column name (the new openChartView URL format).
       let column = ov.id;
       let params = ov.params;
       const m = /^ta__(.+)__/.exec(ov.id);
@@ -191,7 +195,7 @@ export default function ChartView() {
           params = catalogParamsToBackendParams(catalogName, params);
         }
       }
-      cols.push(column);
+      if (!cols.includes(column)) cols.push(column);
       if (params && Object.keys(params).length > 0) {
         overrides[column] = params;
       }
@@ -312,27 +316,22 @@ export default function ChartView() {
       });
     });
     return overlays.map((ov, i) => {
-      // Resolve which chart-endpoint payload key holds this overlay's data.
-      // For a catalog id (ta__<Name>__<sig>), the column is the catalog
-      // translation and the payload key is `<column>__<sig>`. For a
-      // payload key id (sma_50__window50), the column AND payload key
-      // are the id verbatim.
+      // Resolve the chart-endpoint payload key for this overlay.
+      // - For a catalog id (ta__<Name>__<sig>): translate the catalog
+      //   name to its backend column, then build `<column>__<sig>` from
+      //   the params dict.
+      // - For a plain backend column id: the column IS the id, and
+      //   when the overlay has params the key becomes `<column>__<sig>`.
       let column: string;
       let payloadKey: string;
       const m = /^ta__(.+)__/.exec(ov.id);
       if (m) {
         const catalogName = m[1];
         column = catalogEntryToColumn(catalogName);
-        const sig = ov.params
-          ? Object.entries(ov.params)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([k, v]) => `${k}${v}`)
-              .join('_')
-          : '';
-        payloadKey = sig ? `${column}__${sig}` : column;
+        payloadKey = chartPayloadKey(column, ov.params);
       } else {
         column = ov.id;
-        payloadKey = ov.id;
+        payloadKey = chartPayloadKey(column, ov.params);
       }
       return {
         name: ov.label,

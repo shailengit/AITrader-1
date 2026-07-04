@@ -666,17 +666,26 @@ export default function ScreenerBuilder() {
     (t: string) => {
       const upper = t.toUpperCase();
       closeDrawer();
-      const overlays = chartIndicators.map((c) => c.id).join(',');
+      // Translate each IndicatorDescriptor's payload key (`<column>__<sig>`)
+      // into the actual backend column name. The standalone chart endpoint
+      // expects `overlays=<col1>,<col2>` (column names), with a separate
+      // `params` map keyed by column for any non-default window overrides.
+      // Sending payload keys as `overlays` makes the backend silently drop
+      // them (registry doesn't know about `trend_sma_slow__window50`).
+      const cols: string[] = [];
       const params: Record<string, Record<string, number>> = {};
       for (const c of chartIndicators) {
+        const lastSep = c.id.lastIndexOf('__');
+        const column = lastSep > 0 ? c.id.slice(0, lastSep) : c.id;
+        if (!cols.includes(column)) cols.push(column);
         if (c.params && Object.keys(c.params).length > 0) {
-          params[c.id] = c.params;
+          params[column] = c.params;
         }
       }
       const qs = new URLSearchParams();
       if (cutoffDate) qs.set('from', cutoffDate);
       qs.set('range', '1y');
-      qs.set('overlays', overlays);
+      qs.set('overlays', cols.join(','));
       if (Object.keys(params).length) qs.set('params', JSON.stringify(params));
       navigate(`/screener/build/chart/${upper}?${qs.toString()}`);
     },

@@ -107,6 +107,33 @@ export function formatOverlayLabel(
   return `${name} (${ordered.join(',')})`;
 }
 
+/** Stable short signature for an indicator-params dict.
+ *  Mirrors the backend's `_params_signature` in
+ *  `app/services/screening/chart_data.py`. Two requests with the same
+ *  params collapse to the same signature, so the dedup key in
+ *  `getColumnsForFilters` only collapses genuinely-duplicate columns.
+ *
+ *  Examples:
+ *    None        → ""
+ *    {w:20}      → "w20"
+ *    {w:200}     → "w200"
+ *    {w:20,b:2}  → "b2_w20"  (sorted keys for determinism)
+ */
+export function paramsSignature(params?: Record<string, number>): string {
+  if (!params || Object.keys(params).length === 0) return "";
+  const items = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
+  return items.map(([k, v]) => `${k}${v}`).join("_");
+}
+
+/** Build the chart-endpoint payload key for a (column, params) pair. */
+export function chartPayloadKey(
+  column: string,
+  params?: Record<string, number>,
+): string {
+  const sig = paramsSignature(params);
+  return sig ? `${column}__${sig}` : column;
+}
+
 export function idFromCatalog(
   name: string,
   params: Record<string, number>,
