@@ -98,6 +98,8 @@ def get_chart_data(
     indicators: List[str],
     days: int = 250,
     overrides: Optional[Dict[str, Dict[str, Any]]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """Fetch OHLCV candles for `ticker` with indicator time series.
 
@@ -110,13 +112,21 @@ def get_chart_data(
             the whole chart.
         days: How many calendar days of history (default 250). The ta library
             needs ~200 days to compute SMA/EMA 200, so going lower than 200
-            returns unusable indicator values.
+            returns unusable indicator values. Ignored when `start` and
+            `end` are both provided.
         overrides: Optional map of `{column: custom_params}` for indicators
             that need non-default parameters. e.g. `{'ema_20': {'window': 200}}`
             requests a 200-period EMA using the `ema_20` indicator. Each
             distinct (column, params) pair gets a unique payload key in the
             output (`<column>__<sig>`) so the frontend can render both side
             by side.
+        start: Optional ISO date (YYYY-MM-DD) for the lower bound of the
+            query. When both `start` and `end` are provided, the SQL uses
+            `WHERE "Date" BETWEEN :start AND :end` and `days` is ignored.
+            When only one of `start` / `end` is provided, the other side
+            defaults to `start + days` (for `start`) or `end - days` (for
+            `end`), whichever produces a non-empty result.
+        end: Symmetric to `start`.
 
     Returns:
         List of `{time, open, high, close, volume, high, low, indicators: {...}}`
@@ -131,14 +141,34 @@ def get_chart_data(
     if not safe:
         return None
 
-    try:
-        df = pd.read_sql(
-            f'SELECT * FROM "{safe}" ORDER BY "Date" DESC LIMIT {days}',
-            _chart_engine,
+    has_range = bool(start) or bool(end)
+    if has_range:
+        where_clauses = []
+        params: Dict[str, Any] = {}
+        if start:
+            where_clauses.append('"Date" >= :start')
+            params["start"] = start
+        if end:
+            where_clauses.append('"Date" <= :end')
+            params["end"] = end
+        sql = (
+            f'SELECT * FROM "{safe}" WHERE {" AND ".join(where_clauses)} '
+            f'ORDER BY "Date"'
         )
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.warning('chart_data: DB read failed for %s: %s', safe, exc)
-        return None
+        try:
+            df = pd.read_sql(sql, _chart_engine, params=params)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning('chart_data: DB read failed for %s: %s', safe, exc)
+            return None
+    else:
+        try:
+            df = pd.read_sql(
+                f'SELECT * FROM "{safe}" ORDER BY "Date" DESC LIMIT {days}',
+                _chart_engine,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning('chart_data: DB read failed for %s: %s', safe, exc)
+            return None
 
     if df.empty or len(df) < 50:
         return None

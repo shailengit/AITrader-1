@@ -483,6 +483,8 @@ async def chart_data(
     indicators: str = "",
     days: int = 250,
     overrides: str = "",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
 ):
     """
     Fetch OHLCV bars for a single ticker, with the requested indicator time
@@ -501,6 +503,7 @@ async def chart_data(
                     will produce unusable SMA/EMA 200 values. There is no
                     hard upper bound; pass a very large value (e.g. 10000)
                     to fetch the full history for a long-listed ticker.
+                    Ignored when both `start` and `end` are provided.
         overrides:  Optional JSON object mapping column → custom params for
                     indicators that need non-default parameters. Example:
                     `overrides={"ema_20":{"window":200}}` requests a 200-
@@ -508,6 +511,14 @@ async def chart_data(
                     (column, params) pair gets a unique payload key in the
                     output (`<column>__<sig>`) so the frontend can render
                     both side by side.
+        start:      Optional ISO date (YYYY-MM-DD) for the lower bound.
+                    When both `start` and `end` are provided, the SQL uses
+                    `WHERE "Date" BETWEEN :start AND :end`. When only
+                    `start` is provided, the upper bound is `start + days`
+                    calendar days (or the latest available date, whichever
+                    is earlier).
+        end:        Optional ISO date (YYYY-MM-DD) for the upper bound.
+                    Symmetric to `start`.
 
     Returns: List of {time, open, high, low, close, volume, indicators: {...}}
     bars ordered oldest-first. Empty list when the ticker has no data. The
@@ -555,8 +566,28 @@ async def chart_data(
                 status_code=400, detail=f"Invalid overrides JSON: {exc}"
             ) from exc
 
+    # Validate start/end formats early so the route returns a clean 400
+    # before the service runs any SQL.
+    from datetime import datetime as _dt
+    if start:
+        try:
+            _dt.strptime(start, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid start date: {start!r}; expected YYYY-MM-DD",
+            )
+    if end:
+        try:
+            _dt.strptime(end, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid end date: {end!r}; expected YYYY-MM-DD",
+            )
+
     bars = await run_in_threadpool(
-        get_chart_data, ticker, indicator_list, days, overrides_map
+        get_chart_data, ticker, indicator_list, days, overrides_map, start, end
     )
     return bars or []
 
