@@ -151,7 +151,10 @@ def get_chart_data(
         if end:
             where_clauses.append('"Date" <= :end')
             params["end"] = end
-        sql = (
+        # Use SQLAlchemy's text() so named parameters bind correctly.
+        # Plain string SQL with :name placeholders fails on psycopg2.
+        from sqlalchemy import text as _sa_text
+        sql = _sa_text(
             f'SELECT * FROM "{safe}" WHERE {" AND ".join(where_clauses)} '
             f'ORDER BY "Date"'
         )
