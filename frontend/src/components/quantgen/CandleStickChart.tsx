@@ -166,7 +166,10 @@ export function CandleStickChart({
     chartRef.current.timeScale().fitContent();
   };
 
-  // Initialize chart
+  // Initialize chart — runs ONCE on mount. The chart's height is later
+  // adjusted via a separate effect that calls `applyOptions({ height })`
+  // rather than re-initializing, so indicator series and the candle
+  // series stay attached across height changes (expand/collapse).
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -224,6 +227,15 @@ export function CandleStickChart({
       volumeSeriesRef.current = null;
       cutoffLineRef.current = null;
     };
+  }, []);
+
+  // Adjust chart height without tearing down the chart. Runs whenever
+  // the height prop changes. Lightweight-charts accepts a height change
+  // via `applyOptions` and the series stay attached across height
+  // changes (expand/collapse, full-page vs drawer).
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({ height });
   }, [height]);
 
   // Update candlestick data
