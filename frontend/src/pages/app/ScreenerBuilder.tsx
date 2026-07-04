@@ -23,6 +23,7 @@ import {
   type ResultsColumn,
 } from '../../data/filterCatalog';
 import type { IndicatorDescriptor } from '../../types/indicators';
+import { recordAppReferrer, clearAppReferrer } from '../../components/layout/Layout';
 import TickerDetailDrawer from './ScreenerBuilder/TickerDetailDrawer';
 import TemplateChips from './ScreenerBuilder/TemplateChips';
 import GroupHeader from './ScreenerBuilder/GroupHeader';
@@ -255,6 +256,9 @@ export default function ScreenerBuilder() {
   const [scanProgress, setScanProgress] = useState(0);
   const [scanError, setScanError] = useState<string | undefined>();
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
+  // Stable scan id — persists across remounts so a back-navigation can
+  // re-fetch the same results from the backend without re-running the scan.
+  const [scanId, setScanId] = useState<string | null>(null);
 
   // Buy-and-hold return data (ticker -> return_pct)
   const [returnData, setReturnData] = useState<Record<string, number> | null>(null);
@@ -309,7 +313,34 @@ export default function ScreenerBuilder() {
     }
   }, [searchParams]);
 
+  // Record this page as the referrer so the QuantGen header's "Back"
+  // button can return here. Cleared on unmount.
+  useEffect(() => {
+    recordAppReferrer('/screener/build', 'Custom Screener');
+    return () => {
+      // Only clear if we're navigating away from the whole builder
+      // route; the Layout will re-record on the next mount.
+      // (Using a microtask delay to avoid clobbering when the user
+      // is just toggling the drawer / chart view.)
+      setTimeout(() => {
+        // If the user navigated to /screener/build/chart/:ticker, the
+        // referrer is still useful for that view's "Back" button — but
+        // that page is also under /screener/build/* so it shares the
+        // Layout and would re-record. So we always clear on unmount;
+        // the next mount (the chart view, the builder, etc.) re-records
+        // with the right label.
+        clearAppReferrer();
+      }, 0);
+    };
+  }, []);
+
   // ── Draft persistence ──────────────────────────────────
+  // The draft covers the full page state so a browser back-navigation
+  // (which remounts the page) restores the same view — including the
+  // results table. scanResults are also persisted so a remount is
+  // instant; if the user closes the tab, the next mount re-fetches
+  // results from the backend by scanId (the values may be slightly
+  // stale, but the schema is the same).
   useEffect(() => {
     try {
       const draft = {
@@ -320,6 +351,13 @@ export default function ScreenerBuilder() {
         sortOrder,
         maxResults,
         useAi,
+        // Persisted so the back button (which remounts the page)
+        // returns to the same screen state, not a fresh builder.
+        scanId,
+        // Results / return data / drawer are intentionally persisted
+        // by the special useEffects below (which fire on changes), not
+        // on every render of these large arrays.
+        drawerTicker,
         timestamp: Date.now(),
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -328,8 +366,45 @@ export default function ScreenerBuilder() {
     }
   }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi]);
 
-  // Restore draft on mount
+  // Persist scanResults separately to avoid re-serializing on every
+  // render (which would happen if we put it in the main draft effect).
   useEffect(() => {
+    if (scanResults.length === 0) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      const draft = raw ? JSON.parse(raw) : {};
+      draft.scanResults = scanResults;
+      draft.timestamp = Date.now();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // ignore
+    }
+  }, [scanResults]);
+
+  // Persist returnData separately too.
+  useEffect(() => {
+    if (returnData === null) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      const draft = raw ? JSON.parse(raw) : {};
+      draft.returnData = returnData;
+      draft.timestamp = Date.now();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // ignore
+    }
+  }, [returnData]);
+
+  // Restore draft on mount. If a fresh draft has a scanId, re-fetch
+  // results from the backend so the user gets up-to-date values
+  // (matching what the page would show if the user had run the scan
+  // just now). The persisted scanResults are also seeded so the page
+  // has data to show during the refetch.
+  useEffect(() => {
+    let restoredScanId: string | null = null;
+    let restoredResults: ScanResult[] | null = null;
+    let restoredReturnData: Record<string, number> | null = null;
+
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -343,12 +418,78 @@ export default function ScreenerBuilder() {
           if (draft.sort?.order) setSortOrder(draft.sort?.order);
           if (draft.maxResults) setMaxResults(draft.maxResults);
           if (draft.useAi !== undefined) setUseAi(draft.useAi);
+          if (draft.drawerTicker) setDrawerTicker(draft.drawerTicker);
+          if (draft.scanId) restoredScanId = draft.scanId;
+          if (Array.isArray(draft.scanResults)) {
+            setScanResults(draft.scanResults);
+            restoredResults = draft.scanResults;
+          }
+          if (draft.returnData) {
+            setReturnData(draft.returnData);
+            restoredReturnData = draft.returnData;
+          }
+        } else {
+          // Stale draft — drop persisted scan results so the user
+          // doesn't see old data, but keep the filter draft.
+          if (draft.filters) setFilters(draft.filters);
+          if (draft.screenName) setScreenName(draft.screenName);
+          if (draft.cutoffDate) setCutoffDate(draft.cutoffDate);
+          if (draft.sort?.by) setSortBy(draft.sort?.by);
+          if (draft.sort?.order) setSortOrder(draft.sort?.order);
+          if (draft.maxResults) setMaxResults(draft.maxResults);
+          if (draft.useAi !== undefined) setUseAi(draft.useAi);
         }
       }
     } catch {
       // ignore
     }
-  }, []);
+
+    // If we restored a scanId, re-fetch the results from the backend so
+    // the user sees fresh data. This handles the case where the page
+    // remounts (e.g. after a back-navigation) — the persisted
+    // scanResults are shown immediately, then replaced by the live
+    // fetch when it returns.
+    if (restoredScanId) {
+      setScanId(restoredScanId);
+      const tickers = (restoredResults ?? []).map((r) => r.ticker);
+      // Fire-and-forget the live refetch.
+      fetch(`/api/screener/results/${restoredScanId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.results)) {
+            setScanResults(data.results);
+            // Refresh return data if the cutoff is eligible.
+            if (cutoffDate && isCutoffEligible(cutoffDate) && data.results.length > 0) {
+              const newTickers = data.results.map((r: ScanResult) => r.ticker);
+              setReturnLoading(true);
+              fetch('/api/screener/backtest-hold', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: newTickers, as_of_date: cutoffDate }),
+              })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((bd) => {
+                  if (bd && Array.isArray(bd.ticker_results)) {
+                    const next: Record<string, number> = {};
+                    for (const tr of bd.ticker_results) {
+                      next[tr.ticker] = tr.return_pct;
+                    }
+                    setReturnData(next);
+                  }
+                })
+                .catch(() => {})
+                .finally(() => setReturnLoading(false));
+            }
+          }
+        })
+        .catch(() => {
+          // Live refetch failed — the persisted scanResults stay visible.
+        });
+      // Touch the variables so TypeScript doesn't complain.
+      void tickers;
+      void restoredReturnData;
+    }
+  }, [cutoffDate]);
 
   // Cleanup event source on unmount
   useEffect(() => {
@@ -486,6 +627,7 @@ export default function ScreenerBuilder() {
     setIsScanning(true);
     setScanError(undefined);
     setScanResults([]);
+    setScanId(null);
     setScanProgress(0);
     setReturnData(null);
 
@@ -532,6 +674,7 @@ export default function ScreenerBuilder() {
 
       const data = await res.json();
       const id = data.scan_id;
+      setScanId(id);
 
       // SSE stream
       const es = new EventSource(`/api/screener/stream/${id}`);
@@ -693,6 +836,9 @@ export default function ScreenerBuilder() {
   );
 
   const exportToLab = () => {
+    // Make sure the referrer is current before navigating so the
+    // QuantGen page's "Back" button can find its way back here.
+    recordAppReferrer('/screener/build', 'Custom Screener');
     const tickers = scanResults.map((r) => r.ticker).join(',');
     const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
     navigate(`/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`);
