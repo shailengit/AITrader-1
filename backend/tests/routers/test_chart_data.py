@@ -154,3 +154,29 @@ def test_chart_data_route_with_malformed_start_returns_400(patched_chart) -> Non
         asyncio.run(chart_data("AAPL", "", days=120, overrides="", start="not-a-date", end=None))
     assert exc_info.value.status_code == 400
     assert "Invalid start date" in str(exc_info.value.detail)
+
+
+def test_chart_data_falls_back_to_rolling_for_unknown_sma_columns(patched_chart) -> None:
+    """When a column like `sma_200` isn't in INDICATOR_REGISTRY, the chart
+    endpoint must still produce a series using `df['Close'].rolling(N)`.
+    This mirrors the result-row enrichment in `_worker_ta_analysis` and
+    is what makes the Custom Screener chart render arbitrary SMA windows
+    (e.g. Golden Cross uses sma_200 with window=200).
+    """
+    from app.services.screening.chart_data import get_chart_data
+
+    bars = get_chart_data(
+        "AAPL",
+        ["sma_200"],
+        days=250,
+        overrides={"sma_200": {"window": 200}},
+    )
+    assert bars is not None
+    # The override payload key must have non-null values.
+    found = next(
+        (b for b in bars if b.get("indicators", {}).get("sma_200__window200") is not None),
+        None,
+    )
+    assert found is not None
+    # The value is rolling-200 of Close — should be a real number.
+    assert isinstance(found["indicators"]["sma_200__window200"], (int, float))

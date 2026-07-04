@@ -227,6 +227,14 @@ def get_chart_data(
                 series = _recompute_indicator(df, col, custom_params=params)
                 if series is not None:
                     df[payload_key] = series
+            elif 'sma' in col and params.get('window') and 'Close' in df.columns and len(df) >= params['window']:
+                # Generic SMA fallback for tunable columns not in the registry
+                # (e.g. `sma_200` with `window=200`). Mirrors the result-row
+                # enrichment in `_worker_ta_analysis` so the chart can render
+                # any SMA/EMA window the user picks.
+                df[payload_key] = df['Close'].rolling(window=params['window']).mean()
+            elif col.startswith('ema_') and params.get('window') and 'Close' in df.columns and len(df) >= params['window']:
+                df[payload_key] = df['Close'].ewm(span=params['window'], adjust=False).mean()
         else:
             # Default-param request — only recompute if the auto-bundle
             # didn't already produce the column.
@@ -234,6 +242,15 @@ def get_chart_data(
                 series = _recompute_indicator(df, col)
                 if series is not None:
                     df[payload_key] = series
+            elif col not in df.columns and 'sma' in col and 'Close' in df.columns:
+                # Try a sensible default for `<col>` — the column name
+                # may encode the window (e.g. `sma_200` -> 200).
+                try:
+                    w = int(col.split('_')[-1])
+                    if len(df) >= w:
+                        df[payload_key] = df['Close'].rolling(window=w).mean()
+                except (ValueError, IndexError):
+                    pass
             elif col in df.columns:
                 # Mirror the auto-produced column to the payload key so the
                 # rest of the pipeline can treat every entry uniformly.

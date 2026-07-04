@@ -161,17 +161,40 @@ export default function TickerDetailDrawer({
     const controller = new AbortController();
     setChartLoading(true);
 
-    const indicatorIds = indicators.map((i) => i.id).join(',');
+    // Translate each indicator's payload key (`<column>__<sig>`) back to
+    // a backend column + override params. The chart endpoint expects
+    // `indicators` to be a comma-separated list of column names
+    // (e.g. `sma_50,sma_200`), and `overrides` to be a JSON map from
+    // column → custom params (e.g. `{"sma_50":{"window":50}}`).
+    const cols: string[] = [];
     const overrides: Record<string, Record<string, number>> = {};
+    let maxWindow = 0;
     for (const ind of indicators) {
+      // The id is a payload key: `<column>__<sig>` for tunable params,
+      // or just `<column>` for default-param indicators. Strip the
+      // trailing sig to recover the column.
+      const lastSep = ind.id.lastIndexOf('__');
+      const column = lastSep > 0 ? ind.id.slice(0, lastSep) : ind.id;
+      if (!cols.includes(column)) cols.push(column);
       if (ind.params && Object.keys(ind.params).length > 0) {
-        overrides[ind.id] = ind.params;
+        overrides[column] = ind.params;
+        // Track the largest requested window so we can ask the endpoint
+        // for enough history to actually compute that SMA/EMA.
+        const w = (ind.params as Record<string, number>).window;
+        if (typeof w === 'number' && w > maxWindow) maxWindow = w;
       }
     }
+    const indicatorIds = cols.join(',');
+
+    // The endpoint needs at least `maxWindow` rows to compute the largest
+    // requested indicator (e.g. SMA 200 needs 200 bars). Add some margin
+    // for visual context. Floor at 120 to keep the chart scope reasonable
+    // for short-window filters (RSI, MACD, etc.).
+    const days = Math.max(120, maxWindow + 30);
 
     const params = new URLSearchParams();
     if (indicatorIds) params.set('indicators', indicatorIds);
-    params.set('days', '120');
+    params.set('days', String(days));
     if (Object.keys(overrides).length > 0) {
       params.set('overrides', JSON.stringify(overrides));
     }
