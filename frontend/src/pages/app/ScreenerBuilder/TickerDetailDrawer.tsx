@@ -209,9 +209,19 @@ export default function TickerDetailDrawer({
     setChartLoading(true);
 
     const indicatorIds = indicators.map((i) => i.id).join(',');
+    const overrides: Record<string, Record<string, number>> = {};
+    for (const ind of indicators) {
+      if (ind.params && Object.keys(ind.params).length > 0) {
+        overrides[ind.id] = ind.params;
+      }
+    }
+
     const params = new URLSearchParams();
     if (indicatorIds) params.set('indicators', indicatorIds);
     params.set('days', '120');
+    if (Object.keys(overrides).length > 0) {
+      params.set('overrides', JSON.stringify(overrides));
+    }
 
     fetch(
       `/api/screener/chart-data/${encodeURIComponent(ticker)}?${params.toString()}`,
