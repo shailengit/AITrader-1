@@ -514,6 +514,13 @@ export default function ScreenerBuilder() {
           cutoff_date: cutoffDate || undefined,
           max_results: maxResults,
           filters: backendFilters,
+          // Tell the backend which result-row keys the UI needs values for
+          // (e.g. the user's chosen SMA 200 with window=200). The worker
+          // computes each column at the requested params and includes the
+          // value in the scan result row.
+          result_columns: filterColumns
+            .filter((c) => c.dataKey)
+            .map((c) => ({ dataKey: c.dataKey, params: c.params })),
           custom_composites: customCompositesList.length > 0 ? customCompositesList : undefined,
         }),
       });

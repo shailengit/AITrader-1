@@ -52,6 +52,19 @@ class CustomCompositeDef(BaseModel):
     operation: Literal["add", "subtract", "multiply", "divide", "ratio_pct"]
 
 
+class ResultColumnRef(BaseModel):
+    """A result-row key the frontend expects to be populated.
+
+    The frontend sends the list of columns the results table will display
+    (e.g. {'dataKey': 'sma_200', 'params': {'window': 200}}). The worker
+    guarantees each requested column has a value in the result row by
+    computing it at the requested params (or copying from the
+    add_all_ta_features output if it was already produced).
+    """
+    dataKey: str
+    params: Optional[Dict[str, Any]] = None
+
+
 class ScanRequest(BaseModel):
     """Scan request model."""
     mode: Literal["dormant_giant", "quant_strategy"] = "dormant_giant"
@@ -62,6 +75,7 @@ class ScanRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     base_weight: Optional[int] = 60  # 0-100, percent weight for base setup score in quant strategy
     custom_composites: Optional[List[CustomCompositeDef]] = None  # User-defined composite metrics
+    result_columns: Optional[List[ResultColumnRef]] = None  # Result-row keys the UI will display
 
 
 class ScanResult(BaseModel):
@@ -808,6 +822,7 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         log_callback=update_logs,
                         filters=request.filters,
                         base_weight=request.base_weight,
+                        result_columns=[c.model_dump(exclude_none=True) for c in (request.result_columns or [])],
                     )
                 )
         else:

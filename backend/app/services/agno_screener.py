@@ -510,6 +510,21 @@ def tool_verify_eps_acceleration(tickers: List[Dict], log_callback=None) -> List
 # INDICATOR RECOMPUTATION HELPERS
 # =============================================================================
 
+# Default window for friendly SMA/EMA names, used as a fallback when the
+# frontend sends a result_column without explicit params. The frontend
+# always sends params for non-default windows (e.g. sma_400 with
+# window=400), so this is only hit for the canonical names.
+_DEFAULT_SMA_EMA_WINDOWS = {
+    'sma_10': 10, 'sma_20': 20, 'sma_50': 50, 'sma_100': 100, 'sma_200': 200,
+    'ema_9': 9, 'ema_12': 12, 'ema_20': 20, 'ema_26': 26,
+}
+
+
+def _default_window_for(data_key: str) -> Optional[int]:
+    """Return the conventional default window for a friendly SMA/EMA name."""
+    return _DEFAULT_SMA_EMA_WINDOWS.get(data_key)
+
+
 def _recompute_indicator(df: pd.DataFrame, column: str, custom_params: Optional[Dict[str, Any]] = None) -> Optional[pd.Series]:
     """Recompute a single technical indicator with optional custom parameters.
 
@@ -634,7 +649,7 @@ def _resolve_requested_indicators(filters: Optional[Dict[str, Any]]) -> tuple[Li
 # QUANT STRATEGY SCREENER (agnoMultiAgentTrader_2.py)
 # =============================================================================
 
-def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> Optional[Dict]:
+def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None, result_columns: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict]:
     """Worker for multiprocessing TA calculations using ta library (matching standalone)."""
     if not ticker or not isinstance(ticker, str):
         return None
@@ -684,13 +699,35 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
         def _safe_round(series, ndigits=2):
             v = series.iloc[-1] if len(series) else float('nan')
             return None if pd.isna(v) else round(float(v), ndigits)
-        res['sma_20'] = _safe_round(df['Close'].rolling(window=20).mean())
-        res['sma_50'] = _safe_round(df['Close'].rolling(window=50).mean())
-        res['sma_100'] = _safe_round(df['Close'].rolling(window=100).mean())
-        res['sma_200'] = _safe_round(df['Close'].rolling(window=200).mean())
         res['ema_9'] = _safe_round(df['Close'].ewm(span=9, adjust=False).mean())
         res['high_52w'] = round(float(df['High'].tail(252).max()), 2) if len(df) else None
         res['low_52w'] = round(float(df['Low'].tail(252).min()), 2) if len(df) else None
+
+        # Dynamic enrichment: for every result_column the frontend asked
+        # for, ensure a value is in the result row. The column may already
+        # be in `latest` (via add_all_ta_features or custom_params), in
+        # which case we just copy it. Otherwise compute it on the fly —
+        # this is the only way the UI gets values for arbitrary
+        # SMA/EMA windows (e.g. sma_200 with window=200, sma_400 with
+        # window=400) that the registry doesn't pre-compute.
+        for col_ref in (result_columns or []):
+            data_key = col_ref.get('dataKey') if isinstance(col_ref, dict) else getattr(col_ref, 'dataKey', None)
+            params = col_ref.get('params') if isinstance(col_ref, dict) else getattr(col_ref, 'params', None)
+            if not data_key or data_key in res:
+                continue
+            if data_key in latest.index:
+                v = latest[data_key]
+                res[data_key] = None if pd.isna(v) else (
+                    round(float(v), 4) if isinstance(v, (int, float)) else v
+                )
+                continue
+            # Fallback: compute on the fly for SMA/EMA-style indicators.
+            window = (params or {}).get('window') or _default_window_for(data_key)
+            if window and 'Close' in df.columns and len(df) >= window:
+                if 'sma' in data_key:
+                    res[data_key] = _safe_round(df['Close'].rolling(window=window).mean())
+                elif data_key.startswith('ema_') or data_key == 'ema_9':
+                    res[data_key] = _safe_round(df['Close'].ewm(span=window, adjust=False).mean())
 
         # Volume ratio vs 50-day average + raw volume stats
         try:
@@ -735,7 +772,8 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                        cutoff_date: Optional[str] = None,
                        progress_callback=None, log_callback=None,
                        filters: Optional[Dict[str, Any]] = None,
-                       custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
+                       custom_params: Optional[Dict[str, Dict[str, Any]]] = None,
+                       result_columns: Optional[List[Dict[str, Any]]] = None) -> str:
     """Screen S&P 1500 using parallel processing with ta library (matching standalone)."""
     # Source tickers from information_schema.tables (matching standalone)
     with ENGINE.connect() as conn:
@@ -752,7 +790,7 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
     if log_callback:
         log_callback(f"Scanning {total} stocks for {merged_indicators}...")
 
-    args = [(ticker, merged_indicators, cutoff_date, custom_params) for ticker in tickers]
+    args = [(ticker, merged_indicators, cutoff_date, custom_params, result_columns) for ticker in tickers]
     results = []
     completed = 0
 
@@ -1306,7 +1344,8 @@ def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_ca
 
 def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, progress_callback=None,
                                 log_callback=None, filters: Optional[Dict[str, Any]] = None,
-                                base_weight: int = 60) -> Dict[str, Any]:
+                                base_weight: int = 60,
+                                result_columns: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
     Uses ta library column names and maps to frontend-friendly keys.
@@ -1336,7 +1375,8 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
         progress_callback=progress_callback,
         log_callback=log_callback,
         filters=filters,
-        custom_params=custom_params
+        custom_params=custom_params,
+        result_columns=result_columns,
     )
     tech_df = pd.read_csv(pd.io.common.StringIO(tech_csv)) if tech_csv != "No results found." else pd.DataFrame()
 
