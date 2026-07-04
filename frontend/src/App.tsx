@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout'
 import Landing from './pages/Landing'
 import SectorRotation from './pages/SectorRotation'
 import ScreenerBuilder from './pages/app/ScreenerBuilder'
+import ChartView from './pages/app/ScreenerBuilder/ChartView'
 import QuantGen from './pages/QuantGen'
 import EarningsCalendar from './pages/EarningsCalendar'
 import Markov from './pages/Markov'
@@ -31,6 +32,11 @@ function App() {
             <Route path="screener/build" element={
               <ErrorBoundary>
                 <ScreenerBuilder />
+              </ErrorBoundary>
+            } />
+            <Route path="screener/build/chart/:ticker" element={
+              <ErrorBoundary>
+                <ChartView />
               </ErrorBoundary>
             } />
             <Route path="earnings" element={
