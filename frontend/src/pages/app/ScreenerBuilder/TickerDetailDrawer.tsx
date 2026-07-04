@@ -29,6 +29,7 @@ interface TickerDetailDrawerProps {
   indicators: IndicatorDescriptor[];
   onClose: () => void;
   onExportToLab: (ticker: string) => void;
+  onOpenInChart: (ticker: string) => void;
 }
 
 const CHART_PALETTE = ['#3B82F6', '#EF4444', '#F59E0B', '#A855F7', '#10B981', '#06B6D4'];
@@ -89,6 +90,7 @@ export default function TickerDetailDrawer({
   indicators,
   onClose,
   onExportToLab,
+  onOpenInChart,
 }: TickerDetailDrawerProps) {
   const { isDarkMode } = useTheme();
   const [data, setData] = useState<TickerDetail | null>(null);
@@ -353,24 +355,44 @@ export default function TickerDetailDrawer({
             >
               CHART · 120D
             </span>
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              aria-label={expanded ? 'Shrink chart' : 'Expand chart'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 10,
-                fontWeight: 600,
-                color: colors.accent,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {expanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-              {expanded ? 'Shrink' : 'Expand'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => onOpenInChart(ticker)}
+                aria-label="Open in full-page chart"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: colors.accent,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={11} />
+                Open in chart
+              </button>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                aria-label={expanded ? 'Shrink chart' : 'Expand chart'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: colors.accent,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {expanded ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+                {expanded ? 'Shrink' : 'Expand'}
+              </button>
+            </div>
           </div>
           {indicatorChips}
           {chartLoading && chartBars.length === 0 ? (

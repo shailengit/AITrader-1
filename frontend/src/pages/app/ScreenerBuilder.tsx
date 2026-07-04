@@ -662,6 +662,27 @@ export default function ScreenerBuilder() {
   };
 
   // ── Export to Lab ──────────────────────────────────────
+  const openChartView = useCallback(
+    (t: string) => {
+      const upper = t.toUpperCase();
+      closeDrawer();
+      const overlays = chartIndicators.map((c) => c.id).join(',');
+      const params: Record<string, Record<string, number>> = {};
+      for (const c of chartIndicators) {
+        if (c.params && Object.keys(c.params).length > 0) {
+          params[c.id] = c.params;
+        }
+      }
+      const qs = new URLSearchParams();
+      if (cutoffDate) qs.set('from', cutoffDate);
+      qs.set('range', '1y');
+      qs.set('overlays', overlays);
+      if (Object.keys(params).length) qs.set('params', JSON.stringify(params));
+      navigate(`/screener/build/chart/${upper}?${qs.toString()}`);
+    },
+    [closeDrawer, navigate, cutoffDate, chartIndicators],
+  );
+
   const exportToLab = () => {
     const tickers = scanResults.map((r) => r.ticker).join(',');
     const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
@@ -1383,6 +1404,7 @@ export default function ScreenerBuilder() {
         asOfDate={cutoffDate}
         indicators={chartIndicators}
         onClose={closeDrawer}
+        onOpenInChart={openChartView}
         onExportToLab={(t) => {
           // Pre-fill Lab with just this ticker and the current as-of date.
           const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
