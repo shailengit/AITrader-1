@@ -76,7 +76,12 @@ frontend/src/data/
 
 frontend/src/components/shared/   # NEW dir
 └── TickerMetadataPanel.tsx       # NEW — shared fundamentals/indicators/earnings panel,
-                                   #       used by both drawer and ChartView
+                                   #       used by both drawer and ChartView. Replaces
+                                   #       the inline FundCell / IndRow / SectionLabel
+                                   #       sub-components currently defined at the bottom
+                                   #       of TickerDetailDrawer.tsx. The drawer imports
+                                   #       this; ChartView/MetadataRail reuses the same
+                                   #       fetch logic.
 ```
 
 ### Backend
