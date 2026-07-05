@@ -23,7 +23,7 @@ import {
   type ResultsColumn,
 } from '../../data/filterCatalog';
 import type { IndicatorDescriptor } from '../../types/indicators';
-import { recordAppReferrer, clearAppReferrer } from '../../components/layout/Layout';
+import { recordAppReferrer } from '../../components/layout/Layout';
 import TickerDetailDrawer from './ScreenerBuilder/TickerDetailDrawer';
 import TemplateChips from './ScreenerBuilder/TemplateChips';
 import GroupHeader from './ScreenerBuilder/GroupHeader';
@@ -313,35 +313,49 @@ export default function ScreenerBuilder() {
     }
   }, [searchParams]);
 
-  // Record this page as the referrer so the QuantGen header's "Back"
-  // button can return here. Cleared on unmount.
+  // Record this page as the referrer so the QuantGen (or chart page)
+  // header's "Back" button can return here. We do NOT clear on
+  // unmount — the referrer is meant to persist across navigations
+  // away from the screener and back. The Layout's "Home" button (and
+  // the chart page's "Back" button) explicitly clear the referrer
+  // when the user explicitly leaves the screener subtree.
   useEffect(() => {
     recordAppReferrer('/screener/build', 'Custom Screener');
-    return () => {
-      // Only clear if we're navigating away from the whole builder
-      // route; the Layout will re-record on the next mount.
-      // (Using a microtask delay to avoid clobbering when the user
-      // is just toggling the drawer / chart view.)
-      setTimeout(() => {
-        // If the user navigated to /screener/build/chart/:ticker, the
-        // referrer is still useful for that view's "Back" button — but
-        // that page is also under /screener/build/* so it shares the
-        // Layout and would re-record. So we always clear on unmount;
-        // the next mount (the chart view, the builder, etc.) re-records
-        // with the right label.
-        clearAppReferrer();
-      }, 0);
-    };
   }, []);
 
   // ── Draft persistence ──────────────────────────────────
   // The draft covers the full page state so a browser back-navigation
   // (which remounts the page) restores the same view — including the
-  // results table. scanResults are also persisted so a remount is
-  // instant; if the user closes the tab, the next mount re-fetches
-  // results from the backend by scanId (the values may be slightly
-  // stale, but the schema is the same).
-  useEffect(() => {
+  // results table. scanResults and returnData are persisted by the
+  // special useEffects below (which fire on changes), not on every
+  // render of these large arrays.
+  //
+  // CRITICAL: the persistence effects must NOT run before the
+  // restore effect (declared last). Otherwise the initial empty
+  // state would overwrite the persisted draft on mount, breaking
+  // back-navigation state recovery. The persistence effects skip
+  // their first run (via useSkipFirstRun) so the restore effect is
+  // the first to touch localStorage on mount.
+
+  // Helper hook: returns a `useEffect` that skips its first run.
+  // (Built-in useEffect always runs on mount; we want to defer
+  // persistence until the restore has happened.)
+  function useSkipFirstRun(
+    effect: () => void | (() => void),
+    deps: ReadonlyArray<unknown>,
+  ): void {
+    const isFirst = useRef(true);
+    useEffect(() => {
+      if (isFirst.current) {
+        isFirst.current = false;
+        return;
+      }
+      return effect();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, deps);
+  }
+
+  useSkipFirstRun(() => {
     try {
       const draft = {
         filters,
@@ -355,8 +369,7 @@ export default function ScreenerBuilder() {
         // returns to the same screen state, not a fresh builder.
         scanId,
         // Results / return data / drawer are intentionally persisted
-        // by the special useEffects below (which fire on changes), not
-        // on every render of these large arrays.
+        // by the special useEffects below.
         drawerTicker,
         timestamp: Date.now(),
       };
@@ -364,11 +377,11 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi]);
+  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, scanId]);
 
   // Persist scanResults separately to avoid re-serializing on every
   // render (which would happen if we put it in the main draft effect).
-  useEffect(() => {
+  useSkipFirstRun(() => {
     if (scanResults.length === 0) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -382,7 +395,7 @@ export default function ScreenerBuilder() {
   }, [scanResults]);
 
   // Persist returnData separately too.
-  useEffect(() => {
+  useSkipFirstRun(() => {
     if (returnData === null) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -400,6 +413,12 @@ export default function ScreenerBuilder() {
   // (matching what the page would show if the user had run the scan
   // just now). The persisted scanResults are also seeded so the page
   // has data to show during the refetch.
+  //
+  // This effect must run BEFORE the persistence effects write, so
+  // the initial empty state doesn't clobber the saved draft. Because
+  // effects fire in declaration order and the persistence effects
+  // above also skip their first run, this restore effect is the
+  // first to touch localStorage on mount.
   useEffect(() => {
     let restoredScanId: string | null = null;
     let restoredResults: ScanResult[] | null = null;
@@ -448,15 +467,20 @@ export default function ScreenerBuilder() {
     // the user sees fresh data. This handles the case where the page
     // remounts (e.g. after a back-navigation) — the persisted
     // scanResults are shown immediately, then replaced by the live
-    // fetch when it returns.
+    // fetch ONLY if the backend returns usable data. If the refetch
+    // fails (e.g. backend was restarted and the in-memory scan_status
+    // is gone) the persisted scanResults stay visible — that is the
+    // primary state-recovery path. The refetch is a refresh, not a
+    // requirement.
     if (restoredScanId) {
       setScanId(restoredScanId);
       const tickers = (restoredResults ?? []).map((r) => r.ticker);
-      // Fire-and-forget the live refetch.
+      // Fire-and-forget the live refetch. Only overwrite the
+      // persisted results if the backend returns a non-empty list.
       fetch(`/api/screener/results/${restoredScanId}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (data && Array.isArray(data.results)) {
+          if (data && Array.isArray(data.results) && data.results.length > 0) {
             setScanResults(data.results);
             // Refresh return data if the cutoff is eligible.
             if (cutoffDate && isCutoffEligible(cutoffDate) && data.results.length > 0) {
@@ -481,6 +505,8 @@ export default function ScreenerBuilder() {
                 .finally(() => setReturnLoading(false));
             }
           }
+          // If data.results is empty/missing, keep the persisted
+          // results visible — they are the source of truth.
         })
         .catch(() => {
           // Live refetch failed — the persisted scanResults stay visible.
@@ -1562,6 +1588,9 @@ export default function ScreenerBuilder() {
         onOpenInChart={openChartView}
         onExportToLab={(t) => {
           // Pre-fill Lab with just this ticker and the current as-of date.
+          // Record the referrer first so the QuantGen page's "Back to
+          // Custom Screener" button can return here.
+          recordAppReferrer('/screener/build', 'Custom Screener');
           const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
           navigate(`/quantgen/build?tickers=${encodeURIComponent(t)}&from_date=${fromDate}`);
           closeDrawer();

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import TickerMetadataPanel, { type TickerDetail } from '../../../../components/shared/TickerMetadataPanel';
+import { recordAppReferrer } from '../../../../components/layout/Layout';
 
 interface MetadataRailProps {
   ticker: string;
@@ -25,6 +26,10 @@ export default function MetadataRail({ ticker, data, loading, error, fromDate }:
       <TickerMetadataPanel data={data} loading={loading} error={error} variant="rail" />
       <button
         onClick={() => {
+          // Record the referrer first so QuantGen's "Back to Custom
+          // Screener" button can return to the chart view (or to the
+          // builder via Layout's referrer-based navigation).
+          recordAppReferrer('/screener/build', 'Custom Screener');
           const from = fromDate || new Date().toISOString().split('T')[0];
           navigate(`/quantgen/build?tickers=${encodeURIComponent(ticker)}&from_date=${from}`);
         }}

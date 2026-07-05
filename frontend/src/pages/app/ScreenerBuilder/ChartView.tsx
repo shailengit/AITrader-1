@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
+import { recordAppReferrer } from '../../../components/layout/Layout';
 import type { TickerDetail } from '../../../components/shared/TickerMetadataPanel';
 import {
   catalogEntryToColumn,
@@ -142,6 +143,16 @@ export default function ChartView() {
     canvas: isDarkMode ? '#050505' : '#f5f5f7',
     accent: '#10B981',
   };
+
+  // Record this page's parent as the back-navigation target. The
+  // Layout's header "Back to Custom Screener" button uses the value
+  // here to return to /screener/build with the same scan state. We do
+  // NOT clear on unmount — the chart view is part of the screener
+  // subtree, so the referrer is the same whether the user is on
+  // /screener/build or /screener/build/chart/:ticker.
+  useEffect(() => {
+    recordAppReferrer('/screener/build', 'Custom Screener');
+  }, []);
 
   // Metadata fetch
   useEffect(() => {
