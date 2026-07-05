@@ -1640,6 +1640,8 @@ export default function ScreenerBuilder() {
         ticker={drawerTicker}
         asOfDate={cutoffDate}
         indicators={chartIndicators}
+        scoreRow={drawerTicker ? scanResults.find((r) => r.ticker.toUpperCase() === drawerTicker.toUpperCase()) ?? null : null}
+        baseWeight={baseWeight}
         onClose={closeDrawer}
         onOpenInChart={openChartView}
         onExportToLab={(t) => {

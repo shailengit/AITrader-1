@@ -9,6 +9,11 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import { CandleStickChart } from '../../../components/quantgen';
+import {
+  SUB_SCORE_KEYS,
+  getSubScoreInputs,
+  type SubScoreKey,
+} from '../../../lib/subScoreInputs';
 import type { IndicatorDescriptor } from '../../../types/indicators';
 import TickerMetadataPanel, { type TickerDetail } from '../../../components/shared/TickerMetadataPanel';
 
@@ -30,6 +35,23 @@ interface TickerDetailDrawerProps {
   onClose: () => void;
   onExportToLab: (ticker: string) => void;
   onOpenInChart: (ticker: string) => void;
+  /** The scan-result row for this ticker. Used to render the
+   *  "Scoring breakdown" section with the 4 sub-scores and their inputs.
+   *  Optional: when omitted, the breakdown section is hidden. */
+  scoreRow?: ScanResultRow | null;
+  /** Current base_weight (0-100). Used in the composite-score label. */
+  baseWeight?: number;
+}
+
+interface ScanResultRow {
+  ticker: string;
+  score?: number;
+  trend_score?: number;
+  momentum_score?: number;
+  volatility_score?: number;
+  volume_score?: number;
+  score_minus_return?: number;
+  [key: string]: unknown;
 }
 
 const CHART_PALETTE = ['#3B82F6', '#EF4444', '#F59E0B', '#A855F7', '#10B981', '#06B6D4'];
@@ -91,6 +113,8 @@ export default function TickerDetailDrawer({
   onClose,
   onExportToLab,
   onOpenInChart,
+  scoreRow = null,
+  baseWeight = 60,
 }: TickerDetailDrawerProps) {
   const { isDarkMode } = useTheme();
   const [data, setData] = useState<TickerDetail | null>(null);
@@ -110,6 +134,8 @@ export default function TickerDetailDrawer({
     border: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
     surface: isDarkMode ? '#0a0a0a' : '#f5f5f7',
     surfaceRaised: isDarkMode ? '#111111' : '#fafafc',
+    // Card body background — slightly raised above surface for sub-score cards.
+    bg: isDarkMode ? '#1a1a1c' : '#ffffff',
     accent: '#10B981',
     danger: '#EF4444',
     warning: '#F59E0B',
@@ -417,6 +443,131 @@ export default function TickerDetailDrawer({
               </button>
             </div>
           </div>
+          {/* Scoring breakdown — 4 sub-score cards with their raw inputs.
+              Only rendered when the parent supplies a scoreRow (i.e. the
+              drawer was opened from a scan-results table click). */}
+          {scoreRow && (
+            <div
+              style={{
+                padding: '12px 16px',
+                borderBottom: `1px solid ${colors.border}`,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
+                  Scoring breakdown
+                </span>
+                <span style={{ fontSize: 11, color: colors.muted }}>
+                  Composite:{' '}
+                  <strong style={{ color: colors.text }}>
+                    {scoreRow.score == null ? '—' : Number(scoreRow.score).toFixed(0)}
+                  </strong>
+                  {' · '}
+                  {baseWeight}% base + {100 - baseWeight}% filter match
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {SUB_SCORE_KEYS.map((key: SubScoreKey) => {
+                  const value = scoreRow[key];
+                  const color =
+                    value == null
+                      ? colors.subtle
+                      : Number(value) >= 70
+                      ? colors.accent
+                      : Number(value) >= 50
+                      ? colors.warning
+                      : colors.danger;
+                  const inputs = getSubScoreInputs(key, scoreRow as Record<string, unknown>);
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        backgroundColor: colors.bg,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 8,
+                        padding: '8px 10px',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'baseline',
+                          justifyContent: 'space-between',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: colors.muted,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {key === 'trend_score'
+                            ? 'Trend'
+                            : key === 'momentum_score'
+                            ? 'Momentum'
+                            : key === 'volatility_score'
+                            ? 'Volatility'
+                            : 'Volume'}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color,
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {value == null ? '—' : Number(value).toFixed(0)}
+                        </span>
+                      </div>
+                      {inputs.map((inp) => (
+                        <div
+                          key={inp.label}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 11,
+                            padding: '1px 0',
+                          }}
+                        >
+                          <span style={{ color: colors.muted }}>{inp.label}</span>
+                          <span
+                            style={{
+                              color: colors.text,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {inp.value == null
+                              ? '—'
+                              : typeof inp.value === 'number'
+                              ? inp.value.toFixed(2)
+                              : inp.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {indicatorChips}
           {chartLoading && chartBars.length === 0 ? (
             <div
