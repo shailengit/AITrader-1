@@ -74,6 +74,8 @@ class ScanRequest(BaseModel):
     max_results: int = 50
     filters: Optional[Dict[str, Any]] = None
     base_weight: Optional[int] = 60  # 0-100, percent weight for base setup score in quant strategy
+    sub_weights: Optional[Dict[str, int]] = None  # Per-sub-score weights: {trend, momentum, volatility, volume}; each >= 0
+    include_alignment: Optional[bool] = False  # When true, attach score_minus_return per result row
     custom_composites: Optional[List[CustomCompositeDef]] = None  # User-defined composite metrics
     result_columns: Optional[List[ResultColumnRef]] = None  # Result-row keys the UI will display
 
@@ -841,7 +843,9 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         progress_callback=update_progress,
                         agent_log_callback=update_agent_log,
                         filters=request.filters,
-                        base_weight=request.base_weight
+                        base_weight=request.base_weight,
+                        sub_weights=request.sub_weights,
+                        include_alignment=request.include_alignment,
                     )
                 )
             else:
@@ -853,6 +857,8 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         log_callback=update_logs,
                         filters=request.filters,
                         base_weight=request.base_weight,
+                        sub_weights=request.sub_weights,
+                        include_alignment=request.include_alignment,
                         result_columns=[c.model_dump(exclude_none=True) for c in (request.result_columns or [])],
                     )
                 )

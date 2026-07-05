@@ -137,3 +137,23 @@ def test_compute_quant_score_alignment_skipped_when_no_return_pct():
     row = _row()
     out = compute_quant_score(row, {}, include_alignment=True)
     assert 'score_minus_return' not in out
+
+
+def test_scan_request_accepts_sub_weights():
+    """The ScanRequest model accepts a valid sub_weights dict."""
+    from app.routers.screener import ScanRequest
+    req = ScanRequest(
+        mode='quant_strategy',
+        sub_weights={'trend': 50, 'momentum': 25, 'volatility': 10, 'volume': 15},
+        include_alignment=True,
+    )
+    assert req.sub_weights == {'trend': 50, 'momentum': 25, 'volatility': 10, 'volume': 15}
+    assert req.include_alignment is True
+
+
+def test_scan_request_sub_weights_default_to_none():
+    """When omitted, sub_weights is None and include_alignment is False."""
+    from app.routers.screener import ScanRequest
+    req = ScanRequest(mode='quant_strategy')
+    assert req.sub_weights is None
+    assert req.include_alignment is False
