@@ -53,19 +53,21 @@ function transformBars(bars: ChartBar[]) {
 }
 
 /**
- * Parse the `overlays` and `params` query params back into
- * IndicatorDescriptors. `params` (if present) is a JSON map from
- * overlay id → params dict, and takes precedence. When the id is a
- * catalog-formatted id (starts with `ta__`), we recover the params
- * from the id; otherwise the id is treated as a payload key (e.g. from
- * the drawer's pass-through) and the params come from the params map.
+ * Parse the `overlays`, `labels`, and `params` query params back into
+ * IndicatorDescriptors. `labels` is a parallel comma-separated array
+ * of the friendly column headers (e.g. "SMA 50", "SMA 200") and takes
+ * precedence over the column-derived fallback. `params` is a JSON map
+ * from overlay id → params dict, and is also used to derive a label
+ * for catalog-style ids (`ta__<Name>__<sig>`).
  */
 function parseOverlaysFromUrl(
   overlaysParam: string | null,
+  labelsParam: string | null,
   paramsParam: string | null,
 ): IndicatorDescriptor[] {
   if (!overlaysParam) return [];
   const ids = overlaysParam.split(',').filter(Boolean);
+  const labels = labelsParam ? labelsParam.split(',') : [];
   let paramMap: Record<string, Record<string, number>> = {};
   if (paramsParam) {
     try {
@@ -74,30 +76,72 @@ function parseOverlaysFromUrl(
       paramMap = {};
     }
   }
-  return ids.map((id) => {
-    // Prefer the explicit params map. Fall back to a label derived from
-    // the id so the chip is at least readable.
-    const params = paramMap[id];
+  return ids.map((id, i) => {
+    // 1) Parallel-array label wins (preferred — matches the column
+    //    header the user saw in the screener results table).
+    // 2) params map entry (caller may have supplied a label there).
+    // 3) Catalog-style id: derive a label from the params.
+    // 4) Fallback: derive a label from the id itself.
+    const fromParams = paramMap[id];
+    const label =
+      labels[i] ||
+      (fromParams ? deriveLabel(id, fromParams) : deriveLabel(id, {}));
     return {
       id,
-      label: params ? deriveLabel(id, params) : id,
-      params,
+      label,
+      params: fromParams,
     };
   });
 }
 
-/** Best-effort label for an id+params pair, e.g. "EMA (200)" or "MACD (12,26,9)". */
+/** Best-effort label for an id+params pair, e.g. "EMA (200)" or "MACD (12,26,9)".
+ *  Falls back to the column name formatted for display if the id is
+ *  not a catalog id (e.g. "trend_sma_slow" → "SMA"). */
+const COLUMN_FRIENDLY: Record<string, string> = {
+  trend_sma_slow: 'SMA',
+  trend_sma_fast: 'SMA',
+  trend_ema_fast: 'EMA',
+  trend_ema_slow: 'EMA',
+  sma_50: 'SMA 50',
+  sma_100: 'SMA 100',
+  sma_200: 'SMA 200',
+  ema_20: 'EMA 20',
+  ema_50: 'EMA 50',
+  ema_200: 'EMA 200',
+  momentum_rsi: 'RSI',
+  trend_macd: 'MACD',
+  trend_adx: 'ADX',
+  momentum_wr: 'Williams %R',
+  momentum_stoch_rsi: 'Stoch RSI',
+  momentum_roc: 'ROC',
+  momentum_ao: 'AO',
+  momentum_kama: 'KAMA',
+  volatility_bbm: 'BB Middle',
+  volatility_atr: 'ATR',
+};
+
 function deriveLabel(id: string, params: Record<string, number>): string {
   // The id may be a catalog id (ta__<Name>__<sig>) or a payload key
-  // (sma_50__window50). Try to extract the name.
-  const m = /^ta__([^_]+(?:_[^_]+?)*?)__/.exec(id);
-  if (m) {
-    return `${m[1]} (${Object.values(params).join(',')})`;
+  // (sma_50__window50) or a plain backend column (trend_sma_slow).
+  // 1. Catalog id: use the catalog name.
+  const catMatch = /^ta__([^_]+(?:_[^_]+?)*?)__/.exec(id);
+  if (catMatch) {
+    const paramList = Object.values(params);
+    return paramList.length > 0
+      ? `${catMatch[1]} (${paramList.join(',')})`
+      : catMatch[1];
   }
-  // Fallback for payload keys: strip the trailing param sig
-  const idx = id.lastIndexOf('__');
-  if (idx > 0) return id.slice(0, idx).replace(/_/g, ' ').toUpperCase();
-  return id;
+  // 2. Strip the trailing __<sig> to get the column.
+  const sep = id.lastIndexOf('__');
+  const column = sep > 0 ? id.slice(0, sep) : id;
+  const friendly = COLUMN_FRIENDLY[column];
+  if (friendly) {
+    // If the params specify a window, append it.
+    if (params.window != null) return `${friendly} (${params.window})`;
+    return friendly;
+  }
+  // 3. Fallback: humanize the column name.
+  return column.replace(/_/g, ' ').toUpperCase();
 }
 
 /**
@@ -119,9 +163,31 @@ export default function ChartView() {
   const fromDate = searchParams.get('from') ?? undefined;
 
   const overlays: IndicatorDescriptor[] = useMemo(
-    () => parseOverlaysFromUrl(searchParams.get('overlays'), searchParams.get('params')),
+    () => parseOverlaysFromUrl(
+      searchParams.get('overlays'),
+      searchParams.get('labels'),
+      searchParams.get('params'),
+    ),
     [searchParams],
   );
+
+  // Per-overlay visibility. Each overlay starts visible. Toggling does
+  // not affect the URL — it's a transient view-state. The set is
+  // re-seeded when the overlay list changes (e.g. user adds a new
+  // overlay from the picker or removes one).
+  const [activeIds, setActiveIds] = useState<Set<string>>(
+    () => new Set(overlays.map((o) => o.id)),
+  );
+  useEffect(() => {
+    setActiveIds((prev) => {
+      const next = new Set<string>();
+      for (const o of overlays) {
+        if (prev.has(o.id)) next.add(o.id);
+        else next.add(o.id); // new overlays default to visible
+      }
+      return next;
+    });
+  }, [overlays]);
 
   // Metadata (left rail)
   const [metaData, setMetaData] = useState<TickerDetail | null>(null);
@@ -270,6 +336,7 @@ export default function ChartView() {
       }
       updateUrl({
         overlays: nextOverlays.map((o) => o.id).join(','),
+        labels: nextOverlays.map((o) => o.label).join(','),
         params: Object.keys(paramMap).length ? JSON.stringify(paramMap) : null,
       });
     },
@@ -287,11 +354,23 @@ export default function ChartView() {
       }
       updateUrl({
         overlays: nextOverlays.length ? nextOverlays.map((o) => o.id).join(',') : null,
+        labels: nextOverlays.length ? nextOverlays.map((o) => o.label).join(',') : null,
         params: Object.keys(paramMap).length ? JSON.stringify(paramMap) : null,
       });
     },
     [overlays, updateUrl],
   );
+
+  // Toggle visibility of a single overlay without removing it. Local
+  // state only — does not affect the URL.
+  const handleToggleOverlay = useCallback((id: string) => {
+    setActiveIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const handleRangeChange = useCallback(
     (mode: RangeMode, custom?: { start?: string; end?: string }) => {
@@ -314,7 +393,9 @@ export default function ChartView() {
 
   // Build the chart's indicator payload from the bars + overlays. Match
   // the chart endpoint's payload key convention: `<column>` for default
-  // and `<column>__<sig>` for overrides.
+  // and `<column>__<sig>` for overrides. Hide overlays that the user
+  // has toggled off — the underlying series data is still fetched
+  // (one round-trip) but the chart only renders the active ones.
   const chartIndicatorsPayload = useMemo(() => {
     const series: Record<string, { time: number; value: number }[]> = {};
     chartBars.forEach((b) => {
@@ -347,11 +428,18 @@ export default function ChartView() {
       return {
         name: ov.label,
         type: 'line',
-        data: series[payloadKey] ?? [],
+        // Empty data array hides the series (lightweight-charts skips
+        // lines with no points). The legend marker still shows because
+        // the series is registered in CandleStickChart's effect — we
+        // also need to skip the registration when inactive.
+        data: activeIds.has(ov.id) ? (series[payloadKey] ?? []) : [],
         color: CHART_PALETTE[i % CHART_PALETTE.length],
+        // Pass active state through so CandleStickChart can avoid
+        // creating a series for hidden overlays.
+        visible: activeIds.has(ov.id),
       };
     });
-  }, [chartBars, overlays]);
+  }, [chartBars, overlays, activeIds]);
 
   if (!ticker) {
     return (
@@ -445,7 +533,13 @@ export default function ChartView() {
             >
               Overlays
             </div>
-            <OverlaysList overlays={overlays} onRemove={handleRemoveOverlay} colors={colors} />
+            <OverlaysList
+              overlays={overlays}
+              activeIds={activeIds}
+              onToggle={handleToggleOverlay}
+              onRemove={handleRemoveOverlay}
+              colors={colors}
+            />
           </div>
           <div style={{ height: 1, backgroundColor: colors.border }} />
           <div>

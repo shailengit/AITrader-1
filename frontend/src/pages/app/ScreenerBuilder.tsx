@@ -841,12 +841,23 @@ export default function ScreenerBuilder() {
       // `params` map keyed by column for any non-default window overrides.
       // Sending payload keys as `overlays` makes the backend silently drop
       // them (registry doesn't know about `trend_sma_slow__window50`).
+      //
+      // We also pass `labels` (a parallel array of the friendly column
+      // headers like "SMA 50" / "SMA 200") so the standalone chart can
+      // show the overlay list with the same labels the user saw in the
+      // results table — not the raw backend column name. When the label
+      // can't be recovered (e.g. it was never supplied), we fall back to
+      // a best-effort `name (params)` form on the chart side.
       const cols: string[] = [];
+      const labels: string[] = [];
       const params: Record<string, Record<string, number>> = {};
       for (const c of chartIndicators) {
         const lastSep = c.id.lastIndexOf('__');
         const column = lastSep > 0 ? c.id.slice(0, lastSep) : c.id;
-        if (!cols.includes(column)) cols.push(column);
+        if (!cols.includes(column)) {
+          cols.push(column);
+          labels.push(c.label);
+        }
         if (c.params && Object.keys(c.params).length > 0) {
           params[column] = c.params;
         }
@@ -855,6 +866,7 @@ export default function ScreenerBuilder() {
       if (cutoffDate) qs.set('from', cutoffDate);
       qs.set('range', '1y');
       qs.set('overlays', cols.join(','));
+      if (labels.length) qs.set('labels', labels.join(','));
       if (Object.keys(params).length) qs.set('params', JSON.stringify(params));
       navigate(`/screener/build/chart/${upper}?${qs.toString()}`);
     },

@@ -45,6 +45,12 @@ interface Indicator {
   data: IndicatorData[];
   color?: string;
   lineWidth?: number;
+  /**
+   * When false, the line series is not registered on the chart at all
+   * (no legend entry, no render). When true (default) or omitted, the
+   * series is created and plotted normally.
+   */
+  visible?: boolean;
 }
 
 interface CandleStickChartProps {
@@ -350,6 +356,11 @@ export function CandleStickChart({
     indicatorSeriesRef.current = {};
 
     indicators.forEach((indicator, index) => {
+      // Skip indicators the caller marked invisible. The caller is
+      // responsible for not sending the data; we also skip the
+      // series creation entirely so the legend doesn't show a hidden
+      // overlay.
+      if (indicator.visible === false) return;
       if (!indicator?.data?.length) return;
 
       try {
