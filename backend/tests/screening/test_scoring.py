@@ -98,3 +98,42 @@ def test_base_setup_score_forwards_sub_weights():
     default = compute_base_setup_score(row)
     explicit = compute_base_setup_score(row, sub_weights={'trend': 30, 'momentum': 25, 'volatility': 20, 'volume': 25})
     assert math.isclose(default, explicit, abs_tol=0.05)
+
+
+def test_compute_quant_score_returns_dict_with_score_only_by_default():
+    """When include_alignment is False (default), the result is a dict with only `score`."""
+    filters = {}
+    out = compute_quant_score(_row(), filters)
+    assert isinstance(out, dict)
+    assert 'score' in out
+    assert 'score_minus_return' not in out
+
+
+def test_compute_quant_score_with_alignment_returns_both_keys():
+    """When include_alignment is True and the row has return_pct, both keys are present."""
+    filters = {}
+    row = _row()
+    row['return_pct'] = 5.0
+    out = compute_quant_score(row, filters, include_alignment=True)
+    assert 'score' in out
+    assert 'score_minus_return' in out
+    # 5% return is normalized to 5; score_minus_return = score - 5
+    assert math.isclose(out['score_minus_return'], out['score'] - 5.0, abs_tol=0.5)
+
+
+def test_compute_quant_score_alignment_clamps_extreme_returns():
+    """Return values outside [-100, 100] are clamped before subtraction."""
+    row = _row()
+    row['return_pct'] = 250.0
+    out = compute_quant_score(row, {}, include_alignment=True)
+    assert math.isclose(out['score_minus_return'], out['score'] - 100.0, abs_tol=0.5)
+    row['return_pct'] = -300.0
+    out = compute_quant_score(row, {}, include_alignment=True)
+    assert math.isclose(out['score_minus_return'], out['score'] + 100.0, abs_tol=0.5)
+
+
+def test_compute_quant_score_alignment_skipped_when_no_return_pct():
+    """Without return_pct, score_minus_return is omitted even if alignment is on."""
+    row = _row()
+    out = compute_quant_score(row, {}, include_alignment=True)
+    assert 'score_minus_return' not in out

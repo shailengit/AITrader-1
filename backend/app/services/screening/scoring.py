@@ -216,12 +216,28 @@ def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float
     return round(sum(bonuses) / len(bonuses), 1)
 
 
-def compute_quant_score(row: pd.Series, filters: Dict[str, Any], base_weight: int = 60) -> float:
-    """Compute hybrid final score with adjustable base setup weight (0-100)."""
-    base = compute_base_setup_score(row)
+def compute_quant_score(
+    row: pd.Series,
+    filters: Dict[str, Any],
+    base_weight: int = 60,
+    sub_weights: Optional[Dict[str, int]] = None,
+    include_alignment: bool = False,
+) -> Dict[str, Any]:
+    """Compute the hybrid quant score and optional alignment diagnostic.
+
+    Returns a dict with at least `score`. When `include_alignment` is True
+    and the row carries a `return_pct`, also returns `score_minus_return`
+    (score minus the return clipped to [-100, 100]).
+    """
+    base = compute_base_setup_score(row, sub_weights)
     bonus = compute_filter_match_bonus(row, filters)
     bw = max(0, min(100, base_weight)) / 100.0
-    return round(base * bw + bonus * (1 - bw), 1)
+    score = round(base * bw + bonus * (1 - bw), 1)
+    out: Dict[str, Any] = {'score': score}
+    if include_alignment and row.get('return_pct') is not None:
+        normalized_return = max(-100.0, min(100.0, float(row['return_pct'])))
+        out['score_minus_return'] = round(score - normalized_return, 1)
+    return out
 
 
 # =============================================================================

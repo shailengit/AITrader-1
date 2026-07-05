@@ -1345,6 +1345,8 @@ def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_ca
 def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, progress_callback=None,
                                 log_callback=None, filters: Optional[Dict[str, Any]] = None,
                                 base_weight: int = 60,
+                                sub_weights: Optional[Dict[str, int]] = None,
+                                include_alignment: bool = False,
                                 result_columns: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
@@ -1392,8 +1394,15 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
             "summary": "No stocks matched the technical criteria."
         }
 
-    # Compute hybrid score (60% base setup + 40% filter match) and sort descending
-    tech_df['score'] = tech_df.apply(lambda row: compute_quant_score(row, filters or {}, base_weight), axis=1)
+    # Compute hybrid score (60% base setup + 40% filter match) and sort descending.
+    # `include_alignment` propagates from the request; if true, each result row
+    # gets a `score_minus_return` field too (computed post-enrich below).
+    tech_df['score'] = tech_df.apply(
+        lambda row: compute_quant_score(
+            row, filters or {}, base_weight, sub_weights, include_alignment
+        )['score'],
+        axis=1,
+    )
     tech_df = tech_df.sort_values(by='score', ascending=False)
 
     # Map ta column names to frontend-friendly names
@@ -1460,6 +1469,15 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
     # Apply earnings calendar filter if specified
     top_records = _apply_earnings_filter(top_records, filters)
 
+    # When alignment diagnostic is requested, attach `score_minus_return` to each
+    # record now that enrichment has populated `return_pct`.
+    if include_alignment:
+        for record in top_records:
+            return_pct = record.get('return_pct')
+            if return_pct is not None:
+                normalized = max(-100.0, min(100.0, float(return_pct)))
+                record['score_minus_return'] = round(float(record.get('score', 0)) - normalized, 1)
+
     return {
         "technical_candidates": len(results_records),
         "results": top_records,
@@ -1473,7 +1491,9 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
 def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: Optional[str] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None,
                                         progress_callback=None, agent_log_callback=None,
                                         filters: Optional[Dict[str, Any]] = None,
-                                        base_weight: int = 60) -> Dict[str, Any]:
+                                        base_weight: int = 60,
+                                        sub_weights: Optional[Dict[str, int]] = None,
+                                        include_alignment: bool = False) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
     Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
@@ -1511,7 +1531,9 @@ Screening criteria applied:
             progress_callback=progress_callback,
             log_callback=None,
             filters=filters,
-            base_weight=base_weight
+            base_weight=base_weight,
+            sub_weights=sub_weights,
+            include_alignment=include_alignment,
         )
 
         log_capture.log_system(f"Technical screen complete: {structured['technical_candidates']} candidates found")
