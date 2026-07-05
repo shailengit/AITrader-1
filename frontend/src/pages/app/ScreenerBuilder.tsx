@@ -1536,6 +1536,8 @@ export default function ScreenerBuilder() {
               returnLoading={returnLoading}
               cutoffDate={cutoffDate}
               filters={filters}
+              showAlignment={showAlignment}
+              baseWeight={baseWeight}
               onExport={exportToLab}
               onShowBacktest={() => {
                 // Toggle the inline backtest panel (Buy & Hold + With Exit Rules)

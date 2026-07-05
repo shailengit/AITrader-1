@@ -7,6 +7,8 @@ import {
   FileDown,
   Eye,
   EyeOff,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useTheme } from '../../../context/ThemeContext';
 import {
@@ -14,6 +16,12 @@ import {
   type ResultsColumn,
 } from '../../../data/filterCatalog';
 import type { FilterCondition, FilterGroup } from '../../../hooks/useScreens';
+import {
+  SUB_SCORE_KEYS,
+  getSubScoreTooltip,
+  getSubScoreInputs,
+  type SubScoreKey,
+} from '../../../lib/subScoreInputs';
 
 // Buy-and-hold return is only meaningful if at least 2 trading days have elapsed
 // since the as-of-date. Otherwise the buy/sell prices collapse to the same bar.
@@ -52,6 +60,10 @@ interface ResultsPanelProps {
    *  chart overlays so the results table is meaningful for what was actually
    *  filtered on. */
   filters?: FilterGroup;
+  /** When true, show the "Δ vs return" alignment column. */
+  showAlignment?: boolean;
+  /** Current base_weight value; used in the composite-score tooltip. */
+  baseWeight?: number;
   onExport: () => void;
   onShowBacktest: () => void;
   /** Called when the user clicks anywhere on a results row. */
@@ -66,6 +78,8 @@ export default function ResultsPanel({
   returnLoading,
   cutoffDate,
   filters,
+  showAlignment = false,
+  baseWeight = 60,
   onExport,
   onShowBacktest,
   onTickerClick,
@@ -73,6 +87,18 @@ export default function ResultsPanel({
   const { isDarkMode } = useTheme();
 
   const [showAllMetrics, setShowAllMetrics] = useState(false);
+  // Per-(ticker, sub-score) expand state for the inline breakdown rows.
+  const [expanded, setExpanded] = useState<Record<string, Set<SubScoreKey>>>({});
+  const toggleExpand = (ticker: string, key: SubScoreKey) => {
+    setExpanded((prev) => {
+      const next = { ...prev };
+      const set = new Set(next[ticker] ?? []);
+      if (set.has(key)) set.delete(key);
+      else set.add(key);
+      next[ticker] = set;
+      return next;
+    });
+  };
 
   // Derive one column per indicator referenced by the active filters.
   // Falls back to empty array when no filters were applied yet (load/empty states).
@@ -169,13 +195,6 @@ export default function ResultsPanel({
   }
 
   // ── Results table ───────────────────────────────────────
-  const formatScore = (score: number | undefined): { label: string; color: string } => {
-    if (score == null) return { label: '--', color: colors.subtle };
-    if (score >= 70) return { label: score.toFixed(0), color: colors.accent };
-    if (score >= 50) return { label: score.toFixed(0), color: colors.warning };
-    return { label: score.toFixed(0), color: colors.danger };
-  };
-
   const formatPrice = (val: number | undefined): string => {
     if (val == null) return '--';
     return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -371,6 +390,41 @@ export default function ResultsPanel({
                     {header}
                   </th>
                 ))}
+                {/* Sub-score columns: trend, momentum, volatility, volume.
+                    Tooltip describes what each sub-score measures; click
+                    a cell to expand the indicator inputs beneath the row. */}
+                {SUB_SCORE_KEYS.map((key) => (
+                  <th
+                    key={key}
+                    style={{
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: colors.muted,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'left',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={
+                      key === 'trend_score'
+                        ? 'Trend strength (ADX, SMA stack, MACD)'
+                        : key === 'momentum_score'
+                        ? 'Momentum (RSI, ROC, Stoch)'
+                        : key === 'volatility_score'
+                        ? 'Volatility regime (ATR%, BBW)'
+                        : 'Volume confirmation (Vol ratio, MFI)'
+                    }
+                  >
+                    {key === 'trend_score'
+                      ? 'Trend'
+                      : key === 'momentum_score'
+                      ? 'Momentum'
+                      : key === 'volatility_score'
+                      ? 'Volatility'
+                      : 'Volume'}
+                  </th>
+                ))}
                 {/* Filter-derived columns — what's actually being tested. */}
                 {filterColumns.map((col) => (
                   <th
@@ -429,16 +483,33 @@ export default function ResultsPanel({
                     {returnLoading ? 'Loading...' : returnLabel}
                   </th>
                 )}
+                {showAlignment && (
+                  <th
+                    style={{
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: colors.accent,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      textAlign: 'right',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title="Score minus normalized return. Small values mean score and return agree."
+                  >
+                    Δ vs return
+                  </th>
+                )}
               </tr>
             </thead>
 
             {/* Table body */}
             <tbody>
-              {results.map((row, idx) => {
-                const score = formatScore(row.score);
+              {results.flatMap((row, idx) => {
+                const openSet = expanded[row.ticker] ?? new Set<SubScoreKey>();
                 const retVal = returnData?.[row.ticker.toUpperCase()];
                 const retPositive = retVal != null && retVal >= 0;
-                return (
+                const cells = [
                   <tr
                     key={row.ticker}
                     role="button"
@@ -453,7 +524,9 @@ export default function ResultsPanel({
                     }}
                     style={{
                       borderBottom:
-                        idx < results.length - 1 ? `1px solid ${colors.border}` : 'none',
+                        idx < results.length - 1 || openSet.size > 0
+                          ? `1px solid ${colors.border}`
+                          : 'none',
                       backgroundColor: colors.bg,
                       cursor: 'pointer',
                       transition: 'background-color 150ms ease',
@@ -486,12 +559,56 @@ export default function ResultsPanel({
                         style={{
                           fontSize: 13,
                           fontWeight: 700,
-                          color: score.color,
+                          color: row.score == null
+                            ? colors.subtle
+                            : Number(row.score) >= 70
+                            ? colors.accent
+                            : Number(row.score) >= 50
+                            ? colors.warning
+                            : colors.danger,
                         }}
+                        title={`Composite = base setup (${baseWeight}%) + filter match (${100 - baseWeight}%)`}
                       >
-                        {score.label}
+                        {row.score == null ? '--' : Number(row.score).toFixed(0)}
                       </span>
                     </td>
+                    {SUB_SCORE_KEYS.map((key) => {
+                      const value = row[key];
+                      const formatted = value == null ? '--' : Number(value).toFixed(0);
+                      const color =
+                        value == null
+                          ? colors.subtle
+                          : Number(value) >= 70
+                          ? colors.accent
+                          : Number(value) >= 50
+                          ? colors.warning
+                          : colors.danger;
+                      const tooltip = getSubScoreTooltip(key, row);
+                      const isOpen = openSet.has(key);
+                      return (
+                        <td
+                          key={key}
+                          title={tooltip}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(row.ticker, key);
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color,
+                            cursor: 'pointer',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            {formatted}
+                          </span>
+                        </td>
+                      );
+                    })}
                     {/* Filter-derived values */}
                     {filterColumns.map((col) => {
                       // Prefer the canonical column, but fall back to a
@@ -507,8 +624,8 @@ export default function ResultsPanel({
                         raw == null
                           ? '--'
                           : typeof raw === 'number'
-                            ? raw.toFixed(2)
-                            : String(raw);
+                          ? raw.toFixed(2)
+                          : String(raw);
                       return (
                         <td
                           key={col.dataKey}
@@ -556,8 +673,112 @@ export default function ResultsPanel({
                         {returnLoading ? '...' : formatReturn(retVal)}
                       </td>
                     )}
-                  </tr>
-                );
+                    {showAlignment && (
+                      <td
+                        style={{
+                          padding: '10px 14px',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color:
+                            row.score_minus_return == null
+                              ? colors.subtle
+                              : Number(row.score_minus_return) >= 0
+                              ? colors.accent
+                              : colors.danger,
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                        title="Score minus normalized return. Small values mean score and return agree."
+                      >
+                        {row.score_minus_return == null
+                          ? '--'
+                          : `${
+                              Number(row.score_minus_return) >= 0 ? '+' : ''
+                            }${Number(row.score_minus_return).toFixed(1)}`}
+                      </td>
+                    )}
+                  </tr>,
+                ];
+                if (openSet.size > 0) {
+                  const inputsByKey: Record<SubScoreKey, ReturnType<typeof getSubScoreInputs>> = {
+                    trend_score: getSubScoreInputs('trend_score', row),
+                    momentum_score: getSubScoreInputs('momentum_score', row),
+                    volatility_score: getSubScoreInputs('volatility_score', row),
+                    volume_score: getSubScoreInputs('volume_score', row),
+                  };
+                  cells.push(
+                    <tr
+                      key={`${row.ticker}-expand`}
+                      style={{ backgroundColor: colors.surface }}
+                    >
+                      <td
+                        colSpan={99}
+                        style={{
+                          padding: '8px 14px 14px 36px',
+                          borderBottom:
+                            idx < results.length - 1 ? `1px solid ${colors.border}` : 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                            gap: 16,
+                          }}
+                        >
+                          {Array.from(openSet).map((key) => (
+                            <div key={key}>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: colors.muted,
+                                  textTransform: 'uppercase',
+                                  marginBottom: 6,
+                                }}
+                              >
+                                {key === 'trend_score'
+                                  ? 'Trend inputs'
+                                  : key === 'momentum_score'
+                                  ? 'Momentum inputs'
+                                  : key === 'volatility_score'
+                                  ? 'Volatility inputs'
+                                  : 'Volume inputs'}
+                              </div>
+                              {inputsByKey[key].map((inp) => (
+                                <div
+                                  key={inp.label}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: 12,
+                                    color: colors.text,
+                                    padding: '2px 0',
+                                  }}
+                                >
+                                  <span style={{ color: colors.muted }}>{inp.label}</span>
+                                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                    {inp.value == null
+                                      ? '—'
+                                      : typeof inp.value === 'number'
+                                      ? inp.value.toFixed(2)
+                                      : inp.value}
+                                    {inp.note ? (
+                                      <span style={{ color: colors.subtle, marginLeft: 6 }}>
+                                        ({inp.note})
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>,
+                  );
+                }
+                return cells;
               })}
             </tbody>
           </table>
