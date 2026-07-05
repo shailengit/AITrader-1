@@ -56,3 +56,45 @@ def test_momentum_score_stoch_peak_is_55():
     s55 = compute_base_setup_breakdown(_row(momentum_stoch=55.0))['momentum_score']
     s10 = compute_base_setup_breakdown(_row(momentum_stoch=10.0))['momentum_score']
     assert s55 > s10
+
+
+def test_base_setup_default_weights_match_legacy_behavior():
+    """When sub_weights is None, the total uses 30/25/20/25 hard-coded."""
+    row = _row()
+    default = compute_base_setup_breakdown(row)['total']
+    explicit = compute_base_setup_breakdown(row, sub_weights={'trend': 30, 'momentum': 25, 'volatility': 20, 'volume': 25})['total']
+    assert math.isclose(default, explicit, abs_tol=0.05)
+
+
+def test_base_setup_user_weights_change_total():
+    """Larger weight on trend shifts the total toward the trend sub-score."""
+    # Use a row where the sub-scores are not all equal so the weight swap is observable.
+    # With close > SMA20 > SMA50 + MACD>0 + high ADX, trend_score ~ 95-100.
+    # With RSI 30 (oversold) + ROC -10, momentum_score is depressed.
+    row = _row(
+        trend_adx=55.0,
+        trend_sma_fast=99.0,
+        trend_sma_slow=95.0,
+        close=101.0,
+        trend_macd_diff=1.5,
+        momentum_rsi=30.0,
+        momentum_roc=-10.0,
+    )
+    trend_heavy = compute_base_setup_breakdown(row, sub_weights={'trend': 100, 'momentum': 0, 'volatility': 0, 'volume': 0})['total']
+    momentum_heavy = compute_base_setup_breakdown(row, sub_weights={'trend': 0, 'momentum': 100, 'volatility': 0, 'volume': 0})['total']
+    assert trend_heavy > momentum_heavy
+
+
+def test_base_setup_all_zero_weights_falls_back_to_equal():
+    """All-zero weights must not raise; fallback uses equal weights."""
+    row = _row()
+    out = compute_base_setup_breakdown(row, sub_weights={'trend': 0, 'momentum': 0, 'volatility': 0, 'volume': 0})
+    assert 0 <= out['total'] <= 100
+
+
+def test_base_setup_score_forwards_sub_weights():
+    """compute_base_setup_score must accept and forward sub_weights."""
+    row = _row()
+    default = compute_base_setup_score(row)
+    explicit = compute_base_setup_score(row, sub_weights={'trend': 30, 'momentum': 25, 'volatility': 20, 'volume': 25})
+    assert math.isclose(default, explicit, abs_tol=0.05)

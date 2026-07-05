@@ -4,13 +4,13 @@ Extracted from agno_screener.py for better maintainability.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
+def compute_base_setup_breakdown(row: pd.Series, sub_weights: Optional[Dict[str, int]] = None) -> Dict[str, float]:
     """Compute 0-100 sub-scores for each base-setup category.
 
     Returns dict with:
@@ -86,11 +86,21 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     mfi_score = min(mfi, 100) if mfi >= 50 else mfi * 2
     volume_score = round(vol_ratio_score * 0.50 + mfi_score * 0.50, 1)
 
+    # Apply user-supplied sub-weights. Missing keys fall back to legacy
+    # hard-coded values; all-zero weights fall back to equal weighting
+    # to avoid division by zero.
+    default_sub_weights = {'trend': 30, 'momentum': 25, 'volatility': 20, 'volume': 25}
+    weights = {**default_sub_weights, **(sub_weights or {})}
+    weight_sum = sum(weights.values())
+    if weight_sum == 0:
+        weights = {k: 1 for k in default_sub_weights}
+        weight_sum = sum(weights.values())
     total = round(
-        trend_score * 0.30 +
-        momentum_score * 0.25 +
-        volatility_score * 0.20 +
-        volume_score * 0.25, 1
+        (trend_score * weights['trend']
+         + momentum_score * weights['momentum']
+         + volatility_score * weights['volatility']
+         + volume_score * weights['volume']) / weight_sum,
+        1,
     )
 
     return {
@@ -102,9 +112,9 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     }
 
 
-def compute_base_setup_score(row: pd.Series) -> float:
+def compute_base_setup_score(row: pd.Series, sub_weights: Optional[Dict[str, int]] = None) -> float:
     """Compute a 0-100 base setup score from technical indicators."""
-    return compute_base_setup_breakdown(row)['total']
+    return compute_base_setup_breakdown(row, sub_weights)['total']
 
 
 def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float:
