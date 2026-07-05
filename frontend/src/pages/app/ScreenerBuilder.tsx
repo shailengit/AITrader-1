@@ -35,6 +35,7 @@ import ShareDialog from './ScreenerBuilder/ShareDialog';
 import ResultsPanel from './ScreenerBuilder/ResultsPanel';
 import BacktestPanel from './ScreenerBuilder/BacktestPanel';
 import CompositeBuilder from './ScreenerBuilder/CompositeBuilder';
+import ScoringPanel, { DEFAULT_BASE_WEIGHT, DEFAULT_SUB_WEIGHTS, DEFAULT_SHOW_ALIGNMENT } from './ScreenerBuilder/ScoringPanel';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -251,6 +252,14 @@ export default function ScreenerBuilder() {
   const [maxResults, setMaxResults] = useState(50);
   const [useAi, setUseAi] = useState(false);
 
+  // Scoring tunables (added 2026-07-05). Persisted in screen presets and
+  // the page-state draft. Sent on every scan request.
+  const [baseWeight, setBaseWeight] = useState(60);
+  const [subWeights, setSubWeights] = useState<{ trend: number; momentum: number; volatility: number; volume: number }>(
+    { trend: 30, momentum: 25, volatility: 20, volume: 25 },
+  );
+  const [showAlignment, setShowAlignment] = useState(false);
+
   // Scan state
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
@@ -365,6 +374,9 @@ export default function ScreenerBuilder() {
         sortOrder,
         maxResults,
         useAi,
+        baseWeight,
+        subWeights,
+        showAlignment,
         // Persisted so the back button (which remounts the page)
         // returns to the same screen state, not a fresh builder.
         scanId,
@@ -377,7 +389,7 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, scanId]);
+  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, scanId]);
 
   // Persist scanResults separately to avoid re-serializing on every
   // render (which would happen if we put it in the main draft effect).
@@ -437,6 +449,9 @@ export default function ScreenerBuilder() {
           if (draft.sort?.order) setSortOrder(draft.sort?.order);
           if (draft.maxResults) setMaxResults(draft.maxResults);
           if (draft.useAi !== undefined) setUseAi(draft.useAi);
+          if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
+          if (draft.subWeights) setSubWeights(draft.subWeights);
+          if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
           if (draft.drawerTicker) setDrawerTicker(draft.drawerTicker);
           if (draft.scanId) restoredScanId = draft.scanId;
           if (Array.isArray(draft.scanResults)) {
@@ -457,6 +472,9 @@ export default function ScreenerBuilder() {
           if (draft.sort?.order) setSortOrder(draft.sort?.order);
           if (draft.maxResults) setMaxResults(draft.maxResults);
           if (draft.useAi !== undefined) setUseAi(draft.useAi);
+          if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
+          if (draft.subWeights) setSubWeights(draft.subWeights);
+          if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
         }
       }
     } catch {
@@ -618,6 +636,9 @@ export default function ScreenerBuilder() {
     if (preset.maxResults) setMaxResults(preset.maxResults);
     if (preset.cutoffDate) setCutoffDate(preset.cutoffDate);
     if (preset.useAi !== undefined) setUseAi(preset.useAi);
+    if (typeof preset.baseWeight === 'number') setBaseWeight(preset.baseWeight);
+    if (preset.subWeights) setSubWeights(preset.subWeights);
+    if (typeof preset.showAlignment === 'boolean') setShowAlignment(preset.showAlignment);
   };
 
   // ── Save ───────────────────────────────────────────────
@@ -631,6 +652,9 @@ export default function ScreenerBuilder() {
       maxResults,
       cutoffDate: cutoffDate || undefined,
       useAi,
+      baseWeight,
+      subWeights,
+      showAlignment,
     });
     setScreenName(name);
   };
@@ -682,6 +706,9 @@ export default function ScreenerBuilder() {
           cutoff_date: cutoffDate || undefined,
           max_results: maxResults,
           filters: backendFilters,
+          base_weight: baseWeight,
+          sub_weights: subWeights,
+          include_alignment: showAlignment,
           // Tell the backend which result-row keys the UI needs values for
           // (e.g. the user's chosen SMA 200 with window=200). The worker
           // computes each column at the requested params and includes the
@@ -765,7 +792,7 @@ export default function ScreenerBuilder() {
       setIsScanning(false);
       setScanError(err instanceof Error ? err.message : 'Unknown error');
     }
-  }, [filters, useAi, cutoffDate, maxResults]);
+  }, [filters, useAi, cutoffDate, maxResults, baseWeight, subWeights, showAlignment]);
 
   const fetchResults = async (id: string) => {
     try {
@@ -1295,6 +1322,21 @@ export default function ScreenerBuilder() {
             </div>
           )}
         </div>
+
+        {/* ── Scoring panel ──────────────────────────────── */}
+        <ScoringPanel
+          baseWeight={baseWeight}
+          subWeights={subWeights}
+          showAlignment={showAlignment}
+          onBaseWeightChange={setBaseWeight}
+          onSubWeightChange={(key, v) => setSubWeights((prev) => ({ ...prev, [key]: v }))}
+          onShowAlignmentChange={setShowAlignment}
+          onReset={() => {
+            setBaseWeight(DEFAULT_BASE_WEIGHT);
+            setSubWeights(DEFAULT_SUB_WEIGHTS);
+            setShowAlignment(DEFAULT_SHOW_ALIGNMENT);
+          }}
+        />
 
         {/* ── Sort & Config ──────────────────────────────── */}
         <div
