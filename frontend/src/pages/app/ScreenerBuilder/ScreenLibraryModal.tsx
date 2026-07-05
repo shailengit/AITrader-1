@@ -51,6 +51,9 @@ export default function ScreenLibraryModal({
       sort: template.sort,
       maxResults: template.maxResults,
       useAi: template.useAi,
+      baseWeight: template.baseWeight,
+      subWeights: template.subWeights,
+      showAlignment: template.showAlignment,
     };
     onLoad(preset);
     onOpenChange(false);

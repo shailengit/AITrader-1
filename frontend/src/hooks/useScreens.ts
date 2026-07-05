@@ -41,6 +41,15 @@ export interface ScreenPreset {
   useAi: boolean;
   category?: string;
   tags?: string[];
+  // Scoring tunables (added 2026-07-05). All optional — defaults applied on load.
+  baseWeight?: number; // 0–100, default 60
+  subWeights?: {
+    trend: number;     // 0–100, default 30
+    momentum: number;  // 0–100, default 25
+    volatility: number; // 0–100, default 20
+    volume: number;    // 0–100, default 25
+  };
+  showAlignment?: boolean; // default false
 }
 
 export interface UseScreensReturn {

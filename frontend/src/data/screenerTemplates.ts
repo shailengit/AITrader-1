@@ -31,6 +31,15 @@ export interface ScreenTemplate {
   sort?: { by: string; order: 'asc' | 'desc' };
   maxResults: number;
   useAi: boolean;
+  // Scoring tunables (added 2026-07-05). All optional — defaults applied on load.
+  baseWeight?: number;
+  subWeights?: {
+    trend: number;
+    momentum: number;
+    volatility: number;
+    volume: number;
+  };
+  showAlignment?: boolean;
 }
 
 // ---------------------------------------------------------------------------
