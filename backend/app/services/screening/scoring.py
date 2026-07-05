@@ -37,12 +37,15 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     trend_score = round(adx_score * 0.40 + sma_score * 0.35 + macd_score * 0.25, 1)
 
     # --- Momentum Quality ---
+    # Peak at RSI 65 (strong with room to run), zero at RSI 30 and 100.
+    # ROC contributes directionally — negative ROC subtracts, positive adds.
+    # Stoch peak at 55, zero at 10 and 100.
     rsi = row.get('momentum_rsi', 50)
-    rsi_score = max(0, 100 - abs(rsi - 55) * 2.5)
+    rsi_score = 100 - min(abs(rsi - 65), 35) * (100 / 35)
     roc = row.get('momentum_roc', 0)
-    roc_score = min(100, max(0, 50 + roc * 5)) if roc is not None else 50
+    roc_score = 50 + max(-50, min(50, roc * 5))
     stoch = row.get('momentum_stoch', 50)
-    stoch_score = max(0, 100 - abs(stoch - 50) * 2) if stoch is not None else 50
+    stoch_score = 100 - min(abs(stoch - 55), 45) * (100 / 45) if stoch is not None else 50
     momentum_score = round(rsi_score * 0.45 + roc_score * 0.30 + stoch_score * 0.25, 1)
 
     # --- Volatility Regime ---
