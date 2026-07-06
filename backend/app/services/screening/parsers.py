@@ -244,36 +244,49 @@ def apply_quant_filters(df: pd.DataFrame, filters: Dict[str, Any]) -> pd.DataFra
     # Dynamic indicator_filters (new format: any indicator with min/max and optional params)
     for item in filters.get("indicator_filters", []):
         col = item.get("column")
-        if not col or col not in df.columns:
-            logger.warning("Filter references missing column: %s", col)
+        if not col:
             continue
-        try:
-            condition = item.get("condition")
-            ref_col = item.get("reference_column")
-            if condition and ref_col and ref_col in df.columns:
-                # Cross-indicator comparison (e.g. EMA above SMA)
-                if condition == "above":
-                    df = df[df[col] > df[ref_col]]
-                elif condition == "below":
-                    df = df[df[col] < df[ref_col]]
-                elif condition == "equals":
-                    # Use percentage-based tolerance if provided (default 1%)
-                    # Formula: |A - B| <= |B| * tolerance
-                    tol = item.get("tolerance", 0.01)
-                    if tol > 0:
-                        df = df[np.abs(df[col] - df[ref_col]) <= (df[ref_col].abs() * tol)]
-                    else:
-                        df = df[df[col] == df[ref_col]]
-            else:
-                # Threshold-based filter (min/max)
-                min_val = item.get("min")
-                max_val = item.get("max")
-                if min_val is not None:
-                    df = df[df[col] >= min_val]
-                if max_val is not None:
-                    df = df[df[col] <= max_val]
-        except Exception as e:
-            logger.warning("Failed to apply indicator filter on %s: %s", col, e)
+        if col not in df.columns:
+            raise ValueError(
+                f"apply_quant_filters: missing column '{col}' in row DataFrame; "
+                f"offending filter: {item!r}"
+            )
+        condition = item.get("condition")
+        # Cross conditions (crossed_above / crossed_below) are worker-only —
+        # they require a per-ticker time series and lookback, neither of
+        # which `apply_quant_filters` has access to. The aggregator
+        # (`technical_screener`) must strip them from the filters dict
+        # before calling us. If we see one here, it's a bug in the caller
+        # — fail loud so the score doesn't silently ignore the filter.
+        if condition in ("crossed_above", "crossed_below"):
+            raise ValueError(
+                f"apply_quant_filters: '{condition}' is worker-only; "
+                f"the aggregator must strip cross conditions before calling apply_quant_filters. "
+                f"Offending filter: {item!r}"
+            )
+        ref_col = item.get("reference_column")
+        if condition and ref_col and ref_col in df.columns:
+            # Cross-indicator comparison (e.g. EMA above SMA)
+            if condition == "above":
+                df = df[df[col] > df[ref_col]]
+            elif condition == "below":
+                df = df[df[col] < df[ref_col]]
+            elif condition == "equals":
+                # Use percentage-based tolerance if provided (default 1%)
+                # Formula: |A - B| <= |B| * tolerance
+                tol = item.get("tolerance", 0.01)
+                if tol > 0:
+                    df = df[np.abs(df[col] - df[ref_col]) <= (df[ref_col].abs() * tol)]
+                else:
+                    df = df[df[col] == df[ref_col]]
+        else:
+            # Threshold-based filter (min/max)
+            min_val = item.get("min")
+            max_val = item.get("max")
+            if min_val is not None:
+                df = df[df[col] >= min_val]
+            if max_val is not None:
+                df = df[df[col] <= max_val]
 
     # Sort (limit removed — scoring will rank and cap downstream)
     sort_by = filters.get("sort_by", "ticker")

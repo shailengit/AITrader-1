@@ -10,6 +10,7 @@ Includes real-time progress callbacks and AGNO stdout capture for SSE streaming.
 import os
 import sys
 import io
+import re
 import logging
 import pandas as pd
 import numpy as np
@@ -525,6 +526,51 @@ def _default_window_for(data_key: str) -> Optional[int]:
     return _DEFAULT_SMA_EMA_WINDOWS.get(data_key)
 
 
+def _ensure_series_on_df(df: pd.DataFrame, column: str, params: Optional[Dict[str, Any]] = None) -> Optional[pd.Series]:
+    """Return a Series for `column` on `df`, adding it as a column if needed.
+
+    Used by cross-evaluation to produce any SMA/EMA series the cross references
+    (e.g. `sma_200`) even when `add_all_ta_features` did not produce it natively.
+    Mirrors the sma/ema fallback in `chart_data.py:230-237` for consistency.
+
+    Lookup order:
+      1. Already a column on `df` → return it as-is.
+      2. In `INDICATOR_REGISTRY` → recompute via the ta library.
+      3. Matches `sma_N` or `ema_N` → compute the generic rolling/ewm mean.
+      4. Otherwise → return None (caller decides what to do).
+    """
+    if column in df.columns:
+        return df[column]
+    recomputed = _recompute_indicator(df, column, params)
+    if recomputed is not None:
+        df[column] = recomputed
+        return recomputed
+    m = re.match(r'^(sma|ema)_(\d+)$', column)
+    if m and 'Close' in df.columns and len(df) >= int(m.group(2)):
+        kind, window = m.group(1), int(m.group(2))
+        if kind == 'sma':
+            s = df['Close'].rolling(window=window, min_periods=window).mean()
+        else:
+            s = df['Close'].ewm(span=window, adjust=False).mean()
+        df[column] = s
+        return s
+    return None
+
+
+def _cross_column_name(cf: Dict[str, Any]) -> str:
+    """Stable column name for a cross condition's evaluated boolean.
+
+    Example:
+        {"column": "trend_sma_slow", "condition": "crossed_above",
+         "reference_column": "sma_200", "lookback_days": 1}
+        → "cross_trend_sma_slow_crossed_above_sma_200_in_1d"
+    """
+    return (
+        f"cross_{cf['column']}_{cf['condition']}_"
+        f"{cf['reference_column']}_in_{cf.get('lookback_days', 1)}d"
+    )
+
+
 def _recompute_indicator(df: pd.DataFrame, column: str, custom_params: Optional[Dict[str, Any]] = None) -> Optional[pd.Series]:
     """Recompute a single technical indicator with optional custom parameters.
 
@@ -649,7 +695,7 @@ def _resolve_requested_indicators(filters: Optional[Dict[str, Any]]) -> tuple[Li
 # QUANT STRATEGY SCREENER (agnoMultiAgentTrader_2.py)
 # =============================================================================
 
-def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None, result_columns: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict]:
+def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None, result_columns: Optional[List[Dict[str, Any]]] = None, cross_filters: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict]:
     """Worker for multiprocessing TA calculations using ta library (matching standalone)."""
     if not ticker or not isinstance(ticker, str):
         return None
@@ -686,6 +732,35 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                 ema = df['Close'].ewm(span=period, adjust=False).mean()
                 df[col] = (ema - ema.shift(1)) / ema.shift(1) * 100
 
+        # Evaluate cross conditions (e.g. "SMA50 crossed above SMA200 in the
+        # past 1 day"). Each cross becomes a boolean column on the returned
+        # row. The aggregator (`technical_screener`) reads these columns to
+        # gate which stocks make it past the filter — see the matching
+        # stripping in `technical_screener` below and the raise guard in
+        # `parsers.apply_quant_filters`. `apply_quant_filters` is NOT expected
+        # to see a cross item; it raises loudly if it does.
+        cross_booleans: Dict[str, bool] = {}
+        for cf in (cross_filters or []):
+            if not isinstance(cf, dict):
+                continue
+            col = cf.get('column')
+            ref = cf.get('reference_column')
+            op = cf.get('condition')
+            if not (col and ref and op in ('crossed_above', 'crossed_below')):
+                continue
+            lookback = max(1, int(cf.get('lookback_days', 1)))
+            col_s = _ensure_series_on_df(df, col, (custom_params or {}).get(col))
+            ref_s = _ensure_series_on_df(df, ref, (custom_params or {}).get(ref))
+            if col_s is None or ref_s is None or len(df) <= lookback:
+                cross_booleans[_cross_column_name(cf)] = False
+                continue
+            if op == 'crossed_above':
+                crossed = (col_s > ref_s) & (col_s.shift(lookback) <= ref_s.shift(lookback))
+            else:  # crossed_below
+                crossed = (col_s < ref_s) & (col_s.shift(lookback) >= ref_s.shift(lookback))
+            last = crossed.iloc[-1]
+            cross_booleans[_cross_column_name(cf)] = bool(last) if pd.notna(last) else False
+
         latest = df.iloc[-1]
         res = {'ticker': ticker.upper(), 'close': round(latest['Close'], 2)}
         for col in requested_indicators:
@@ -694,6 +769,8 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                     res[col] = round(latest[col], 4)
                 except (TypeError, ValueError):
                     res[col] = latest[col]
+        # Attach cross booleans (e.g. `cross_sma_50_crossed_above_sma_200_in_1d`)
+        res.update(cross_booleans)
 
         # Enrich with price stats
         def _safe_round(series, ndigits=2):
@@ -773,7 +850,8 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                        progress_callback=None, log_callback=None,
                        filters: Optional[Dict[str, Any]] = None,
                        custom_params: Optional[Dict[str, Dict[str, Any]]] = None,
-                       result_columns: Optional[List[Dict[str, Any]]] = None) -> str:
+                       result_columns: Optional[List[Dict[str, Any]]] = None,
+                       cross_filters: Optional[List[Dict[str, Any]]] = None) -> str:
     """Screen S&P 1500 using parallel processing with ta library (matching standalone)."""
     # Source tickers from information_schema.tables (matching standalone)
     with ENGINE.connect() as conn:
@@ -790,7 +868,7 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
     if log_callback:
         log_callback(f"Scanning {total} stocks for {merged_indicators}...")
 
-    args = [(ticker, merged_indicators, cutoff_date, custom_params, result_columns) for ticker in tickers]
+    args = [(ticker, merged_indicators, cutoff_date, custom_params, result_columns, cross_filters) for ticker in tickers]
     results = []
     completed = 0
 
@@ -812,11 +890,28 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
 
     df = pd.DataFrame([r for r in results if r is not None])
     if not df.empty:
-        # Apply user-defined QuantFilters if provided
+        # Apply user-defined QuantFilters if provided. Cross conditions
+        # (crossed_above / crossed_below) are worker-evaluated (boolean
+        # columns on the row); we strip them from the filters dict before
+        # calling apply_quant_filters (which raises if it sees a cross
+        # condition) and apply them as direct DataFrame boolean masks.
         if filters:
-            df = apply_quant_filters(df, filters)
+            non_cross = [
+                it for it in filters.get('indicator_filters', [])
+                if it.get('condition') not in ('crossed_above', 'crossed_below')
+            ]
+            stripped = {**filters, 'indicator_filters': non_cross}
+            df = apply_quant_filters(df, stripped)
+            for cf in (cross_filters or []):
+                cname = _cross_column_name(cf)
+                if cname in df.columns:
+                    df = df[df[cname] == True]
             if log_callback:
-                log_callback(f"Applied filters: {len(df)} stocks remain after filtering.")
+                cross_count = len(cross_filters or [])
+                msg = f"Applied filters: {len(df)} stocks remain after filtering."
+                if cross_count:
+                    msg += f" (incl. {cross_count} cross gate{'s' if cross_count != 1 else ''})"
+                log_callback(msg)
         elif sort_by in df.columns:
             df = df.sort_values(by=sort_by)
 
@@ -1370,6 +1465,16 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
         'Volume': 'volume',
     }
 
+    # Cross conditions (crossed_above / crossed_below) are evaluated per
+    # ticker in the worker (which has the 250-row time series) and surfaced
+    # as boolean columns on the result rows. The aggregator then filters on
+    # those booleans. Extract them from `filters` here so the worker gets
+    # them as a separate `cross_filters` arg.
+    cross_filters = [
+        it for it in (filters or {}).get('indicator_filters', [])
+        if it.get('condition') in ('crossed_above', 'crossed_below')
+    ]
+
     # Technical scan with progress and optional filters
     tech_csv = technical_screener(
         requested_indicators,
@@ -1379,6 +1484,7 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
         filters=filters,
         custom_params=custom_params,
         result_columns=result_columns,
+        cross_filters=cross_filters,
     )
     tech_df = pd.read_csv(pd.io.common.StringIO(tech_csv)) if tech_csv != "No results found." else pd.DataFrame()
 

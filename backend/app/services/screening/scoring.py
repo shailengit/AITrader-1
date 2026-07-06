@@ -8,6 +8,12 @@ from typing import Dict, Any, Optional
 
 import pandas as pd
 
+# Imported lazily inside `compute_filter_match_bonus` to avoid a circular
+# import: `agno_screener` already imports from `screening.scoring`, so we
+# can't `from app.services.agno_screener import _cross_column_name` at
+# module load time. See function docstring for details.
+_CROSS_COLUMN_NAME = None
+
 logger = logging.getLogger(__name__)
 
 def compute_base_setup_breakdown(row: pd.Series, sub_weights: Optional[Dict[str, int]] = None) -> Dict[str, float]:
@@ -153,6 +159,29 @@ def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float
 
     for item in indicator_filters:
         col = item.get('column')
+        condition = item.get('condition')
+        ref_col = item.get('reference_column')
+
+        # Cross conditions are evaluated by the worker; we just need to
+        # read the boolean column. Don't require the raw `column` to be
+        # on the row (e.g. the cross column might be there but the raw
+        # SMA column might not).
+        if condition in ('crossed_above', 'crossed_below') and ref_col:
+            global _CROSS_COLUMN_NAME
+            if _CROSS_COLUMN_NAME is None:
+                from app.services.agno_screener import _cross_column_name as _cn
+                _CROSS_COLUMN_NAME = _cn
+            cross_col = _CROSS_COLUMN_NAME(item)
+            if cross_col in row.index:
+                val = row[cross_col]
+                if pd.isna(val):
+                    continue
+                bonuses.append(100.0 if bool(val) else 0.0)
+                continue
+            # Cross column not on the row — fall through to legacy
+            # min/max logic below (which will likely append 0 if there's
+            # no usable data on `col`).
+
         if not col or col not in row.index:
             continue
         actual = row[col]

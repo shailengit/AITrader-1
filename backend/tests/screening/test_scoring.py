@@ -157,3 +157,74 @@ def test_scan_request_sub_weights_default_to_none():
     req = ScanRequest(mode='quant_strategy')
     assert req.sub_weights is None
     assert req.include_alignment is False
+
+
+# ── Cross bonus branch (defence in depth for the crossed_above filter) ──
+
+def test_cross_bonus_is_100_when_cross_happened():
+    """A `crossed_above` filter whose worker-evaluated boolean is True should
+    give a bonus of 100. A False boolean should give 0. Multiple filters
+    should be averaged."""
+    from app.services.screening.scoring import compute_filter_match_bonus
+
+    cross_col = 'cross_sma_50_crossed_above_sma_200_in_1d'
+    filters = {
+        'indicator_filters': [{
+            'column': 'sma_50',
+            'condition': 'crossed_above',
+            'reference_column': 'sma_200',
+            'lookback_days': 1,
+        }]
+    }
+    # The worker would have attached the boolean column to the row.
+    row_true = _row(**{cross_col: True})
+    row_false = _row(**{cross_col: False})
+    assert compute_filter_match_bonus(row_true, filters) == 100.0
+    assert compute_filter_match_bonus(row_false, filters) == 0.0
+
+
+def test_cross_bonus_coexists_with_legacy_filter():
+    """A cross + a legacy min/max filter should be averaged, not overridden."""
+    from app.services.screening.scoring import compute_filter_match_bonus
+
+    cross_col = 'cross_sma_50_crossed_above_sma_200_in_1d'
+    filters = {
+        'indicator_filters': [
+            {
+                'column': 'sma_50',
+                'condition': 'crossed_above',
+                'reference_column': 'sma_200',
+                'lookback_days': 1,
+            },
+            {'column': 'momentum_rsi', 'min': 30},  # row has RSI=55, well above 30
+        ]
+    }
+    row = _row(**{cross_col: True})  # default _row has RSI=55
+    bonus = compute_filter_match_bonus(row, filters)
+    # Cross branch: 100, RSI branch: ~71 → averaged → ~85
+    assert 80 < bonus < 90, f"expected ~85, got {bonus}"
+
+
+def test_cross_bonus_handles_missing_boolean_column():
+    """If the cross boolean column is not on the row (worker didn't run or
+    column not requested), the function should not crash; it should fall
+    through to legacy logic, which finds no min/max and no usable column,
+    so no bonuses are appended and the function returns the neutral 50.0
+    (`compute_filter_match_bonus` returns 50.0 when no bonuses are
+    collected)."""
+    from app.services.screening.scoring import compute_filter_match_bonus
+
+    filters = {
+        'indicator_filters': [{
+            'column': 'sma_50',
+            'condition': 'crossed_above',
+            'reference_column': 'sma_200',
+            'lookback_days': 1,
+        }]
+    }
+    # No cross column on the row, no sma_50 either
+    row = _row()
+    del row['trend_sma_fast']  # so the cross branch's `col in row.index` check is also false
+    bonus = compute_filter_match_bonus(row, filters)
+    # No bonuses collected → neutral 50.0 (not 0, not 100)
+    assert bonus == 50.0
