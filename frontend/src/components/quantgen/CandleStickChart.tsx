@@ -45,6 +45,12 @@ interface Indicator {
   data: IndicatorData[];
   color?: string;
   lineWidth?: number;
+  /**
+   * When false, the line series is not registered on the chart at all
+   * (no legend entry, no render). When true (default) or omitted, the
+   * series is created and plotted normally.
+   */
+  visible?: boolean;
 }
 
 interface CandleStickChartProps {
@@ -166,7 +172,10 @@ export function CandleStickChart({
     chartRef.current.timeScale().fitContent();
   };
 
-  // Initialize chart
+  // Initialize chart — runs ONCE on mount. The chart's height is later
+  // adjusted via a separate effect that calls `applyOptions({ height })`
+  // rather than re-initializing, so indicator series and the candle
+  // series stay attached across height changes (expand/collapse).
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -224,6 +233,15 @@ export function CandleStickChart({
       volumeSeriesRef.current = null;
       cutoffLineRef.current = null;
     };
+  }, []);
+
+  // Adjust chart height without tearing down the chart. Runs whenever
+  // the height prop changes. Lightweight-charts accepts a height change
+  // via `applyOptions` and the series stay attached across height
+  // changes (expand/collapse, full-page vs drawer).
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({ height });
   }, [height]);
 
   // Update candlestick data
@@ -338,6 +356,11 @@ export function CandleStickChart({
     indicatorSeriesRef.current = {};
 
     indicators.forEach((indicator, index) => {
+      // Skip indicators the caller marked invisible. The caller is
+      // responsible for not sending the data; we also skip the
+      // series creation entirely so the legend doesn't show a hidden
+      // overlay.
+      if (indicator.visible === false) return;
       if (!indicator?.data?.length) return;
 
       try {

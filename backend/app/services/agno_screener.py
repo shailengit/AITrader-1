@@ -83,55 +83,8 @@ BASE_SCORING_INDICATORS = [
 
 # Indicator registry: maps ta column names to their recomputation functions and default params.
 # Used for dynamic indicator fetching and custom parameter override in Quant Strategy screener.
-INDICATOR_REGISTRY = {
-    # Volume
-    'volume_adi': {'module': 'ta.volume', 'class': 'AccDistIndexIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}},
-    'volume_obv': {'module': 'ta.volume', 'class': 'OnBalanceVolumeIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}},
-    'volume_cmf': {'module': 'ta.volume', 'class': 'ChaikinMoneyFlowIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, 'default_window': 20},
-    'volume_fi': {'module': 'ta.volume', 'class': 'ForceIndexIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}, 'default_window': 13},
-    'volume_em': {'module': 'ta.volume', 'class': 'EaseOfMovementIndicator', 'params': {'high': 'High', 'low': 'Low', 'volume': 'Volume'}},
-    'volume_mfi': {'module': 'ta.volume', 'class': 'MFIIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}, 'default_window': 14},
-    'volume_vwap': {'module': 'ta.volume', 'class': 'VolumeWeightedAveragePrice', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'}},
-    'volume_nvi': {'module': 'ta.volume', 'class': 'NegativeVolumeIndexIndicator', 'params': {'close': 'Close', 'volume': 'Volume'}},
-    # Volatility
-    'volatility_bbm': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_mavg'},
-    'volatility_bbh': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_hband'},
-    'volatility_bbl': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_lband'},
-    'volatility_bbw': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_wband'},
-    'volatility_bbp': {'module': 'ta.volatility', 'class': 'BollingerBands', 'params': {'close': 'Close'}, 'default_window': 20, 'default_window_dev': 2, 'output': 'bollinger_pband'},
-    'volatility_kcw': {'module': 'ta.volatility', 'class': 'KeltnerChannel', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 20, 'output': 'keltner_channel_wband'},
-    'volatility_atr': {'module': 'ta.volatility', 'class': 'AverageTrueRange', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14},
-    'volatility_ui': {'module': 'ta.volatility', 'class': 'UlcerIndex', 'params': {'close': 'Close'}, 'default_window': 14},
-    # Trend
-    'trend_sma_fast': {'module': 'ta.trend', 'class': 'SMAIndicator', 'params': {'close': 'Close'}, 'default_window': 20},
-    'trend_sma_slow': {'module': 'ta.trend', 'class': 'SMAIndicator', 'params': {'close': 'Close'}, 'default_window': 50},
-    'trend_ema_fast': {'module': 'ta.trend', 'class': 'EMAIndicator', 'params': {'close': 'Close'}, 'default_window': 12},
-    'trend_ema_slow': {'module': 'ta.trend', 'class': 'EMAIndicator', 'params': {'close': 'Close'}, 'default_window': 26},
-    'trend_macd': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9},
-    'trend_macd_signal': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9, 'output': 'macd_signal'},
-    'trend_macd_diff': {'module': 'ta.trend', 'class': 'MACD', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9, 'output': 'macd_diff'},
-    'trend_adx': {'module': 'ta.trend', 'class': 'ADXIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14},
-    'trend_cci': {'module': 'ta.trend', 'class': 'CCIIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 20},
-    'trend_trix': {'module': 'ta.trend', 'class': 'TRIXIndicator', 'params': {'close': 'Close'}, 'default_window': 15},
-    'trend_mass_index': {'module': 'ta.trend', 'class': 'MassIndex', 'params': {'high': 'High', 'low': 'Low'}},
-    'trend_aroon_up': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
-    'trend_aroon_down': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
-    'trend_aroon_ind': {'module': 'ta.trend', 'class': 'AroonIndicator', 'params': {'close': 'Close'}, 'default_window': 25},
-    'trend_stc': {'module': 'ta.trend', 'class': 'STCIndicator', 'params': {'close': 'Close'}},
-    # Momentum
-    'momentum_rsi': {'module': 'ta.momentum', 'class': 'RSIIndicator', 'params': {'close': 'Close'}, 'default_window': 14},
-    'momentum_stoch': {'module': 'ta.momentum', 'class': 'StochasticOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14, 'default_smooth_window': 3},
-    'momentum_stoch_signal': {'module': 'ta.momentum', 'class': 'StochasticOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_window': 14, 'default_smooth_window': 3, 'output': 'stoch_signal'},
-    'momentum_wr': {'module': 'ta.momentum', 'class': 'WilliamsRIndicator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}, 'default_lbp': 14},
-    'momentum_ao': {'module': 'ta.momentum', 'class': 'AwesomeOscillatorIndicator', 'params': {'high': 'High', 'low': 'Low'}},
-    'momentum_roc': {'module': 'ta.momentum', 'class': 'ROCIndicator', 'params': {'close': 'Close'}, 'default_window': 12},
-    'momentum_tsi': {'module': 'ta.momentum', 'class': 'TSIIndicator', 'params': {'close': 'Close'}, 'default_window_slow': 25, 'default_window_fast': 13},
-    'momentum_uo': {'module': 'ta.momentum', 'class': 'UltimateOscillator', 'params': {'high': 'High', 'low': 'Low', 'close': 'Close'}},
-    'momentum_kama': {'module': 'ta.momentum', 'class': 'KAMAIndicator', 'params': {'close': 'Close'}, 'default_window': 10, 'default_pow1': 2, 'default_pow2': 30},
-    'momentum_ppo': {'module': 'ta.momentum', 'class': 'PercentagePriceOscillator', 'params': {'close': 'Close'}, 'default_window_slow': 26, 'default_window_fast': 12, 'default_window_sign': 9},
-    # Others
-    'others_dr': {'module': 'ta.others', 'class': 'DailyReturnIndicator', 'params': {'close': 'Close'}},
-}
+# Re-exported for backwards compatibility — will be removed when agno_screener.py is deleted.
+from app.services.screening.indicators import INDICATOR_REGISTRY  # noqa: F401
 
 # Friendly name mapping for common indicators (used in LLM prompts)
 INDICATOR_FRIENDLY_NAMES = {
@@ -557,6 +510,21 @@ def tool_verify_eps_acceleration(tickers: List[Dict], log_callback=None) -> List
 # INDICATOR RECOMPUTATION HELPERS
 # =============================================================================
 
+# Default window for friendly SMA/EMA names, used as a fallback when the
+# frontend sends a result_column without explicit params. The frontend
+# always sends params for non-default windows (e.g. sma_400 with
+# window=400), so this is only hit for the canonical names.
+_DEFAULT_SMA_EMA_WINDOWS = {
+    'sma_10': 10, 'sma_20': 20, 'sma_50': 50, 'sma_100': 100, 'sma_200': 200,
+    'ema_9': 9, 'ema_12': 12, 'ema_20': 20, 'ema_26': 26,
+}
+
+
+def _default_window_for(data_key: str) -> Optional[int]:
+    """Return the conventional default window for a friendly SMA/EMA name."""
+    return _DEFAULT_SMA_EMA_WINDOWS.get(data_key)
+
+
 def _recompute_indicator(df: pd.DataFrame, column: str, custom_params: Optional[Dict[str, Any]] = None) -> Optional[pd.Series]:
     """Recompute a single technical indicator with optional custom parameters.
 
@@ -681,7 +649,7 @@ def _resolve_requested_indicators(filters: Optional[Dict[str, Any]]) -> tuple[Li
 # QUANT STRATEGY SCREENER (agnoMultiAgentTrader_2.py)
 # =============================================================================
 
-def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> Optional[Dict]:
+def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_date: Optional[str] = None, custom_params: Optional[Dict[str, Dict[str, Any]]] = None, result_columns: Optional[List[Dict[str, Any]]] = None) -> Optional[Dict]:
     """Worker for multiprocessing TA calculations using ta library (matching standalone)."""
     if not ticker or not isinstance(ticker, str):
         return None
@@ -728,10 +696,38 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                     res[col] = latest[col]
 
         # Enrich with price stats
-        res['sma_20'] = round(float(df['Close'].rolling(window=20).mean().iloc[-1]), 2)
-        res['ema_9'] = round(float(df['Close'].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
-        res['high_52w'] = round(float(df['High'].tail(252).max()), 2)
-        res['low_52w'] = round(float(df['Low'].tail(252).min()), 2)
+        def _safe_round(series, ndigits=2):
+            v = series.iloc[-1] if len(series) else float('nan')
+            return None if pd.isna(v) else round(float(v), ndigits)
+        res['ema_9'] = _safe_round(df['Close'].ewm(span=9, adjust=False).mean())
+        res['high_52w'] = round(float(df['High'].tail(252).max()), 2) if len(df) else None
+        res['low_52w'] = round(float(df['Low'].tail(252).min()), 2) if len(df) else None
+
+        # Dynamic enrichment: for every result_column the frontend asked
+        # for, ensure a value is in the result row. The column may already
+        # be in `latest` (via add_all_ta_features or custom_params), in
+        # which case we just copy it. Otherwise compute it on the fly —
+        # this is the only way the UI gets values for arbitrary
+        # SMA/EMA windows (e.g. sma_200 with window=200, sma_400 with
+        # window=400) that the registry doesn't pre-compute.
+        for col_ref in (result_columns or []):
+            data_key = col_ref.get('dataKey') if isinstance(col_ref, dict) else getattr(col_ref, 'dataKey', None)
+            params = col_ref.get('params') if isinstance(col_ref, dict) else getattr(col_ref, 'params', None)
+            if not data_key or data_key in res:
+                continue
+            if data_key in latest.index:
+                v = latest[data_key]
+                res[data_key] = None if pd.isna(v) else (
+                    round(float(v), 4) if isinstance(v, (int, float)) else v
+                )
+                continue
+            # Fallback: compute on the fly for SMA/EMA-style indicators.
+            window = (params or {}).get('window') or _default_window_for(data_key)
+            if window and 'Close' in df.columns and len(df) >= window:
+                if 'sma' in data_key:
+                    res[data_key] = _safe_round(df['Close'].rolling(window=window).mean())
+                elif data_key.startswith('ema_') or data_key == 'ema_9':
+                    res[data_key] = _safe_round(df['Close'].ewm(span=window, adjust=False).mean())
 
         # Volume ratio vs 50-day average + raw volume stats
         try:
@@ -776,7 +772,8 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
                        cutoff_date: Optional[str] = None,
                        progress_callback=None, log_callback=None,
                        filters: Optional[Dict[str, Any]] = None,
-                       custom_params: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
+                       custom_params: Optional[Dict[str, Dict[str, Any]]] = None,
+                       result_columns: Optional[List[Dict[str, Any]]] = None) -> str:
     """Screen S&P 1500 using parallel processing with ta library (matching standalone)."""
     # Source tickers from information_schema.tables (matching standalone)
     with ENGINE.connect() as conn:
@@ -793,7 +790,7 @@ def technical_screener(requested_indicators: List[str], sort_by: str = "ticker",
     if log_callback:
         log_callback(f"Scanning {total} stocks for {merged_indicators}...")
 
-    args = [(ticker, merged_indicators, cutoff_date, custom_params) for ticker in tickers]
+    args = [(ticker, merged_indicators, cutoff_date, custom_params, result_columns) for ticker in tickers]
     results = []
     completed = 0
 
@@ -1079,95 +1076,8 @@ def create_quant_strategy_team():
 # RESULT ENRICHMENT
 # =============================================================================
 
-def enrich_results(results: List[Dict]) -> List[Dict]:
-    """
-    Enrich screener results with metadata, fundamentals, and price stats.
-    Adds: company_name, sector, market_cap, beta, eps_growth_qoq,
-          revenue_growth_qoq, peg_ratio.
-    """
-    if not results:
-        return results
-
-    tickers = [r['ticker'].upper() for r in results if r.get('ticker')]
-    if not tickers:
-        return results
-
-    # 1. Metadata (single batched query)
-    try:
-        meta_query = text(
-            "SELECT ticker, name, sector, market_cap, beta FROM stock_metadata WHERE ticker = ANY(:t)"
-        )
-        meta_df = pd.read_sql(meta_query, ENGINE, params={"t": tickers})
-        meta_map = {row['ticker'].upper(): row for _, row in meta_df.iterrows()}
-    except Exception as e:
-        logger.warning("Metadata enrichment failed: %s", e)
-        meta_map = {}
-
-    # 2. Financials — last 2 quarters per ticker (single batched query)
-    try:
-        fin_query = text("""
-            SELECT ticker, report_date, diluted_eps, total_revenue, net_income
-            FROM stock_financials_quarterly
-            WHERE ticker = ANY(:t)
-            ORDER BY ticker, report_date DESC
-        """)
-        fin_df = pd.read_sql(fin_query, ENGINE, params={"t": tickers})
-    except Exception as e:
-        logger.warning("Financial enrichment failed: %s", e)
-        fin_df = pd.DataFrame()
-
-    for r in results:
-        t = r.get('ticker', '').upper()
-        if not t:
-            continue
-
-        # Metadata
-        m = meta_map.get(t)
-        if m is not None:
-            r['company_name'] = m.get('name') or t
-            r['sector'] = m.get('sector') or 'N/A'
-            r['market_cap'] = float(m['market_cap']) if pd.notnull(m.get('market_cap')) else None
-            r['beta'] = float(m['beta']) if pd.notnull(m.get('beta')) else None
-        else:
-            r['company_name'] = t
-            r['sector'] = 'N/A'
-
-        # Financials
-        t_df = fin_df[fin_df['ticker'] == t]
-        if len(t_df) >= 2:
-            curr = t_df.iloc[0]
-            prev = t_df.iloc[1]
-            close_price = r.get('close')
-
-            # EPS growth QoQ
-            curr_eps = curr['diluted_eps']
-            prev_eps = prev['diluted_eps']
-            if pd.notnull(curr_eps) and pd.notnull(prev_eps) and prev_eps != 0:
-                eps_growth = (curr_eps - prev_eps) / abs(prev_eps)
-                r['eps_growth_qoq'] = round(eps_growth * 100, 2)
-
-                # PEG ratio approximation
-                if close_price and eps_growth > 0:
-                    pe = close_price / max(float(curr_eps), 0.001)
-                    annualized_growth = eps_growth * 4
-                    peg = pe / max(annualized_growth, 0.001)
-                    r['peg_ratio'] = round(peg, 2)
-                else:
-                    r['peg_ratio'] = None
-            else:
-                r['eps_growth_qoq'] = None
-                r['peg_ratio'] = None
-
-            # Revenue growth QoQ
-            curr_rev = curr['total_revenue']
-            prev_rev = prev['total_revenue']
-            if pd.notnull(curr_rev) and pd.notnull(prev_rev) and prev_rev > 0:
-                rev_growth = (curr_rev - prev_rev) / prev_rev
-                r['revenue_growth_qoq'] = round(rev_growth * 100, 2)
-            else:
-                r['revenue_growth_qoq'] = None
-
-    return results
+# Re-exported for backwards compatibility — will be removed when agno_screener.py is deleted.
+from app.services.screening.enrich import enrich_results  # noqa: F401
 
 
 # =============================================================================
@@ -1434,7 +1344,10 @@ def run_dormant_giant_screener_with_ai(prompt: Optional[str] = None, progress_ca
 
 def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, progress_callback=None,
                                 log_callback=None, filters: Optional[Dict[str, Any]] = None,
-                                base_weight: int = 60) -> Dict[str, Any]:
+                                base_weight: int = 60,
+                                sub_weights: Optional[Dict[str, int]] = None,
+                                include_alignment: bool = False,
+                                result_columns: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
     Uses ta library column names and maps to frontend-friendly keys.
@@ -1464,7 +1377,8 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
         progress_callback=progress_callback,
         log_callback=log_callback,
         filters=filters,
-        custom_params=custom_params
+        custom_params=custom_params,
+        result_columns=result_columns,
     )
     tech_df = pd.read_csv(pd.io.common.StringIO(tech_csv)) if tech_csv != "No results found." else pd.DataFrame()
 
@@ -1480,8 +1394,15 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
             "summary": "No stocks matched the technical criteria."
         }
 
-    # Compute hybrid score (60% base setup + 40% filter match) and sort descending
-    tech_df['score'] = tech_df.apply(lambda row: compute_quant_score(row, filters or {}, base_weight), axis=1)
+    # Compute hybrid score (60% base setup + 40% filter match) and sort descending.
+    # `include_alignment` propagates from the request; if true, each result row
+    # gets a `score_minus_return` field too (computed post-enrich below).
+    tech_df['score'] = tech_df.apply(
+        lambda row: compute_quant_score(
+            row, filters or {}, base_weight, sub_weights, include_alignment
+        )['score'],
+        axis=1,
+    )
     tech_df = tech_df.sort_values(by='score', ascending=False)
 
     # Map ta column names to frontend-friendly names
@@ -1548,6 +1469,15 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
     # Apply earnings calendar filter if specified
     top_records = _apply_earnings_filter(top_records, filters)
 
+    # When alignment diagnostic is requested, attach `score_minus_return` to each
+    # record now that enrichment has populated `return_pct`.
+    if include_alignment:
+        for record in top_records:
+            return_pct = record.get('return_pct')
+            if return_pct is not None:
+                normalized = max(-100.0, min(100.0, float(return_pct)))
+                record['score_minus_return'] = round(float(record.get('score', 0)) - normalized, 1)
+
     return {
         "technical_candidates": len(results_records),
         "results": top_records,
@@ -1561,7 +1491,9 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
 def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: Optional[str] = None, logs_buffer: Optional[List[Dict[str, Any]]] = None,
                                         progress_callback=None, agent_log_callback=None,
                                         filters: Optional[Dict[str, Any]] = None,
-                                        base_weight: int = 60) -> Dict[str, Any]:
+                                        base_weight: int = 60,
+                                        sub_weights: Optional[Dict[str, int]] = None,
+                                        include_alignment: bool = False) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
     Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
@@ -1599,7 +1531,9 @@ Screening criteria applied:
             progress_callback=progress_callback,
             log_callback=None,
             filters=filters,
-            base_weight=base_weight
+            base_weight=base_weight,
+            sub_weights=sub_weights,
+            include_alignment=include_alignment,
         )
 
         log_capture.log_system(f"Technical screen complete: {structured['technical_candidates']} candidates found")

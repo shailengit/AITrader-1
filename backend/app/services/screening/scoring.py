@@ -4,13 +4,13 @@ Extracted from agno_screener.py for better maintainability.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
+def compute_base_setup_breakdown(row: pd.Series, sub_weights: Optional[Dict[str, int]] = None) -> Dict[str, float]:
     """Compute 0-100 sub-scores for each base-setup category.
 
     Returns dict with:
@@ -37,12 +37,15 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     trend_score = round(adx_score * 0.40 + sma_score * 0.35 + macd_score * 0.25, 1)
 
     # --- Momentum Quality ---
+    # Peak at RSI 65 (strong with room to run), zero at RSI 30 and 100.
+    # ROC contributes directionally — negative ROC subtracts, positive adds.
+    # Stoch peak at 55, zero at 10 and 100.
     rsi = row.get('momentum_rsi', 50)
-    rsi_score = max(0, 100 - abs(rsi - 55) * 2.5)
+    rsi_score = 100 - min(abs(rsi - 65), 35) * (100 / 35)
     roc = row.get('momentum_roc', 0)
-    roc_score = min(100, max(0, 50 + roc * 5)) if roc is not None else 50
+    roc_score = 50 + max(-50, min(50, roc * 5))
     stoch = row.get('momentum_stoch', 50)
-    stoch_score = max(0, 100 - abs(stoch - 50) * 2) if stoch is not None else 50
+    stoch_score = 100 - min(abs(stoch - 55), 45) * (100 / 45) if stoch is not None else 50
     momentum_score = round(rsi_score * 0.45 + roc_score * 0.30 + stoch_score * 0.25, 1)
 
     # --- Volatility Regime ---
@@ -83,11 +86,21 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     mfi_score = min(mfi, 100) if mfi >= 50 else mfi * 2
     volume_score = round(vol_ratio_score * 0.50 + mfi_score * 0.50, 1)
 
+    # Apply user-supplied sub-weights. Missing keys fall back to legacy
+    # hard-coded values; all-zero weights fall back to equal weighting
+    # to avoid division by zero.
+    default_sub_weights = {'trend': 30, 'momentum': 25, 'volatility': 20, 'volume': 25}
+    weights = {**default_sub_weights, **(sub_weights or {})}
+    weight_sum = sum(weights.values())
+    if weight_sum == 0:
+        weights = {k: 1 for k in default_sub_weights}
+        weight_sum = sum(weights.values())
     total = round(
-        trend_score * 0.30 +
-        momentum_score * 0.25 +
-        volatility_score * 0.20 +
-        volume_score * 0.25, 1
+        (trend_score * weights['trend']
+         + momentum_score * weights['momentum']
+         + volatility_score * weights['volatility']
+         + volume_score * weights['volume']) / weight_sum,
+        1,
     )
 
     return {
@@ -99,9 +112,9 @@ def compute_base_setup_breakdown(row: pd.Series) -> Dict[str, float]:
     }
 
 
-def compute_base_setup_score(row: pd.Series) -> float:
+def compute_base_setup_score(row: pd.Series, sub_weights: Optional[Dict[str, int]] = None) -> float:
     """Compute a 0-100 base setup score from technical indicators."""
-    return compute_base_setup_breakdown(row)['total']
+    return compute_base_setup_breakdown(row, sub_weights)['total']
 
 
 def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float:
@@ -203,12 +216,28 @@ def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float
     return round(sum(bonuses) / len(bonuses), 1)
 
 
-def compute_quant_score(row: pd.Series, filters: Dict[str, Any], base_weight: int = 60) -> float:
-    """Compute hybrid final score with adjustable base setup weight (0-100)."""
-    base = compute_base_setup_score(row)
+def compute_quant_score(
+    row: pd.Series,
+    filters: Dict[str, Any],
+    base_weight: int = 60,
+    sub_weights: Optional[Dict[str, int]] = None,
+    include_alignment: bool = False,
+) -> Dict[str, Any]:
+    """Compute the hybrid quant score and optional alignment diagnostic.
+
+    Returns a dict with at least `score`. When `include_alignment` is True
+    and the row carries a `return_pct`, also returns `score_minus_return`
+    (score minus the return clipped to [-100, 100]).
+    """
+    base = compute_base_setup_score(row, sub_weights)
     bonus = compute_filter_match_bonus(row, filters)
     bw = max(0, min(100, base_weight)) / 100.0
-    return round(base * bw + bonus * (1 - bw), 1)
+    score = round(base * bw + bonus * (1 - bw), 1)
+    out: Dict[str, Any] = {'score': score}
+    if include_alignment and row.get('return_pct') is not None:
+        normalized_return = max(-100.0, min(100.0, float(row['return_pct'])))
+        out['score_minus_return'] = round(score - normalized_return, 1)
+    return out
 
 
 # =============================================================================

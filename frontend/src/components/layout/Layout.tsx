@@ -144,36 +144,38 @@ export default function Layout() {
                 Back to Builder
               </button>
             )}
-            {location.pathname === "/quantgen/build" && referrer && (
-              <button
-                onClick={() => {
-                  clearAppReferrer();
-                  navigate(referrer.path);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: `1px solid ${colors.border}`,
-                  cursor: "pointer",
-                  backgroundColor: "transparent",
-                  color: "#10B981",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                <ArrowLeft size={18} />
-                Back to {referrer.label}
-              </button>
-            )}
+            {(location.pathname === "/quantgen/build" ||
+              location.pathname.startsWith("/screener/build/chart/")) &&
+              referrer && (
+                <button
+                  onClick={() => {
+                    clearAppReferrer();
+                    navigate(referrer.path);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    border: `1px solid ${colors.border}`,
+                    cursor: "pointer",
+                    backgroundColor: "transparent",
+                    color: "#10B981",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <ArrowLeft size={18} />
+                  Back to {referrer.label}
+                </button>
+              )}
           </div>
         )}
         <div

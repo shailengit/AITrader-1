@@ -22,10 +22,10 @@ from app.services.agno_screener import (
     run_dormant_giant_screener_with_ai,
     run_quant_strategy_screener,
     run_quant_strategy_screener_with_ai,
-    parse_quant_filters
 )
 from app.services.pdf_generator import generate_screener_report
 from app.services.screening.chart_data import get_chart_data
+from app.services.screening.ticker_detail import get_ticker_detail
 from app.utils.security import get_safe_table_name, sanitize_ticker
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,19 @@ class CustomCompositeDef(BaseModel):
     operation: Literal["add", "subtract", "multiply", "divide", "ratio_pct"]
 
 
+class ResultColumnRef(BaseModel):
+    """A result-row key the frontend expects to be populated.
+
+    The frontend sends the list of columns the results table will display
+    (e.g. {'dataKey': 'sma_200', 'params': {'window': 200}}). The worker
+    guarantees each requested column has a value in the result row by
+    computing it at the requested params (or copying from the
+    add_all_ta_features output if it was already produced).
+    """
+    dataKey: str
+    params: Optional[Dict[str, Any]] = None
+
+
 class ScanRequest(BaseModel):
     """Scan request model."""
     mode: Literal["dormant_giant", "quant_strategy"] = "dormant_giant"
@@ -61,7 +74,10 @@ class ScanRequest(BaseModel):
     max_results: int = 50
     filters: Optional[Dict[str, Any]] = None
     base_weight: Optional[int] = 60  # 0-100, percent weight for base setup score in quant strategy
+    sub_weights: Optional[Dict[str, int]] = None  # Per-sub-score weights: {trend, momentum, volatility, volume}; each >= 0
+    include_alignment: Optional[bool] = False  # When true, attach score_minus_return per result row
     custom_composites: Optional[List[CustomCompositeDef]] = None  # User-defined composite metrics
+    result_columns: Optional[List[ResultColumnRef]] = None  # Result-row keys the UI will display
 
 
 class ScanResult(BaseModel):
@@ -92,17 +108,6 @@ class ScanStatus(BaseModel):
     results: Optional[List[Dict]] = None
     ai_report: Optional[str] = None
     error: Optional[str] = None
-
-
-class ParseFiltersRequest(BaseModel):
-    """Request to parse a natural language prompt into structured filters."""
-    prompt: str
-
-
-class ParseFiltersResponse(BaseModel):
-    """Response containing parsed QuantFilters."""
-    filters: Dict[str, Any]
-    raw_prompt: str
 
 
 # =============================================================================
@@ -200,26 +205,6 @@ async def get_screener_modes():
             }
         ]
     }
-
-
-@router.post("/parse-filters", response_model=Dict[str, Any])
-async def parse_filters(request: ParseFiltersRequest):
-    """
-    Parse a natural language prompt into structured QuantFilters.
-
-    Uses a lightweight LLM call to extract filter criteria from the user's directive.
-    Returns the parsed filters for frontend review and editing.
-    """
-    try:
-        filters = await run_in_threadpool(lambda: parse_quant_filters(request.prompt))
-        return {
-            "filters": filters,
-            "raw_prompt": request.prompt,
-            "message": "Filters parsed successfully. Review and edit before scanning."
-        }
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        logger.error("Filter parsing failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Filter parsing failed: {str(e)}") from e
 
 
 @router.post("/scan", response_model=Dict[str, Any])
@@ -500,6 +485,8 @@ async def chart_data(
     indicators: str = "",
     days: int = 250,
     overrides: str = "",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
 ):
     """
     Fetch OHLCV bars for a single ticker, with the requested indicator time
@@ -518,6 +505,7 @@ async def chart_data(
                     will produce unusable SMA/EMA 200 values. There is no
                     hard upper bound; pass a very large value (e.g. 10000)
                     to fetch the full history for a long-listed ticker.
+                    Ignored when both `start` and `end` are provided.
         overrides:  Optional JSON object mapping column → custom params for
                     indicators that need non-default parameters. Example:
                     `overrides={"ema_20":{"window":200}}` requests a 200-
@@ -525,6 +513,14 @@ async def chart_data(
                     (column, params) pair gets a unique payload key in the
                     output (`<column>__<sig>`) so the frontend can render
                     both side by side.
+        start:      Optional ISO date (YYYY-MM-DD) for the lower bound.
+                    When both `start` and `end` are provided, the SQL uses
+                    `WHERE "Date" BETWEEN :start AND :end`. When only
+                    `start` is provided, the upper bound is `start + days`
+                    calendar days (or the latest available date, whichever
+                    is earlier).
+        end:        Optional ISO date (YYYY-MM-DD) for the upper bound.
+                    Symmetric to `start`.
 
     Returns: List of {time, open, high, low, close, volume, indicators: {...}}
     bars ordered oldest-first. Empty list when the ticker has no data. The
@@ -572,8 +568,28 @@ async def chart_data(
                 status_code=400, detail=f"Invalid overrides JSON: {exc}"
             ) from exc
 
+    # Validate start/end formats early so the route returns a clean 400
+    # before the service runs any SQL.
+    from datetime import datetime as _dt
+    if start:
+        try:
+            _dt.strptime(start, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid start date: {start!r}; expected YYYY-MM-DD",
+            )
+    if end:
+        try:
+            _dt.strptime(end, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid end date: {end!r}; expected YYYY-MM-DD",
+            )
+
     bars = await run_in_threadpool(
-        get_chart_data, ticker, indicator_list, days, overrides_map
+        get_chart_data, ticker, indicator_list, days, overrides_map, start, end
     )
     return bars or []
 
@@ -827,13 +843,12 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         progress_callback=update_progress,
                         agent_log_callback=update_agent_log,
                         filters=request.filters,
-                        base_weight=request.base_weight
+                        base_weight=request.base_weight,
+                        sub_weights=request.sub_weights,
+                        include_alignment=request.include_alignment,
                     )
                 )
             else:
-                custom_composites_list = None
-                if request.custom_composites:
-                    custom_composites_list = [c.model_dump() for c in request.custom_composites]
                 result = await run_in_threadpool(
                     lambda: run_quant_strategy_screener(
                         prompt=request.prompt or "Find me candidates for a high-growth breakout. Technically, they should be in a Volatility Squeeze (volatility_bbw). Fundamentally, they must have positive QoQ revenue growth.",
@@ -842,7 +857,9 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
                         log_callback=update_logs,
                         filters=request.filters,
                         base_weight=request.base_weight,
-                        custom_composites=custom_composites_list
+                        sub_weights=request.sub_weights,
+                        include_alignment=request.include_alignment,
+                        result_columns=[c.model_dump(exclude_none=True) for c in (request.result_columns or [])],
                     )
                 )
         else:
@@ -883,3 +900,49 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
         await asyncio.sleep(2.0)
         if scan_id in scan_queues:
             del scan_queues[scan_id]
+
+
+# =============================================================================
+# Ticker Detail Endpoint (powers TickerDetailDrawer in the Custom Screener)
+# =============================================================================
+
+@router.get("/ticker/{ticker}")
+async def ticker_detail(
+    ticker: str,
+    as_of_date: str = "",
+):
+    """
+    Return the full TickerDetail payload for one ticker — fundamentals,
+    indicator snapshot, and next earnings event. Powers the on-demand row
+    click in the Custom Screener results table.
+
+    Query params:
+        ticker:     Ticker symbol (sanitized).
+        as_of_date: YYYY-MM-DD cutoff (optional). If absent, the most recent
+                    bar date is used.
+
+    Returns: TickerDetail dict (see app.services.screening.ticker_detail).
+
+    Errors:
+        400 VALIDATION_ERROR — malformed ticker string.
+        404 DATA_NOT_FOUND   — no data for this ticker on the as-of date.
+    """
+    try:
+        safe = sanitize_ticker(ticker)
+        if not safe:
+            raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+
+    from app.exceptions import DataNotFoundError  # local import: keeps top tidy
+    from app.services.screening import ticker_detail as _td_module  # late-bound for tests
+
+    try:
+        return await run_in_threadpool(
+            _td_module.get_ticker_detail, safe, as_of_date or None
+        )
+    except DataNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc) or "No data for ticker",
+        ) from exc

@@ -18,6 +18,14 @@ import { useComposites } from '../../hooks/useComposites';
 import { useMacros } from '../../hooks/useMacros';
 import { decodeShareUrl } from '../../lib/shareCodec';
 import { getFilterByKey, type FilterSpec } from '../../data/filterCatalog';
+import {
+  getColumnsForFilters,
+  type ResultsColumn,
+} from '../../data/filterCatalog';
+import type { IndicatorDescriptor } from '../../types/indicators';
+import { recordAppReferrer } from '../../components/layout/Layout';
+import TickerDetailDrawer from './ScreenerBuilder/TickerDetailDrawer';
+import TemplateChips from './ScreenerBuilder/TemplateChips';
 import GroupHeader from './ScreenerBuilder/GroupHeader';
 import FilterRow from './ScreenerBuilder/FilterRow';
 import FilterPicker from './ScreenerBuilder/FilterPicker';
@@ -27,6 +35,7 @@ import ShareDialog from './ScreenerBuilder/ShareDialog';
 import ResultsPanel from './ScreenerBuilder/ResultsPanel';
 import BacktestPanel from './ScreenerBuilder/BacktestPanel';
 import CompositeBuilder from './ScreenerBuilder/CompositeBuilder';
+import ScoringPanel, { DEFAULT_BASE_WEIGHT, DEFAULT_SUB_WEIGHTS, DEFAULT_SHOW_ALIGNMENT } from './ScreenerBuilder/ScoringPanel';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -186,10 +195,50 @@ function convertFiltersToBackend(filters: FilterGroup): Record<string, any> {
 export default function ScreenerBuilder() {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { savePreset } = useScreens();
   const { composites } = useComposites();
   const { macros, saveMacro } = useMacros();
+
+  // Drawer state — ticker detail card. Synced to ?ticker= URL param.
+  const [drawerTicker, setDrawerTicker] = useState<string | null>(null);
+
+  // URL → drawer sync on mount / external nav.
+  useEffect(() => {
+    const fromUrl = searchParams.get('ticker');
+    if (fromUrl && fromUrl.toUpperCase() !== drawerTicker) {
+      setDrawerTicker(fromUrl.toUpperCase());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const openTicker = useCallback(
+    (t: string) => {
+      const upper = t.toUpperCase();
+      setDrawerTicker(upper);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('ticker', upper);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const closeDrawer = useCallback(() => {
+    setDrawerTicker(null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('ticker');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   // ── State ──────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterGroup>({
@@ -203,11 +252,22 @@ export default function ScreenerBuilder() {
   const [maxResults, setMaxResults] = useState(50);
   const [useAi, setUseAi] = useState(false);
 
+  // Scoring tunables (added 2026-07-05). Persisted in screen presets and
+  // the page-state draft. Sent on every scan request.
+  const [baseWeight, setBaseWeight] = useState(60);
+  const [subWeights, setSubWeights] = useState<{ trend: number; momentum: number; volatility: number; volume: number }>(
+    { trend: 30, momentum: 25, volatility: 20, volume: 25 },
+  );
+  const [showAlignment, setShowAlignment] = useState(false);
+
   // Scan state
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanError, setScanError] = useState<string | undefined>();
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
+  // Stable scan id — persists across remounts so a back-navigation can
+  // re-fetch the same results from the backend without re-running the scan.
+  const [scanId, setScanId] = useState<string | null>(null);
 
   // Buy-and-hold return data (ticker -> return_pct)
   const [returnData, setReturnData] = useState<Record<string, number> | null>(null);
@@ -262,8 +322,49 @@ export default function ScreenerBuilder() {
     }
   }, [searchParams]);
 
-  // ── Draft persistence ──────────────────────────────────
+  // Record this page as the referrer so the QuantGen (or chart page)
+  // header's "Back" button can return here. We do NOT clear on
+  // unmount — the referrer is meant to persist across navigations
+  // away from the screener and back. The Layout's "Home" button (and
+  // the chart page's "Back" button) explicitly clear the referrer
+  // when the user explicitly leaves the screener subtree.
   useEffect(() => {
+    recordAppReferrer('/screener/build', 'Custom Screener');
+  }, []);
+
+  // ── Draft persistence ──────────────────────────────────
+  // The draft covers the full page state so a browser back-navigation
+  // (which remounts the page) restores the same view — including the
+  // results table. scanResults and returnData are persisted by the
+  // special useEffects below (which fire on changes), not on every
+  // render of these large arrays.
+  //
+  // CRITICAL: the persistence effects must NOT run before the
+  // restore effect (declared last). Otherwise the initial empty
+  // state would overwrite the persisted draft on mount, breaking
+  // back-navigation state recovery. The persistence effects skip
+  // their first run (via useSkipFirstRun) so the restore effect is
+  // the first to touch localStorage on mount.
+
+  // Helper hook: returns a `useEffect` that skips its first run.
+  // (Built-in useEffect always runs on mount; we want to defer
+  // persistence until the restore has happened.)
+  function useSkipFirstRun(
+    effect: () => void | (() => void),
+    deps: ReadonlyArray<unknown>,
+  ): void {
+    const isFirst = useRef(true);
+    useEffect(() => {
+      if (isFirst.current) {
+        isFirst.current = false;
+        return;
+      }
+      return effect();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, deps);
+  }
+
+  useSkipFirstRun(() => {
     try {
       const draft = {
         filters,
@@ -273,16 +374,68 @@ export default function ScreenerBuilder() {
         sortOrder,
         maxResults,
         useAi,
+        baseWeight,
+        subWeights,
+        showAlignment,
+        // Persisted so the back button (which remounts the page)
+        // returns to the same screen state, not a fresh builder.
+        scanId,
+        // Results / return data / drawer are intentionally persisted
+        // by the special useEffects below.
+        drawerTicker,
         timestamp: Date.now(),
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {
       // ignore
     }
-  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi]);
+  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, scanId]);
 
-  // Restore draft on mount
+  // Persist scanResults separately to avoid re-serializing on every
+  // render (which would happen if we put it in the main draft effect).
+  useSkipFirstRun(() => {
+    if (scanResults.length === 0) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      const draft = raw ? JSON.parse(raw) : {};
+      draft.scanResults = scanResults;
+      draft.timestamp = Date.now();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // ignore
+    }
+  }, [scanResults]);
+
+  // Persist returnData separately too.
+  useSkipFirstRun(() => {
+    if (returnData === null) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      const draft = raw ? JSON.parse(raw) : {};
+      draft.returnData = returnData;
+      draft.timestamp = Date.now();
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // ignore
+    }
+  }, [returnData]);
+
+  // Restore draft on mount. If a fresh draft has a scanId, re-fetch
+  // results from the backend so the user gets up-to-date values
+  // (matching what the page would show if the user had run the scan
+  // just now). The persisted scanResults are also seeded so the page
+  // has data to show during the refetch.
+  //
+  // This effect must run BEFORE the persistence effects write, so
+  // the initial empty state doesn't clobber the saved draft. Because
+  // effects fire in declaration order and the persistence effects
+  // above also skip their first run, this restore effect is the
+  // first to touch localStorage on mount.
   useEffect(() => {
+    let restoredScanId: string | null = null;
+    let restoredResults: ScanResult[] | null = null;
+    let restoredReturnData: Record<string, number> | null = null;
+
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -296,12 +449,91 @@ export default function ScreenerBuilder() {
           if (draft.sort?.order) setSortOrder(draft.sort?.order);
           if (draft.maxResults) setMaxResults(draft.maxResults);
           if (draft.useAi !== undefined) setUseAi(draft.useAi);
+          if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
+          if (draft.subWeights) setSubWeights(draft.subWeights);
+          if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
+          if (draft.drawerTicker) setDrawerTicker(draft.drawerTicker);
+          if (draft.scanId) restoredScanId = draft.scanId;
+          if (Array.isArray(draft.scanResults)) {
+            setScanResults(draft.scanResults);
+            restoredResults = draft.scanResults;
+          }
+          if (draft.returnData) {
+            setReturnData(draft.returnData);
+            restoredReturnData = draft.returnData;
+          }
+        } else {
+          // Stale draft — drop persisted scan results so the user
+          // doesn't see old data, but keep the filter draft.
+          if (draft.filters) setFilters(draft.filters);
+          if (draft.screenName) setScreenName(draft.screenName);
+          if (draft.cutoffDate) setCutoffDate(draft.cutoffDate);
+          if (draft.sort?.by) setSortBy(draft.sort?.by);
+          if (draft.sort?.order) setSortOrder(draft.sort?.order);
+          if (draft.maxResults) setMaxResults(draft.maxResults);
+          if (draft.useAi !== undefined) setUseAi(draft.useAi);
+          if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
+          if (draft.subWeights) setSubWeights(draft.subWeights);
+          if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
         }
       }
     } catch {
       // ignore
     }
-  }, []);
+
+    // If we restored a scanId, re-fetch the results from the backend so
+    // the user sees fresh data. This handles the case where the page
+    // remounts (e.g. after a back-navigation) — the persisted
+    // scanResults are shown immediately, then replaced by the live
+    // fetch ONLY if the backend returns usable data. If the refetch
+    // fails (e.g. backend was restarted and the in-memory scan_status
+    // is gone) the persisted scanResults stay visible — that is the
+    // primary state-recovery path. The refetch is a refresh, not a
+    // requirement.
+    if (restoredScanId) {
+      setScanId(restoredScanId);
+      const tickers = (restoredResults ?? []).map((r) => r.ticker);
+      // Fire-and-forget the live refetch. Only overwrite the
+      // persisted results if the backend returns a non-empty list.
+      fetch(`/api/screener/results/${restoredScanId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.results) && data.results.length > 0) {
+            setScanResults(data.results);
+            // Refresh return data if the cutoff is eligible.
+            if (cutoffDate && isCutoffEligible(cutoffDate) && data.results.length > 0) {
+              const newTickers = data.results.map((r: ScanResult) => r.ticker);
+              setReturnLoading(true);
+              fetch('/api/screener/backtest-hold', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: newTickers, as_of_date: cutoffDate }),
+              })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((bd) => {
+                  if (bd && Array.isArray(bd.ticker_results)) {
+                    const next: Record<string, number> = {};
+                    for (const tr of bd.ticker_results) {
+                      next[tr.ticker] = tr.return_pct;
+                    }
+                    setReturnData(next);
+                  }
+                })
+                .catch(() => {})
+                .finally(() => setReturnLoading(false));
+            }
+          }
+          // If data.results is empty/missing, keep the persisted
+          // results visible — they are the source of truth.
+        })
+        .catch(() => {
+          // Live refetch failed — the persisted scanResults stay visible.
+        });
+      // Touch the variables so TypeScript doesn't complain.
+      void tickers;
+      void restoredReturnData;
+    }
+  }, [cutoffDate]);
 
   // Cleanup event source on unmount
   useEffect(() => {
@@ -351,6 +583,23 @@ export default function ScreenerBuilder() {
     return filters;
   }, [composites, macros]);
 
+  // Indicator list for the drawer's chart overlay set. Mirrors the
+  // filterColumns derivation in ResultsPanel so the drawer's chart shows
+  // the same overlays the user filtered on.
+  const filterColumns: ResultsColumn[] = useMemo(
+    () => getColumnsForFilters(filters.conditions as unknown as FilterCondition[]),
+    [filters.conditions],
+  );
+  const chartIndicators: IndicatorDescriptor[] = useMemo(
+    () =>
+      filterColumns.map((col) => ({
+        id: col.payloadKey,
+        label: col.header,
+        params: col.params,
+      })),
+    [filterColumns],
+  );
+
   // ── Filter operations ──────────────────────────────────
   const addCondition = () => {
     setFilters((prev) => ({
@@ -387,6 +636,9 @@ export default function ScreenerBuilder() {
     if (preset.maxResults) setMaxResults(preset.maxResults);
     if (preset.cutoffDate) setCutoffDate(preset.cutoffDate);
     if (preset.useAi !== undefined) setUseAi(preset.useAi);
+    if (typeof preset.baseWeight === 'number') setBaseWeight(preset.baseWeight);
+    if (preset.subWeights) setSubWeights(preset.subWeights);
+    if (typeof preset.showAlignment === 'boolean') setShowAlignment(preset.showAlignment);
   };
 
   // ── Save ───────────────────────────────────────────────
@@ -400,6 +652,9 @@ export default function ScreenerBuilder() {
       maxResults,
       cutoffDate: cutoffDate || undefined,
       useAi,
+      baseWeight,
+      subWeights,
+      showAlignment,
     });
     setScreenName(name);
   };
@@ -422,6 +677,7 @@ export default function ScreenerBuilder() {
     setIsScanning(true);
     setScanError(undefined);
     setScanResults([]);
+    setScanId(null);
     setScanProgress(0);
     setReturnData(null);
 
@@ -450,6 +706,16 @@ export default function ScreenerBuilder() {
           cutoff_date: cutoffDate || undefined,
           max_results: maxResults,
           filters: backendFilters,
+          base_weight: baseWeight,
+          sub_weights: subWeights,
+          include_alignment: showAlignment,
+          // Tell the backend which result-row keys the UI needs values for
+          // (e.g. the user's chosen SMA 200 with window=200). The worker
+          // computes each column at the requested params and includes the
+          // value in the scan result row.
+          result_columns: filterColumns
+            .filter((c) => c.dataKey)
+            .map((c) => ({ dataKey: c.dataKey, params: c.params })),
           custom_composites: customCompositesList.length > 0 ? customCompositesList : undefined,
         }),
       });
@@ -461,6 +727,7 @@ export default function ScreenerBuilder() {
 
       const data = await res.json();
       const id = data.scan_id;
+      setScanId(id);
 
       // SSE stream
       const es = new EventSource(`/api/screener/stream/${id}`);
@@ -525,7 +792,7 @@ export default function ScreenerBuilder() {
       setIsScanning(false);
       setScanError(err instanceof Error ? err.message : 'Unknown error');
     }
-  }, [filters, useAi, cutoffDate, maxResults]);
+  }, [filters, useAi, cutoffDate, maxResults, baseWeight, subWeights, showAlignment]);
 
   const fetchResults = async (id: string) => {
     try {
@@ -591,10 +858,55 @@ export default function ScreenerBuilder() {
   };
 
   // ── Export to Lab ──────────────────────────────────────
+  const openChartView = useCallback(
+    (t: string) => {
+      const upper = t.toUpperCase();
+      closeDrawer();
+      // Translate each IndicatorDescriptor's payload key (`<column>__<sig>`)
+      // into the actual backend column name. The standalone chart endpoint
+      // expects `overlays=<col1>,<col2>` (column names), with a separate
+      // `params` map keyed by column for any non-default window overrides.
+      // Sending payload keys as `overlays` makes the backend silently drop
+      // them (registry doesn't know about `trend_sma_slow__window50`).
+      //
+      // We also pass `labels` (a parallel array of the friendly column
+      // headers like "SMA 50" / "SMA 200") so the standalone chart can
+      // show the overlay list with the same labels the user saw in the
+      // results table — not the raw backend column name. When the label
+      // can't be recovered (e.g. it was never supplied), we fall back to
+      // a best-effort `name (params)` form on the chart side.
+      const cols: string[] = [];
+      const labels: string[] = [];
+      const params: Record<string, Record<string, number>> = {};
+      for (const c of chartIndicators) {
+        const lastSep = c.id.lastIndexOf('__');
+        const column = lastSep > 0 ? c.id.slice(0, lastSep) : c.id;
+        if (!cols.includes(column)) {
+          cols.push(column);
+          labels.push(c.label);
+        }
+        if (c.params && Object.keys(c.params).length > 0) {
+          params[column] = c.params;
+        }
+      }
+      const qs = new URLSearchParams();
+      if (cutoffDate) qs.set('from', cutoffDate);
+      qs.set('range', '1y');
+      qs.set('overlays', cols.join(','));
+      if (labels.length) qs.set('labels', labels.join(','));
+      if (Object.keys(params).length) qs.set('params', JSON.stringify(params));
+      navigate(`/screener/build/chart/${upper}?${qs.toString()}`);
+    },
+    [closeDrawer, navigate, cutoffDate, chartIndicators],
+  );
+
   const exportToLab = () => {
+    // Make sure the referrer is current before navigating so the
+    // QuantGen page's "Back" button can find its way back here.
+    recordAppReferrer('/screener/build', 'Custom Screener');
     const tickers = scanResults.map((r) => r.ticker).join(',');
     const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
-    navigate(`/app/lab/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`);
+    navigate(`/quantgen/build?tickers=${encodeURIComponent(tickers)}&from_date=${fromDate}`);
   };
 
   // ── Render ──────────────────────────────────────────────
@@ -817,6 +1129,19 @@ export default function ScreenerBuilder() {
           </div>
         </div>
 
+        {/* ── Template chips strip ──────────────────────── */}
+        <TemplateChips
+          onLoad={(tpl) => {
+            setFilters(tpl.filters);
+            setScreenName(tpl.name);
+            if (tpl.sort?.by) setSortBy(tpl.sort.by);
+            if (tpl.sort?.order) setSortOrder(tpl.sort.order);
+            if (tpl.maxResults) setMaxResults(tpl.maxResults);
+            if (tpl.useAi !== undefined) setUseAi(tpl.useAi);
+          }}
+          activeFilters={filters}
+        />
+
         {/* ── Filter builder ──────────────────────────────── */}
         <div
           style={{
@@ -997,6 +1322,21 @@ export default function ScreenerBuilder() {
             </div>
           )}
         </div>
+
+        {/* ── Scoring panel ──────────────────────────────── */}
+        <ScoringPanel
+          baseWeight={baseWeight}
+          subWeights={subWeights}
+          showAlignment={showAlignment}
+          onBaseWeightChange={setBaseWeight}
+          onSubWeightChange={(key, v) => setSubWeights((prev) => ({ ...prev, [key]: v }))}
+          onShowAlignmentChange={setShowAlignment}
+          onReset={() => {
+            setBaseWeight(DEFAULT_BASE_WEIGHT);
+            setSubWeights(DEFAULT_SUB_WEIGHTS);
+            setShowAlignment(DEFAULT_SHOW_ALIGNMENT);
+          }}
+        />
 
         {/* ── Sort & Config ──────────────────────────────── */}
         <div
@@ -1196,11 +1536,14 @@ export default function ScreenerBuilder() {
               returnLoading={returnLoading}
               cutoffDate={cutoffDate}
               filters={filters}
+              showAlignment={showAlignment}
+              baseWeight={baseWeight}
               onExport={exportToLab}
               onShowBacktest={() => {
                 // Toggle the inline backtest panel (Buy & Hold + With Exit Rules)
                 setBacktestExpanded((v) => !v);
               }}
+              onTickerClick={openTicker}
             />
             {backtestExpanded && cutoffDate && (
               <div style={{ marginTop: 16 }}>
@@ -1291,6 +1634,25 @@ export default function ScreenerBuilder() {
       <CompositeBuilder
         open={compositeOpen}
         onOpenChange={setCompositeOpen}
+      />
+
+      <TickerDetailDrawer
+        ticker={drawerTicker}
+        asOfDate={cutoffDate}
+        indicators={chartIndicators}
+        scoreRow={drawerTicker ? scanResults.find((r) => r.ticker.toUpperCase() === drawerTicker.toUpperCase()) ?? null : null}
+        baseWeight={baseWeight}
+        onClose={closeDrawer}
+        onOpenInChart={openChartView}
+        onExportToLab={(t) => {
+          // Pre-fill Lab with just this ticker and the current as-of date.
+          // Record the referrer first so the QuantGen page's "Back to
+          // Custom Screener" button can return here.
+          recordAppReferrer('/screener/build', 'Custom Screener');
+          const fromDate = cutoffDate || new Date().toISOString().split('T')[0];
+          navigate(`/quantgen/build?tickers=${encodeURIComponent(t)}&from_date=${fromDate}`);
+          closeDrawer();
+        }}
       />
     </div>
   );

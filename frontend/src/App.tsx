@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import QueryProvider from './components/QueryProvider'
 import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/layout/Layout'
 import Landing from './pages/Landing'
 import SectorRotation from './pages/SectorRotation'
-import StockScreener from './pages/StockScreener'
+import ScreenerBuilder from './pages/app/ScreenerBuilder'
+import ChartView from './pages/app/ScreenerBuilder/ChartView'
 import QuantGen from './pages/QuantGen'
 import EarningsCalendar from './pages/EarningsCalendar'
 import Markov from './pages/Markov'
@@ -26,8 +27,16 @@ function App() {
               </ErrorBoundary>
             } />
             <Route path="screener" element={
+              <Navigate to="/screener/build" replace />
+            } />
+            <Route path="screener/build" element={
               <ErrorBoundary>
-                <StockScreener />
+                <ScreenerBuilder />
+              </ErrorBoundary>
+            } />
+            <Route path="screener/build/chart/:ticker" element={
+              <ErrorBoundary>
+                <ChartView />
               </ErrorBoundary>
             } />
             <Route path="earnings" element={
