@@ -276,6 +276,24 @@ export default function ScreenerBuilder() {
   // Inline backtest panel (Buy & Hold + With Exit Rules)
   const [backtestExpanded, setBacktestExpanded] = useState(false);
 
+  // ── Restore gate ─────────────────────────────────────
+  // `hasRestored` is `false` on mount, and is set to `true` by the
+  // restore effect (line ~434) AFTER it has finished reading the
+  // persisted draft and calling all the setState's. The persistence
+  // effects below gate themselves on this flag: if `hasRestored` is
+  // still `false`, the initial empty state must NOT be written to
+  // localStorage — that would clobber the persisted draft and break
+  // back-navigation state recovery.
+  //
+  // This is a `useState` (not `useRef`) on purpose: in React 19's
+  // dev-mode StrictMode, components are mounted, "unmounted", and
+  // remounted to stress-test effects. `useRef` values are NOT
+  // guaranteed to be reset to their initial value across the
+  // simulated remount, but `useState` initializers DO run again.
+  // So a `useState` flag reliably re-starts as `false` on each
+  // remount, which is what the persistence gate needs.
+  const [hasRestored, setHasRestored] = useState(false);
+
   // Dialog state
   const [pickerOpen, setPickerOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -342,29 +360,16 @@ export default function ScreenerBuilder() {
   // CRITICAL: the persistence effects must NOT run before the
   // restore effect (declared last). Otherwise the initial empty
   // state would overwrite the persisted draft on mount, breaking
-  // back-navigation state recovery. The persistence effects skip
-  // their first run (via useSkipFirstRun) so the restore effect is
-  // the first to touch localStorage on mount.
+  // back-navigation state recovery. The persistence effects gate
+  // themselves on the `hasRestored` flag (set by the restore effect
+  // at the end) so the restore is always the first thing to touch
+  // localStorage on mount.
 
-  // Helper hook: returns a `useEffect` that skips its first run.
-  // (Built-in useEffect always runs on mount; we want to defer
-  // persistence until the restore has happened.)
-  function useSkipFirstRun(
-    effect: () => void | (() => void),
-    deps: ReadonlyArray<unknown>,
-  ): void {
-    const isFirst = useRef(true);
-    useEffect(() => {
-      if (isFirst.current) {
-        isFirst.current = false;
-        return;
-      }
-      return effect();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, deps);
-  }
-
-  useSkipFirstRun(() => {
+  useEffect(() => {
+    // Skip persistence until the restore has finished. The restore
+    // sets `hasRestored` to `true` after reading the persisted draft
+    // and applying all the setState's.
+    if (!hasRestored) return;
     try {
       const draft = {
         filters,
@@ -389,11 +394,12 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, scanId]);
+  }, [hasRestored, filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, scanId]);
 
   // Persist scanResults separately to avoid re-serializing on every
   // render (which would happen if we put it in the main draft effect).
-  useSkipFirstRun(() => {
+  useEffect(() => {
+    if (!hasRestored) return;
     if (scanResults.length === 0) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -404,10 +410,11 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [scanResults]);
+  }, [hasRestored, scanResults]);
 
   // Persist returnData separately too.
-  useSkipFirstRun(() => {
+  useEffect(() => {
+    if (!hasRestored) return;
     if (returnData === null) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -418,7 +425,7 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [returnData]);
+  }, [hasRestored, returnData]);
 
   // Restore draft on mount. If a fresh draft has a scanId, re-fetch
   // results from the backend so the user gets up-to-date values
@@ -533,6 +540,12 @@ export default function ScreenerBuilder() {
       void tickers;
       void restoredReturnData;
     }
+    // Mark the restore as done. The persistence effects (which gate
+    // on `hasRestored`) can now safely write to localStorage with the
+    // current (restored) state values. This is the LAST setState in
+    // the effect so the persistence effects' deps are guaranteed to
+    // settle on the next render.
+    setHasRestored(true);
   }, [cutoffDate]);
 
   // Cleanup event source on unmount
