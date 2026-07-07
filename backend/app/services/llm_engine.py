@@ -701,3 +701,11 @@ def is_llm_available() -> bool:
 def get_model_name() -> str:
     """Get the name of the LLM model being used."""
     return MODEL_NAME
+
+
+def get_llm_client() -> tuple[Optional["OpenAI"], str]:
+    """Return the shared LLM client and model name. Reuses the module-level
+    client configured at import time; no duplicate retry/timeout logic.
+    Returns (None, model_name) if the client failed to initialize.
+    """
+    return client, MODEL_NAME
