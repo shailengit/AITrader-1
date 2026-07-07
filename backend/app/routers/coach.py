@@ -248,8 +248,8 @@ def post_report(body: ReportRequest, session: Session = Depends(get_session)):
     start, end = _period(body.period_start, body.period_end)
     bundle = build_bundle(session, start, end, body.strategy_id)
     result = generate_report(session, bundle, model=body.model)
-    if result.error == "llm_unavailable":
-        raise HTTPException(503, detail={"error": "llm_unavailable", "bundle": bundle})
+    if result.error and result.error.startswith("llm_unavailable"):
+        raise HTTPException(503, detail={"error": "llm_unavailable", "bundle": bundle, "details": result.error})
     if result.error == "llm_invented_numbers":
         raise HTTPException(422, detail={"error": "llm_invented_numbers", "bundle": bundle})
     if result.error:
