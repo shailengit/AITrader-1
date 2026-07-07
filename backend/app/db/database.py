@@ -7,10 +7,13 @@ import os
 import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
+
+# Declarative base for ORM models (added for the Trade Coach agent)
+Base = declarative_base()
 
 # Database configuration from environment (no hardcoded defaults for sensitive values)
 DB_USER = os.getenv("DB_USER", "postgres")
