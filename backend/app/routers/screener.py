@@ -876,6 +876,36 @@ async def run_screening_task(scan_id: str, request: ScanRequest):
         if "results" in result and isinstance(result["results"], list):
             result["results"] = result["results"][:request.max_results]
 
+        # --- Coach journal hook (failure-isolated) ---
+        try:
+            from app.services.coach.journal import upsert_strategy, record_strategy_run, record_signal
+            strat = upsert_strategy(kind="screener", name=f"screener:{request.mode}")
+            if strat is not None:
+                from datetime import datetime as _dt
+                _hits = result.get("results", []) or []
+                run = record_strategy_run(
+                    strategy_id=strat.id,
+                    started_at=_dt.utcnow(),
+                    result_summary={"n_hits": len(_hits), "scan_id": scan_id, "mode": request.mode},
+                    as_of_date=getattr(request, "cutoff_date", None),
+                )
+                if run is not None:
+                    _asof = getattr(request, "cutoff_date", None) or _dt.utcnow().date()
+                    for hit in _hits:
+                        if isinstance(hit, dict):
+                            _tk = hit.get("ticker")
+                        else:
+                            _tk = getattr(hit, "ticker", None)
+                        if not _tk:
+                            continue
+                        record_signal(
+                            run_id=run.id, ticker=_tk, signal_type="entry", as_of_date=_asof,
+                            signal_strength=(hit.get("score") if isinstance(hit, dict) else getattr(hit, "score", None)),
+                            payload=(hit if isinstance(hit, dict) else (hit.to_dict() if hasattr(hit, "to_dict") else {})),
+                        )
+        except Exception as _e:
+            logger.warning("Coach screener hook failed: %s", _e)
+
         update_progress(100)
         scan_status[scan_id]["status"] = "completed"
         scan_status[scan_id]["progress"] = 100
