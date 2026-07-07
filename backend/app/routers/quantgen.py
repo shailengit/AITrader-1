@@ -401,6 +401,34 @@ async def run_strategy_endpoint(request: RunRequest):
 
         if result["success"]:
             logger.info("Strategy executed successfully")
+            # --- Coach journal hook (failure-isolated) ---
+            try:
+                from app.services.coach.journal import upsert_strategy, record_strategy_run, record_signal
+                _strat_name = f"quantgen:run:{','.join(request.tickers or ['default'])}"
+                strat = upsert_strategy(kind="quantgen", name=_strat_name, params={"tickers": request.tickers})
+                if strat is not None:
+                    from datetime import datetime as _dt
+                    _trades = (result.get("trades") or [])
+                    _stats = result.get("stats") or {}
+                    run = record_strategy_run(
+                        strategy_id=strat.id,
+                        started_at=_dt.utcnow(),
+                        result_summary={"n_trades": len(_trades), "stats": _stats, "source": "quantgen.run"},
+                    )
+                    if run is not None:
+                        for _t in _trades[:50]:
+                            if not isinstance(_t, dict): continue
+                            _tk = _t.get("ticker") or (request.tickers[0] if request.tickers else None)
+                            if not _tk: continue
+                            record_signal(
+                                run_id=run.id, ticker=_tk,
+                                signal_type=(_t.get("side") or "entry"),
+                                as_of_date=_dt.utcnow().date(),
+                                signal_strength=_t.get("pnl"),
+                                payload=_t,
+                            )
+            except Exception as _e:
+                logger.warning("Coach quantgen /run hook failed: %s", _e)
             return {
                 "success": True,
                 "data": {
@@ -492,6 +520,25 @@ async def optimize_strategy_endpoint(request: OptimizeRequest):
             }
 
         logger.info("Optimization completed successfully")
+        # --- Coach journal hook (failure-isolated) ---
+        try:
+            from app.services.coach.journal import upsert_strategy, record_strategy_run
+            _mode = (validated.config or {}).get("mode", "walk_forward")
+            _strat_name = f"quantgen:{_mode}:{','.join(request.tickers or ['default'])}"
+            strat = upsert_strategy(kind="quantgen", name=_strat_name, params={"tickers": request.tickers, "mode": _mode})
+            if strat is not None:
+                from datetime import datetime as _dt
+                record_strategy_run(
+                    strategy_id=strat.id,
+                    started_at=_dt.utcnow(),
+                    result_summary={
+                        "source": f"quantgen.{_mode}",
+                        "tickers": request.tickers,
+                        "params": validated.strategy_params,
+                    },
+                )
+        except Exception as _e:
+            logger.warning("Coach quantgen /optimize hook failed: %s", _e)
         return {
             "success": True,
             "data": result,
