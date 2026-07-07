@@ -285,6 +285,36 @@ def _do_scan(request: ScanRequest):
     result['cached_models'] = _models_trained()
     result['retraining'] = _retraining.is_set()
     _reset_scan_progress()
+
+    # --- Coach journal hook (failure-isolated) ---
+    try:
+        from app.services.coach.journal import upsert_strategy, record_strategy_run, record_signal
+        strat = upsert_strategy(kind="markov", name=f"markov:daily_scan:{request.model}")
+        if strat is not None:
+            from datetime import datetime as _dt
+            _signals = (result.get("signals") or [])
+            run = record_strategy_run(
+                strategy_id=strat.id,
+                started_at=_dt.utcnow(),
+                result_summary={"n_signals": len(_signals), "model": request.model, "end_date": end},
+                as_of_date=_dt.fromisoformat(end).date() if isinstance(end, str) else None,
+            )
+            if run is not None:
+                _asof = _dt.fromisoformat(end).date() if isinstance(end, str) else _dt.utcnow().date()
+                for _s in _signals[:50]:
+                    if not isinstance(_s, dict): continue
+                    _tk = _s.get("ticker")
+                    if not _tk: continue
+                    record_signal(
+                        run_id=run.id, ticker=_tk,
+                        signal_type=_s.get("action", "hold"),
+                        as_of_date=_asof,
+                        signal_strength=_s.get("conviction"),
+                        payload=_s,
+                    )
+    except Exception as _e:
+        logger.warning("Coach markov /scan hook failed: %s", _e)
+
     return result
 
 
@@ -360,6 +390,20 @@ async def retrain_models(request: RetrainRequest):
         finally:
             _retraining.clear()
             _reset_retrain_progress()
+            # --- Coach journal hook (failure-isolated) ---
+            try:
+                from app.services.coach.journal import upsert_strategy, record_strategy_run
+                _duration = time.time() - started
+                strat = upsert_strategy(kind="markov", name=f"markov:retrain:{request.model}")
+                if strat is not None:
+                    from datetime import datetime as _dt
+                    record_strategy_run(
+                        strategy_id=strat.id,
+                        started_at=_dt.utcnow(),
+                        result_summary={"source": "markov.retrain", "model": request.model, "duration_s": _duration},
+                    )
+            except Exception as _e:
+                logger.warning("Coach markov /retrain hook failed: %s", _e)
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
