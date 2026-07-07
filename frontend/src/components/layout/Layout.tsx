@@ -10,6 +10,7 @@ const pageTitles: Record<string, string> = {
   "/earnings": "Earnings Calendar",
   "/quantgen": "QuantGen Strategy Builder",
   "/markov": "Markov Chain Trader",
+  "/coach": "Trade Coach",
 };
 
 const REFERRER_KEY = "tc_last_app_referrer";

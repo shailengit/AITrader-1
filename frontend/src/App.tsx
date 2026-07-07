@@ -9,6 +9,8 @@ import ChartView from './pages/app/ScreenerBuilder/ChartView'
 import QuantGen from './pages/QuantGen'
 import EarningsCalendar from './pages/EarningsCalendar'
 import Markov from './pages/Markov'
+import CoachIndex from './pages/Coach'
+import CoachTrades from './pages/Coach/trades'
 
 function App() {
   return (
@@ -52,6 +54,16 @@ function App() {
             <Route path="markov" element={
               <ErrorBoundary>
                 <Markov />
+              </ErrorBoundary>
+            } />
+            <Route path="coach" element={
+              <ErrorBoundary>
+                <CoachIndex />
+              </ErrorBoundary>
+            } />
+            <Route path="coach/trades" element={
+              <ErrorBoundary>
+                <CoachTrades />
               </ErrorBoundary>
             } />
           </Route>
