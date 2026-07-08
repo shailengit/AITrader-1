@@ -1,13 +1,10 @@
-"""Setup script for cli-anything-tradecraft."""
-
+"""Setup script for tradecraft CLI."""
 from setuptools import setup, find_namespace_packages
 
 setup(
-    name="cli-anything-tradecraft",
-    version="0.1.0",
-    description="CLI harness for TradeCraft - Sector Rotation, AI Screener, and QuantGen Strategy Builder",
-    author="TradeCraft CLI Team",
-    url="https://github.com/shailendrakaushik/TradeCraft",
+    name="tradecraft-cli",
+    version="0.2.0",
+    description="TradeCraft CLI — strategy creation, backtesting, coach analytics, Markov learning",
     packages=find_namespace_packages(include=["cli_anything.*"]),
     namespace_packages=["cli_anything"],
     include_package_data=True,
@@ -23,7 +20,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "cli-anything-tradecraft=cli_anything.tradecraft.tradecraft_cli:main",
+            "tradecraft=cli_anything.tradecraft.main:cli",
         ],
     },
     classifiers=[
@@ -31,10 +28,5 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
     ],
 )
