@@ -1,12 +1,12 @@
 """Interactive REPL command."""
 import click
-from cli_anything.tradecraft.main import cli
 
 
 @click.command()
 @click.pass_context
 def repl(ctx):
     """Start an interactive shell."""
+    from cli_anything.tradecraft.main import cli
     import shlex
     import sys
     try:

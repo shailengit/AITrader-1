@@ -19,11 +19,11 @@ from cli_anything.tradecraft.core.export import emit
 
 
 def _json_flag() -> bool:
-    ctx = click.get_current_context()
+    ctx = click.get_current_context(silent=True)
     return ctx.obj.get("json", False) if ctx and ctx.obj else False
 
 def _dry_run() -> bool:
-    ctx = click.get_current_context()
+    ctx = click.get_current_context(silent=True)
     return ctx.obj.get("dry_run", False) if ctx and ctx.obj else False
 
 def _emit(data: Any, title: str = "") -> None:

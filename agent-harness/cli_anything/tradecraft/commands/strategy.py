@@ -53,7 +53,8 @@ def strategy_create(prompt: str, tickers: str, start_date: str, end_date: Option
 
     try:
         resp = api_post("/api/generate", body=body)
-        strategy_id = str(uuid.uuid4())[:8]
+        # Use backend ID if available, otherwise fall back to local UUID
+        strategy_id = resp.get("data", {}).get("id") or str(uuid.uuid4())[:8]
         result = {
             "id": strategy_id,
             "prompt": prompt,

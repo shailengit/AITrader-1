@@ -1,4 +1,5 @@
 """Coach / Performance Analytics commands."""
+from datetime import datetime
 from typing import Optional
 
 import click
@@ -20,7 +21,7 @@ def coach_kpis(period: int, strategy_id: Optional[str]):
     if strategy_id:
         params["strategy_id"] = strategy_id
     try:
-        data = api_get("/coach/kpis", params=params)
+        data = api_get("/api/coach/kpis", params=params)
         _emit(data, title=f"KPIs (last {period}d)")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -36,7 +37,7 @@ def coach_report(period: int, strategy_id: Optional[str]):
     if strategy_id:
         params["strategy_id"] = strategy_id
     try:
-        data = api_get("/coach/report", params=params)
+        data = api_get("/api/coach/report", params=params)
         _emit(data, title=f"Coach Report (last {period}d)")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -53,11 +54,11 @@ def coach_trades():
 @click.option("--strategy-id", help="Filter by strategy ID.")
 def coach_trades_list(period: int, strategy_id: Optional[str]):
     """List trades from the journal."""
-    params = {"period_days": period}
+    params = {}
     if strategy_id:
         params["strategy_id"] = strategy_id
     try:
-        data = api_get("/coach/trades", params=params)
+        data = api_get("/api/coach/trades", params=params)
         _emit(data, title="Trades")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -77,10 +78,11 @@ def coach_trades_add(ticker: str, side: str, qty: float, entry_px: float, notes:
         "side": side,
         "qty": qty,
         "entry_px": entry_px,
+        "entry_at": datetime.utcnow().isoformat(),
         "notes": notes or "",
     }
     try:
-        data = api_post("/coach/trades", body=body)
+        data = api_post("/api/coach/trades", body=body)
         _emit(data, title="Trade Added")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -96,7 +98,7 @@ def coach_trades_close(trade_id: str, exit_px: Optional[float]):
     if exit_px:
         body["exit_px"] = exit_px
     try:
-        data = api_post(f"/coach/trades/{trade_id}/close", body=body)
+        data = api_post(f"/api/coach/trades/{trade_id}/close", body=body)
         _emit(data, title="Trade Closed")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
