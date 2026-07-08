@@ -22,8 +22,14 @@ def _request(
     body: Optional[Dict[str, Any]] = None,
     timeout: Optional[int] = None,
     headers: Optional[Dict[str, str]] = None,
+    params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     base = get_backend_url()
+    if params:
+        import urllib.parse
+        query = urllib.parse.urlencode(params)
+        separator = "&" if "?" in path else "?"
+        path = f"{path}{separator}{query}"
     url = f"{base}{path}"
     req_headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if headers:
