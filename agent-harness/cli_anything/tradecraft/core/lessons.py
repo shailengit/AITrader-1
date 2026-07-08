@@ -8,9 +8,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from cli_anything.tradecraft.core.config import CONFIG_DIR
+from cli_anything.tradecraft.core import config as _cfg
 
-LESSONS_FILE = CONFIG_DIR / "lessons.json"
+
+def _lessons_path() -> Path:
+    """Return the path to the lessons file. Evaluated at call time for test isolation."""
+    return _cfg.CONFIG_DIR / "lessons.json"
 
 DEFAULT_LESSONS = [
     {
@@ -42,8 +45,8 @@ class LessonsStore:
         self._load()
 
     def _path(self) -> Path:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        return LESSONS_FILE
+        _cfg.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        return _lessons_path()
 
     def _load(self) -> None:
         path = self._path()

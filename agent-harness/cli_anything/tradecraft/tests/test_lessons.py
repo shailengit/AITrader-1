@@ -1,22 +1,21 @@
 """Tests for lessons learned store."""
-import json
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from cli_anything.tradecraft.core.lessons import LessonsStore
+from cli_anything.tradecraft.core import config as cfg
 
 
 @pytest.fixture
-def store(tmp_path: Path) -> LessonsStore:
+def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> LessonsStore:
     """Create a LessonsStore with a temp config dir."""
-    import cli_anything.tradecraft.core.config as cfg
-    original = cfg.CONFIG_DIR
-    cfg.CONFIG_DIR = tmp_path / ".config" / "tradecraft"
+    test_dir = tmp_path / ".config" / "tradecraft"
+    test_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cfg, "CONFIG_DIR", test_dir)
+    # Force re-import of _lessons_path by creating a fresh instance
     s = LessonsStore()
-    yield s
-    cfg.CONFIG_DIR = original
+    return s
 
 
 def test_default_lessons_exist(store: LessonsStore):
