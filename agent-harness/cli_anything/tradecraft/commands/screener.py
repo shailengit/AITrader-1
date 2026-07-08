@@ -2,12 +2,11 @@
 import json
 import time
 from pathlib import Path
-from typing import Optional
 
 import click
 from cli_anything.tradecraft.utils.api_client import APIError, get as api_get, post as api_post, delete as api_delete
 from cli_anything.tradecraft.main import _emit, _dry_run
-from cli_anything.tradecraft.core.session import set_key
+from cli_anything.tradecraft.core.session import get as session_get, set_key
 
 
 @click.group()
@@ -51,7 +50,7 @@ def screener_scan(mode, use_ai, prompt, cutoff_date, max_results, filters, proje
         resp = api_post("/api/screener/scan", body=body)
         scan_id = resp.get("scan_id")
         if not _dry_run() and scan_id:
-            history = __import__("cli_anything.tradecraft.core.session", fromlist=["get"]).get("scans", [])
+            history = session_get("scans", [])
             history.append({"scan_id": scan_id, "mode": mode, "prompt": prompt})
             set_key("scans", history[-20:])
         if wait and scan_id:

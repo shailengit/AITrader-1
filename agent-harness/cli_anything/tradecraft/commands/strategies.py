@@ -1,9 +1,6 @@
 """Strategy persistence commands."""
-from pathlib import Path
-from typing import Optional
-
 import click
-from cli_anything.tradecraft.utils.api_client import APIError, get as api_get, post as api_post, delete as api_delete
+from cli_anything.tradecraft.utils.api_client import APIError, get as api_get, delete as api_delete
 from cli_anything.tradecraft.main import _emit
 
 

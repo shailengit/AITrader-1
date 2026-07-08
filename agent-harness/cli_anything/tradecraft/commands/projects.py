@@ -1,12 +1,16 @@
 """Project management commands."""
-import json
-from pathlib import Path
 from typing import Optional
 
 import click
 from cli_anything.tradecraft.utils.api_client import APIError, get as api_get, post as api_post, delete as api_delete
 from cli_anything.tradecraft.main import _emit
 from cli_anything.tradecraft.core.project import Project
+
+
+_PROJECT_HELP = (
+    "The Project class in core/project.py does not yet implement this method. "
+    "Update core/project.py with the required method to enable this command."
+)
 
 
 @click.group()
@@ -23,6 +27,9 @@ def projects_create(name: str, description: Optional[str]):
         p = Project(name)
         p.create(description=description or "")
         _emit({"name": name, "description": description}, title="Project Created")
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -36,6 +43,9 @@ def projects_show(name: str):
         p = Project(name)
         data = p.load()
         _emit(data, title=f"Project: {name}")
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -54,6 +64,9 @@ def projects_notes(name: str, notes_text: Optional[str]):
         else:
             data = p.load()
             click.echo(data.get("notes", ""))
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -68,6 +81,9 @@ def projects_add_scan(name: str, scan_id: str):
         p = Project(name)
         p.add_scan(scan_id)
         _emit({"project": name, "scan_id": scan_id}, title="Scan Added")
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -82,6 +98,9 @@ def projects_add_strategy(name: str, strategy_name: str):
         p = Project(name)
         p.add_strategy(strategy_name)
         _emit({"project": name, "strategy": strategy_name}, title="Strategy Added")
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -95,6 +114,9 @@ def projects_delete(name: str):
         p = Project(name)
         p.delete()
         _emit({"name": name}, title="Project Deleted")
+    except AttributeError:
+        click.echo(f"Error: {_PROJECT_HELP}", err=True)
+        raise SystemExit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)

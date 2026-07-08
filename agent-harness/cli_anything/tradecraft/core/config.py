@@ -36,6 +36,9 @@ def save_config(config: Dict[str, Any]) -> None:
         json.dump(config, f, indent=2)
 
 def get_backend_url() -> str:
+    env_url = os.environ.get("TRADECRAFT_BACKEND_URL")
+    if env_url:
+        return env_url
     return load_config().get("backend_url", DEFAULT_CONFIG["backend_url"])
 
 def set_backend_url(url: str) -> None:
