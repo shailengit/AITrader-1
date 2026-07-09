@@ -37,19 +37,19 @@ def strategy():
 @click.argument("prompt")
 @click.option("--tickers", required=True, help="Comma-separated tickers.")
 @click.option("--start-date", default="2020-01-01", help="Start date (default: 2020-01-01).")
-@click.option("--end-date", help="End date (default: latest available).")
-def strategy_create(prompt: str, tickers: str, start_date: str, end_date: Optional[str]):
+@click.option("--end-date", default="", help="End date (default: today's date).")
+def strategy_create(prompt: str, tickers: str, start_date: str, end_date: str):
     """Generate a trading strategy from natural language description.
 
     PROMPT is the natural language description (e.g. "mean reversion on AAPL using RSI(30/70)").
     """
+    resolved_end = end_date if end_date else datetime.now().strftime("%Y-%m-%d")
     body = {
         "prompt": prompt,
         "tickers": [t.strip().upper() for t in tickers.split(",")],
         "start_date": start_date,
+        "end_date": resolved_end,
     }
-    if end_date:
-        body["end_date"] = end_date
 
     try:
         resp = api_post("/api/generate", body=body)

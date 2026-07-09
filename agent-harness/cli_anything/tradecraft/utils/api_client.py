@@ -2,6 +2,7 @@
 """
 
 import json
+import urllib.parse
 import urllib.request
 import urllib.error
 from typing import Any, Dict, Optional
@@ -26,7 +27,6 @@ def _request(
 ) -> Dict[str, Any]:
     base = get_backend_url()
     if params:
-        import urllib.parse
         query = urllib.parse.urlencode(params)
         separator = "&" if "?" in path else "?"
         path = f"{path}{separator}{query}"

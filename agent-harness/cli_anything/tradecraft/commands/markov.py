@@ -15,7 +15,7 @@ def markov():
 def markov_status():
     """Show model training status and health."""
     try:
-        data = api_get("/markov/status")
+        data = api_get("/api/markov/status")
         _emit(data, title="Markov Status")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -23,31 +23,22 @@ def markov_status():
 
 
 @markov.command("train")
-@click.option("--model", type=click.Choice(["xgboost", "lstm"]), help="Model to train (default: all).")
-def markov_train(model: Optional[str]):
+def markov_train():
     """Trigger model retraining."""
-    body = {}
-    if model:
-        body["model"] = model
     try:
-        data = api_post("/markov/train", body=body)
+        data = api_post("/api/markov/retrain", body={})
         _emit(data, title="Training Started")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
 
-@markov.command("signal")
-@click.argument("ticker")
-@click.option("--date", help="Date (YYYY-MM-DD, default: latest).")
-def markov_signal(ticker: str, date: Optional[str]):
-    """Get conviction signal for a ticker."""
-    params = {"ticker": ticker.upper()}
-    if date:
-        params["date"] = date
+@markov.command("retrain-status")
+def markov_retrain_status():
+    """Check retraining progress."""
     try:
-        data = api_get("/markov/signal", params=params)
-        _emit(data, title=f"Signal for {ticker.upper()}")
+        data = api_get("/api/markov/retrain-status")
+        _emit(data, title="Retrain Status")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)

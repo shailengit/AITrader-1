@@ -25,7 +25,7 @@ def test_coach_trades_list_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["coach", "trades", "list", "--help"])
     assert result.exit_code == 0
-    assert "--period" in result.output
+    assert "--strategy-id" in result.output
 
 
 def test_coach_trades_add_missing_ticker():

@@ -1,10 +1,17 @@
 """Coach / Performance Analytics commands."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import click
 from cli_anything.tradecraft.utils.api_client import APIError, get as api_get, post as api_post
 from cli_anything.tradecraft.main import _emit
+
+
+def _date_range(period_days: int):
+    """Compute (period_start, period_end) from a period in days."""
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=period_days)
+    return start.isoformat(), end.isoformat()
 
 
 @click.group()
@@ -17,11 +24,12 @@ def coach():
 @click.option("--strategy-id", help="Filter by strategy ID.")
 def coach_kpis(period: int, strategy_id: Optional[str]):
     """Get key performance indicators from the trade journal."""
-    params = {"period_days": period}
+    period_start, period_end = _date_range(period)
+    params = {"period_start": period_start, "period_end": period_end}
     if strategy_id:
         params["strategy_id"] = strategy_id
     try:
-        data = api_get("/api/coach/kpis", params=params)
+        data = api_get("/api/coach/metrics/overview", params=params)
         _emit(data, title=f"KPIs (last {period}d)")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -33,11 +41,12 @@ def coach_kpis(period: int, strategy_id: Optional[str]):
 @click.option("--strategy-id", help="Filter by strategy ID.")
 def coach_report(period: int, strategy_id: Optional[str]):
     """Get an LLM-generated critique report with recommendations."""
-    params = {"period_days": period}
+    period_start, period_end = _date_range(period)
+    body = {"period_start": period_start, "period_end": period_end}
     if strategy_id:
-        params["strategy_id"] = strategy_id
+        body["strategy_id"] = strategy_id
     try:
-        data = api_get("/api/coach/report", params=params)
+        data = api_post("/api/coach/report", body=body)
         _emit(data, title=f"Coach Report (last {period}d)")
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
@@ -50,9 +59,8 @@ def coach_trades():
 
 
 @coach_trades.command("list")
-@click.option("--period", type=int, default=90, help="Filter by days (default: 90).")
 @click.option("--strategy-id", help="Filter by strategy ID.")
-def coach_trades_list(period: int, strategy_id: Optional[str]):
+def coach_trades_list(strategy_id: Optional[str]):
     """List trades from the journal."""
     params = {}
     if strategy_id:

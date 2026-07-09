@@ -17,7 +17,7 @@ from unittest.mock import patch, MagicMock
 
 from click.testing import CliRunner
 
-from cli_anything.tradecraft.tradecraft_cli import cli
+from cli_anything.tradecraft.main import cli
 from cli_anything.tradecraft.core.config import load_config
 
 
