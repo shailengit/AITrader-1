@@ -43,7 +43,10 @@ export default function MarkovPage() {
   const { isDarkMode } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [drawerTicker, setDrawerTicker] = useState<string | null>(() => searchParams.get('ticker')?.toUpperCase() ?? null);
+  const [drawerTicker, setDrawerTicker] = useState<string | null>(() => {
+    const t = searchParams.get('ticker');
+    return t ? t.toUpperCase() : null;
+  });
   const [loading, setLoading] = useState(false);
   const [sectors, setSectors] = useState<SectorRegime[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
@@ -161,6 +164,7 @@ export default function MarkovPage() {
 
   const handleScan = useCallback(async (params: ScanParams) => {
     setLoading(true);
+    setDrawerTicker(null);
     setError(null);
     setSignals([]);
     setSectors([]);
@@ -215,7 +219,7 @@ export default function MarkovPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setSearchParams]);
 
   const openTicker = useCallback((ticker: string) => {
     setDrawerTicker(ticker.toUpperCase());
@@ -233,6 +237,17 @@ export default function MarkovPage() {
     return `${m}m ${s}s`;
   };
 
+  const handleOpenInChart = useCallback((ticker: string) => {
+    recordAppReferrer('/markov', 'Markov Chain Trader');
+    navigate(`/markov/chart/${encodeURIComponent(ticker)}`);
+  }, [navigate]);
+
+  const handleExportToLab = useCallback((ticker: string) => {
+    recordAppReferrer('/markov', 'Markov Chain Trader');
+    const fromDate = lastAsOfDate || new Date().toISOString().split('T')[0];
+    navigate(`/quantgen/build?tickers=${encodeURIComponent(ticker)}&from_date=${fromDate}`);
+  }, [navigate, lastAsOfDate]);
+
   const defaultIndicators: IndicatorDescriptor[] = useMemo(() => [
     { id: 'ema_20', label: 'EMA 20' },
     { id: 'ema_50', label: 'EMA 50' },
@@ -244,7 +259,9 @@ export default function MarkovPage() {
         onScan={handleScan}
         loading={loading}
         initialValues={{
-          model: (searchParams.get('model') as 'xgboost' | 'lstm') || undefined,
+          model: (['xgboost', 'lstm'].includes(searchParams.get('model') ?? '')
+            ? searchParams.get('model') as 'xgboost' | 'lstm'
+            : undefined) || undefined,
           threshold: searchParams.get('threshold') ? parseFloat(searchParams.get('threshold')!) : undefined,
           minConviction: searchParams.get('minConviction') ? parseFloat(searchParams.get('minConviction')!) : undefined,
           maxResults: searchParams.get('maxResults') ? parseInt(searchParams.get('maxResults')!, 10) : undefined,
@@ -369,15 +386,8 @@ export default function MarkovPage() {
         indicators={defaultIndicators}
         scoreRow={null}
         onClose={closeDrawer}
-        onOpenInChart={(ticker) => {
-          recordAppReferrer('/markov', 'Markov Chain Trader');
-          navigate(`/markov/chart/${encodeURIComponent(ticker)}`);
-        }}
-        onExportToLab={(ticker) => {
-          recordAppReferrer('/markov', 'Markov Chain Trader');
-          const fromDate = lastAsOfDate || new Date().toISOString().split('T')[0];
-          navigate(`/quantgen/build?tickers=${encodeURIComponent(ticker)}&from_date=${fromDate}`);
-        }}
+        onOpenInChart={handleOpenInChart}
+        onExportToLab={handleExportToLab}
       />
     </div>
   );
