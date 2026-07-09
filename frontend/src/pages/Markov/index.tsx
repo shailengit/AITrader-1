@@ -1,8 +1,12 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import ControlPanel, { ScanParams } from "./components/ControlPanel";
 import SectorRegimeGrid from "./components/SectorRegimeGrid";
 import SignalsTable from "./components/SignalsTable";
+import TickerDetailDrawer from "../app/ScreenerBuilder/TickerDetailDrawer";
+import { recordAppReferrer } from "../../components/layout/Layout";
+import type { IndicatorDescriptor } from "../../types/indicators";
 
 interface SectorRegime {
   etf: string;
@@ -37,6 +41,9 @@ interface ScanProgress {
 
 export default function MarkovPage() {
   const { isDarkMode } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [drawerTicker, setDrawerTicker] = useState<string | null>(() => searchParams.get('ticker')?.toUpperCase() ?? null);
   const [loading, setLoading] = useState(false);
   const [sectors, setSectors] = useState<SectorRegime[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
@@ -108,6 +115,50 @@ export default function MarkovPage() {
     };
   }, [loading]);
 
+  // Restore scan results from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem('markov:scan:results');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const age = Date.now() - (parsed.timestamp || 0);
+        // Only restore if less than 5 minutes old
+        if (age < 5 * 60 * 1000 && Array.isArray(parsed.signals)) {
+          setSignals(parsed.signals);
+          if (parsed.sectors) setSectors(parsed.sectors);
+          if (parsed.totalScanned != null) setTotalScanned(parsed.totalScanned);
+        } else {
+          sessionStorage.removeItem('markov:scan:results');
+        }
+      }
+    } catch {
+      sessionStorage.removeItem('markov:scan:results');
+    }
+  }, []);
+
+  // Sync drawerTicker to ?ticker= URL param
+  useEffect(() => {
+    if (drawerTicker) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('ticker', drawerTicker);
+          return next;
+        },
+        { replace: true },
+      );
+    } else {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('ticker');
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [drawerTicker, setSearchParams]);
+
   const handleScan = useCallback(async (params: ScanParams) => {
     setLoading(true);
     setError(null);
@@ -135,11 +186,28 @@ export default function MarkovPage() {
       if (data.signals != null) setSignals(data.signals);
       if (data.sector_status != null) setSectors(data.sector_status);
       if (data.total_scanned != null) setTotalScanned(data.total_scanned);
+      // Cache results in sessionStorage for navigation persistence
+      try {
+        sessionStorage.setItem('markov:scan:results', JSON.stringify({
+          signals: data.signals,
+          sectors: data.sector_status,
+          totalScanned: data.total_scanned,
+          timestamp: Date.now(),
+        }));
+      } catch { /* sessionStorage may be full; ignore */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const openTicker = useCallback((ticker: string) => {
+    setDrawerTicker(ticker.toUpperCase());
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerTicker(null);
   }, []);
 
   // Format elapsed time
@@ -149,6 +217,11 @@ export default function MarkovPage() {
     const s = Math.round(seconds % 60);
     return `${m}m ${s}s`;
   };
+
+  const defaultIndicators: IndicatorDescriptor[] = useMemo(() => [
+    { id: 'ema_20', label: 'EMA 20' },
+    { id: 'ema_50', label: 'EMA 50' },
+  ], []);
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>
@@ -264,7 +337,23 @@ export default function MarkovPage() {
       )}
 
       {sectors.length > 0 && <SectorRegimeGrid sectors={sectors} isDarkMode={isDarkMode} />}
-      <SignalsTable signals={signals} totalScanned={totalScanned} loading={loading} isDarkMode={isDarkMode} minConviction={lastMinConviction} asOfDate={lastAsOfDate} />
+      <SignalsTable signals={signals} totalScanned={totalScanned} loading={loading} isDarkMode={isDarkMode} minConviction={lastMinConviction} asOfDate={lastAsOfDate} onTickerClick={openTicker} />
+      <TickerDetailDrawer
+        ticker={drawerTicker}
+        asOfDate={lastAsOfDate || undefined}
+        indicators={defaultIndicators}
+        scoreRow={null}
+        onClose={closeDrawer}
+        onOpenInChart={(ticker) => {
+          recordAppReferrer('/markov', 'Markov Chain Trader');
+          navigate(`/markov/chart/${encodeURIComponent(ticker)}`);
+        }}
+        onExportToLab={(ticker) => {
+          recordAppReferrer('/markov', 'Markov Chain Trader');
+          const fromDate = lastAsOfDate || new Date().toISOString().split('T')[0];
+          navigate(`/quantgen/build?tickers=${encodeURIComponent(ticker)}&from_date=${fromDate}`);
+        }}
+      />
     </div>
   );
 }
