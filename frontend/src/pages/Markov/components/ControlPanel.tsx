@@ -24,9 +24,11 @@ interface RetrainProgress {
 interface ControlPanelProps {
   onScan: (params: ScanParams) => void;
   loading: boolean;
+  /** Optional initial values to pre-fill the form (from URL params). */
+  initialValues?: Partial<ScanParams>;
 }
 
-export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
+export default function ControlPanel({ onScan, loading, initialValues }: ControlPanelProps) {
   const [model, setModel] = useState<"xgboost" | "lstm">("xgboost");
   const [threshold, setThreshold] = useState(2.0);
   const [minConviction, setMinConviction] = useState(0.6);
@@ -36,6 +38,18 @@ export default function ControlPanel({ onScan, loading }: ControlPanelProps) {
   const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
   const [retrainProgress, setRetrainProgress] = useState<RetrainProgress | null>(null);
   const retrainMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Apply initial values from URL params on mount
+  useEffect(() => {
+    if (!initialValues) return;
+    if (initialValues.model) setModel(initialValues.model);
+    if (initialValues.minConviction != null) setMinConviction(initialValues.minConviction);
+    if (initialValues.maxResults != null) setMaxResults(initialValues.maxResults);
+    if (initialValues.asOfDate != null) setAsOfDate(initialValues.asOfDate);
+    if (initialValues.threshold != null) setThreshold(initialValues.threshold);
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Poll retrain progress while retraining
   useEffect(() => {

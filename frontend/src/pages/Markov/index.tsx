@@ -167,6 +167,21 @@ export default function MarkovPage() {
     setProgress(null);
     setLastMinConviction(params.minConviction);
     setLastAsOfDate(params.asOfDate);
+
+    // Write scan params to URL for state persistence
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('model', params.model);
+        next.set('threshold', String(params.threshold));
+        next.set('minConviction', String(params.minConviction));
+        next.set('maxResults', String(params.maxResults));
+        if (params.asOfDate) next.set('asOfDate', params.asOfDate);
+        return next;
+      },
+      { replace: true },
+    );
+
     try {
       const res = await fetch("/api/markov/scan", {
         method: "POST",
@@ -225,7 +240,17 @@ export default function MarkovPage() {
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-      <ControlPanel onScan={handleScan} loading={loading} />
+      <ControlPanel
+        onScan={handleScan}
+        loading={loading}
+        initialValues={{
+          model: (searchParams.get('model') as 'xgboost' | 'lstm') || undefined,
+          threshold: searchParams.get('threshold') ? parseFloat(searchParams.get('threshold')!) : undefined,
+          minConviction: searchParams.get('minConviction') ? parseFloat(searchParams.get('minConviction')!) : undefined,
+          maxResults: searchParams.get('maxResults') ? parseInt(searchParams.get('maxResults')!, 10) : undefined,
+          asOfDate: searchParams.get('asOfDate') || undefined,
+        }}
+      />
 
       {error && (
         <div style={{ padding: "12px 24px", color: colors.error, fontSize: 14 }}>
