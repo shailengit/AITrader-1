@@ -19,9 +19,11 @@ interface SignalsTableProps {
   isDarkMode: boolean;
   minConviction?: number;  // from the scan params slider, so Actionable uses the same threshold
   asOfDate?: string;
+  /** Called when the user clicks a row. */
+  onTickerClick: (ticker: string) => void;
 }
 
-export default function SignalsTable({ signals, totalScanned, loading, isDarkMode, minConviction = 0.6, asOfDate }: SignalsTableProps) {
+export default function SignalsTable({ signals, totalScanned, loading, isDarkMode, minConviction = 0.6, asOfDate, onTickerClick }: SignalsTableProps) {
   const [showAll, setShowAll] = useState(false);
   // Use the same minConviction from the scan params slider so the
   // Actionable filter matches what the user configured.
@@ -124,7 +126,30 @@ export default function SignalsTable({ signals, totalScanned, loading, isDarkMod
           </thead>
           <tbody>
             {display.map((s, i) => (
-              <tr key={`${s.ticker}-${i}`} style={{ borderBottom: `1px solid ${rowBorder}` }}>
+              <tr
+                key={`${s.ticker}-${i}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open detail for ${s.ticker}`}
+                onClick={() => onTickerClick(s.ticker)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onTickerClick(s.ticker);
+                  }
+                }}
+                style={{
+                  borderBottom: `1px solid ${rowBorder}`,
+                  cursor: 'pointer',
+                  transition: 'background-color 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
                 <td style={{ padding: "8px 12px" }}>{i + 1}</td>
                 <td style={{ padding: "8px 12px", fontWeight: 600 }}>{s.ticker}</td>
                 <td style={{ padding: "8px 12px" }}>{s.sector}</td>
