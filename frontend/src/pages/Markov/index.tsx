@@ -211,6 +211,7 @@ export default function MarkovPage() {
           signals: data.signals,
           sectors: data.sector_status,
           totalScanned: data.total_scanned,
+          params: { model: params.model, threshold: params.threshold, minConviction: params.minConviction, maxResults: params.maxResults, asOfDate: params.asOfDate },
           timestamp: Date.now(),
         }));
       } catch { /* sessionStorage may be full; ignore */ }
@@ -248,9 +249,20 @@ export default function MarkovPage() {
     navigate(`/quantgen/build?tickers=${encodeURIComponent(ticker)}&from_date=${fromDate}`);
   }, [navigate, lastAsOfDate]);
 
+  const cachedParams = useMemo(() => {
+    try {
+      const cached = sessionStorage.getItem('markov:scan:results');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.params || {};
+      }
+    } catch { /* ignore */ }
+    return {};
+  }, []);
+
   const defaultIndicators: IndicatorDescriptor[] = useMemo(() => [
-    { id: 'ema_20', label: 'EMA 20' },
-    { id: 'ema_50', label: 'EMA 50' },
+    { id: 'trend_ema_fast__window20', label: 'EMA 20', params: { window: 20 } },
+    { id: 'trend_ema_slow__window50', label: 'EMA 50', params: { window: 50 } },
   ], []);
 
   return (
@@ -261,11 +273,11 @@ export default function MarkovPage() {
         initialValues={{
           model: (['xgboost', 'lstm'].includes(searchParams.get('model') ?? '')
             ? searchParams.get('model') as 'xgboost' | 'lstm'
-            : undefined) || undefined,
-          threshold: searchParams.get('threshold') ? parseFloat(searchParams.get('threshold')!) : undefined,
-          minConviction: searchParams.get('minConviction') ? parseFloat(searchParams.get('minConviction')!) : undefined,
-          maxResults: searchParams.get('maxResults') ? parseInt(searchParams.get('maxResults')!, 10) : undefined,
-          asOfDate: searchParams.get('asOfDate') || undefined,
+            : cachedParams.model) || undefined,
+          threshold: searchParams.get('threshold') ? parseFloat(searchParams.get('threshold')!) : (cachedParams.threshold ?? undefined),
+          minConviction: searchParams.get('minConviction') ? parseFloat(searchParams.get('minConviction')!) : (cachedParams.minConviction ?? undefined),
+          maxResults: searchParams.get('maxResults') ? parseInt(searchParams.get('maxResults')!, 10) : (cachedParams.maxResults ?? undefined),
+          asOfDate: searchParams.get('asOfDate') || cachedParams.asOfDate || undefined,
         }}
       />
 

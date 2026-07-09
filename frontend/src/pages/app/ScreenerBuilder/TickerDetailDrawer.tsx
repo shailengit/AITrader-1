@@ -15,6 +15,10 @@ import {
   type SubScoreKey,
 } from '../../../lib/subScoreInputs';
 import type { IndicatorDescriptor } from '../../../types/indicators';
+import {
+  isOverlayColumn,
+  midlineForColumn,
+} from '../../../data/indicatorMap';
 import TickerMetadataPanel, { type TickerDetail } from '../../../components/shared/TickerMetadataPanel';
 
 /** Shape of a single bar from /api/screener/chart-data/{ticker}. */
@@ -98,12 +102,21 @@ function buildChartIndicators(
     });
   });
 
-  return Object.entries(series).map(([key, data], i) => ({
-    name: lookup.get(key)?.label ?? key,
-    type: 'line',
-    data,
-    color: CHART_PALETTE[i % CHART_PALETTE.length],
-  }));
+  return Object.entries(series).map(([key, data], i) => {
+    // Extract the backend column from the payload key
+    // (strip trailing __<sig> to get the column name)
+    const sep = key.lastIndexOf('__');
+    const column = sep > 0 ? key.slice(0, sep) : key;
+    const isOverlay = isOverlayColumn(column);
+    return {
+      name: lookup.get(key)?.label ?? key,
+      type: 'line',
+      data,
+      color: CHART_PALETTE[i % CHART_PALETTE.length],
+      pane: isOverlay ? 'overlay' : 'oscillator',
+      midline: isOverlay ? null : midlineForColumn(column),
+    };
+  });
 }
 
 export default function TickerDetailDrawer({
