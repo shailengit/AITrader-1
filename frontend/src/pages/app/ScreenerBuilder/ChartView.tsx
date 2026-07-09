@@ -8,6 +8,8 @@ import {
   catalogEntryToColumn,
   catalogParamsToBackendParams,
   chartPayloadKey,
+  isOverlayColumn,
+  midlineForColumn,
 } from '../../../data/indicatorMap';
 import type { IndicatorDescriptor } from '../../../types/indicators';
 import { CandleStickChart } from '../../../components/quantgen';
@@ -144,12 +146,28 @@ function deriveLabel(id: string, params: Record<string, number>): string {
   return column.replace(/_/g, ' ').toUpperCase();
 }
 
+interface ChartViewProps {
+  /** Label for the back button. Default: "Back to results" */
+  backLabel?: string;
+  /** Path the back button navigates to. Default: "/screener/build" */
+  backPath?: string;
+  /** Referrer path for the Layout's back-navigation. Default: "/screener/build" */
+  referrerPath?: string;
+  /** Referrer label for the Layout's back-navigation. Default: "Custom Screener" */
+  referrerLabel?: string;
+}
+
 /**
  * Full-page chart view for a single ticker. Reached from the drawer's
  * "Open in chart" button. URL is the source of truth for overlays and
  * date range; the chart refetches whenever either changes.
  */
-export default function ChartView() {
+export default function ChartView({
+  backLabel = 'Back to results',
+  backPath = '/screener/build',
+  referrerPath = '/screener/build',
+  referrerLabel = 'Custom Screener',
+}: ChartViewProps) {
   const { ticker: tickerParam } = useParams<{ ticker: string }>();
   const ticker = (tickerParam ?? '').toUpperCase();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -217,7 +235,7 @@ export default function ChartView() {
   // subtree, so the referrer is the same whether the user is on
   // /screener/build or /screener/build/chart/:ticker.
   useEffect(() => {
-    recordAppReferrer('/screener/build', 'Custom Screener');
+    recordAppReferrer(referrerPath, referrerLabel);
   }, []);
 
   // Metadata fetch
@@ -273,8 +291,46 @@ export default function ChartView() {
         }
       }
       if (!cols.includes(column)) cols.push(column);
+      // Multi-output expansion at the fetch layer: Bollinger Bands
+      // also needs the upper/lower bands so the chart can render
+      // the full band. Add them to the columns list with the same
+      // override params (if any) so the chart endpoint returns all
+      // 3 series under the same param signature.
+      if (column === 'volatility_bbm') {
+        if (!cols.includes('volatility_bbh')) cols.push('volatility_bbh');
+        if (!cols.includes('volatility_bbl')) cols.push('volatility_bbl');
+        if (params && Object.keys(params).length > 0) {
+          overrides['volatility_bbh'] = params;
+          overrides['volatility_bbl'] = params;
+        }
+      }
+      // MACD also needs the signal line and histogram (the
+      // diff between MACD and signal). The chart renders all 3:
+      // MACD line + Signal line on the same oscillator pane, plus
+      // a bar histogram on a separate pane below showing bullish
+      // (green) / bearish (red) bars.
+      if (column === 'trend_macd') {
+        if (!cols.includes('trend_macd_signal')) cols.push('trend_macd_signal');
+        if (!cols.includes('trend_macd_diff')) cols.push('trend_macd_diff');
+        if (params && Object.keys(params).length > 0) {
+          overrides['trend_macd_signal'] = params;
+          overrides['trend_macd_diff'] = params;
+        }
+      }
+      // Param overrides: when the same column has multiple param
+      // variants in the overlay list (e.g. three RSI windows —
+      // 14, 21, 28), we need ALL of them recomputed, not just the
+      // last. The chart endpoint's `overrides` map is keyed by
+      // `<column>__<sig>` so multiple variants of the same
+      // backend column coexist. The bare `column` key is reserved
+      // for the default-param case (no params).
       if (params && Object.keys(params).length > 0) {
-        overrides[column] = params;
+        const sig = Object.entries(params)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, v]) => `${k}${v}`)
+          .join('_');
+        const key = sig ? `${column}__${sig}` : column;
+        overrides[key] = params;
       }
     }
 
@@ -407,7 +463,7 @@ export default function ChartView() {
         series[key].push({ time: t, value: v });
       });
     });
-    return overlays.map((ov, i) => {
+    return overlays.flatMap((ov, i) => {
       // Resolve the chart-endpoint payload key for this overlay.
       // - For a catalog id (ta__<Name>__<sig>): translate the catalog
       //   name to its backend column, then build `<column>__<sig>` from
@@ -425,9 +481,135 @@ export default function ChartView() {
         column = ov.id;
         payloadKey = chartPayloadKey(column, ov.params);
       }
-      return {
+
+      // Multi-output expansion: Bollinger Bands renders as 3 series
+      // (middle + upper + lower) so the band is visually complete.
+      // The middle is the "primary" series (solid); the upper and
+      // lower bands are dashed to indicate they represent ±N
+      // standard-deviation offsets rather than separate moving
+      // averages. The user-facing overlays list still shows a
+      // single "Bollinger Bands" entry; only the chart payload
+      // expands it. The chart endpoint auto-fetches the upper/lower
+      // bands whenever the middle is requested, so the data is
+      // already in `series` under `volatility_bbh` / `volatility_bbl`
+      // (and the sig-suffixed variants when the user passed custom
+      // params).
+      if (
+        column === 'volatility_bbm' &&
+        series['volatility_bbh']?.length &&
+        series['volatility_bbl']?.length
+      ) {
+        const sigSuffix =
+          ov.params && Object.keys(ov.params).length > 0
+            ? '__' +
+              Object.entries(ov.params)
+                .sort()
+                .map(([k, v]) => `${k}${v}`)
+                .join('_')
+            : '';
+        const color = CHART_PALETTE[i % CHART_PALETTE.length];
+        const visible = activeIds.has(ov.id);
+        return [
+          {
+            name: ov.label,
+            type: 'line' as const,
+            data: visible ? (series[payloadKey] ?? []) : [],
+            color,
+            visible,
+            pane: 'overlay' as const,
+            midline: null,
+            lineStyle: undefined,
+          },
+          {
+            name: `${ov.label} Upper`,
+            type: 'line' as const,
+            data: visible ? (series[`volatility_bbh${sigSuffix}`] ?? []) : [],
+            color,
+            visible,
+            pane: 'overlay' as const,
+            midline: null,
+            lineStyle: 'dashed' as const,
+          },
+          {
+            name: `${ov.label} Lower`,
+            type: 'line' as const,
+            data: visible ? (series[`volatility_bbl${sigSuffix}`] ?? []) : [],
+            color,
+            visible,
+            pane: 'overlay' as const,
+            midline: null,
+            lineStyle: 'dashed' as const,
+          },
+        ];
+      }
+
+      // Multi-output expansion: MACD renders as 3 series:
+      //  1. MACD line (solid) on the oscillator pane
+      //  2. Signal line (dashed) on the same oscillator pane
+      //  3. Histogram (bar series) on a separate pane below,
+      //     green when MACD - Signal > 0 (bullish), red when < 0
+      //     (bearish). Standard charting convention.
+      if (column === 'trend_macd') {
+        const sigSuffix =
+          ov.params && Object.keys(ov.params).length > 0
+            ? '__' +
+              Object.entries(ov.params)
+                .sort()
+                .map(([k, v]) => `${k}${v}`)
+                .join('_')
+            : '';
+        const color = CHART_PALETTE[i % CHART_PALETTE.length];
+        const visible = activeIds.has(ov.id);
+        // Build the histogram bar colors: green (#10b981) for
+        // positive diff (bullish), red (#f43f5e) for negative
+        // diff (bearish). The diff series is the MACD histogram
+        // (MACD line − signal line).
+        const diffSeries = series[`trend_macd_diff${sigSuffix}`] ?? series['trend_macd_diff'] ?? [];
+        const macdSeries = series[payloadKey] ?? [];
+        // The histogram data per-bar is the value of the diff at
+        // that timestamp. We color each bar based on sign.
+        const dataColors = diffSeries.map(
+          (p) => (p.value >= 0 ? '#10b981' : '#f43f5e') as string,
+        );
+        return [
+          {
+            name: ov.label,
+            type: 'line' as const,
+            data: visible ? macdSeries : [],
+            color,
+            visible,
+            pane: 'oscillator' as const,
+            midline: 0,
+            lineStyle: undefined,
+          },
+          {
+            name: `${ov.label} Signal`,
+            type: 'line' as const,
+            data: visible ? (series[`trend_macd_signal${sigSuffix}`] ?? series['trend_macd_signal'] ?? []) : [],
+            color,
+            visible,
+            pane: 'oscillator' as const,
+            midline: 0,
+            lineStyle: 'dashed' as const,
+          },
+          {
+            name: `${ov.label} Histogram`,
+            type: 'line' as const,
+            seriesType: 'bar' as const,
+            data: visible ? diffSeries : [],
+            color: '#10b981',
+            dataColors,
+            visible,
+            pane: 'oscillator' as const,
+            midline: 0,
+            lineStyle: undefined,
+          },
+        ];
+      }
+
+      return [{
         name: ov.label,
-        type: 'line',
+        type: 'line' as const,
         // Empty data array hides the series (lightweight-charts skips
         // lines with no points). The legend marker still shows because
         // the series is registered in CandleStickChart's effect — we
@@ -437,7 +619,19 @@ export default function ChartView() {
         // Pass active state through so CandleStickChart can avoid
         // creating a series for hidden overlays.
         visible: activeIds.has(ov.id),
-      };
+        // Route price-scaled indicators (SMA/EMA/Bollinger/PSAR/…) to the
+        // candle pane and oscillators (RSI/MACD/ADX/ATR/…) to their own
+        // pane below, so oscillators don't share the price axis.
+        pane: (isOverlayColumn(column) ? 'overlay' : 'oscillator') as 'overlay' | 'oscillator',
+        // Canonical midline for bounded oscillators (RSI 50, MACD 0,
+        // ROC 0, ADX 25, …). Unbounded indicators (OBV, ATR, …) get
+        // `null` and the chart draws no reference line rather than a
+        // fake one.
+        midline: isOverlayColumn(column) ? null : midlineForColumn(column),
+        // Line style for secondary series (dashed/dotted). Default
+        // solid for primary series.
+        lineStyle: undefined as 'solid' | 'dashed' | 'dotted' | undefined,
+      }];
     });
   }, [chartBars, overlays, activeIds]);
 
@@ -450,7 +644,7 @@ export default function ChartView() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: colors.canvas, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', backgroundColor: colors.canvas, display: 'flex', flexDirection: 'column' }}>
       {/* Header strip */}
       <div
         style={{
@@ -464,8 +658,8 @@ export default function ChartView() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
-            onClick={() => navigate('/screener/build')}
-            aria-label="Back to results"
+            onClick={() => navigate(backPath)}
+            aria-label={backLabel}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -481,9 +675,9 @@ export default function ChartView() {
             }}
           >
             <ArrowLeft size={14} />
-            Back to results
+            {backLabel}
           </button>
-          <span style={{ fontSize: 12, color: colors.subtle }}>Custom Screener ›</span>
+          <span style={{ fontSize: 12, color: colors.subtle }}>{referrerLabel} ›</span>
           <span style={{ fontSize: 18, fontWeight: 700, color: colors.text }}>{ticker}</span>
           {metaData?.company_name && (
             <span style={{ fontSize: 13, color: colors.muted }}>{metaData.company_name}</span>
@@ -563,6 +757,16 @@ export default function ChartView() {
         <div
           style={{
             padding: 24,
+            // The chart panel sizes to the available viewport (one
+            // flex-1 child of the right column) and scrolls when the
+            // chart's total content height (candle pane + each pinned
+            // oscillator pane) exceeds that space. The candle pane
+            // never shrinks regardless of how many oscillators are
+            // added — the panel scrolls to reach panes that don't
+            // fit. The DateRangeBar is above the scrollable region so
+            // it stays in view.
+            flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
@@ -582,9 +786,15 @@ export default function ChartView() {
               border: `1px solid ${colors.border}`,
               borderRadius: 12,
               padding: 16,
-              flex: 1,
-              minHeight: 400,
+              // The chart's wrapper drives this box's height. When
+              // the wrapper grows to fit pinned oscillator panes
+              // (candleTarget * (1 + N) + chrome), the box matches
+              // and the parent panel's `overflowY: 'auto'` shows a
+              // scrollbar so every pane stays at the candle's full
+              // target size instead of being squished.
+              minHeight: 500,
               position: 'relative',
+              flexShrink: 0,
             }}
           >
             {chartError ? (
@@ -616,6 +826,14 @@ export default function ChartView() {
             ) : (
               <CandleStickChart
                 data={transformBars(chartBars)}
+                // Fixed chart height. The candle pane must NEVER shrink
+                // to make room for oscillators — each oscillator pane is
+                // pinned to the candle pane's height (see CandleStickChart
+                // effect). When the total pane height exceeds this value,
+                // the chart's content overflows the inner container and
+                // the outer chart panel (`overflowY: 'auto'`) provides
+                // the scrollbar so every pane remains at the candle's
+                // full size.
                 height={500}
                 indicators={chartIndicatorsPayload as never}
                 cutoffDate={fromDate}
