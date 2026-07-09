@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeCraft CLI Manual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242838;
+    --border: #2e3348;
+    --text: #e2e4eb;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --accent2: #4ade80;
+    --accent3: #f59e0b;
+    --accent4: #f472b6;
+    --code-bg: #141822;
+    --max-w: 960px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0 24px;
+  }
+  .container { max-width: var(--max-w); margin: 0 auto; padding: 48px 0 96px; }
+
+  /* Header */
+  h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 1.1rem; margin-bottom: 48px; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 6px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-right: 6px;
+  }
+  .badge-cli { background: #1e3a5f; color: #6c8cff; }
+  .badge-concept { background: #1a3a2a; color: #4ade80; }
+  .badge-learn { background: #3a2a1a; color: #f59e0b; }
+
+  /* Sections */
+  h2 {
+    font-size: 1.5rem; font-weight: 600; margin: 48px 0 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: 28px 0 10px; color: var(--accent); }
+  h4 { font-size: 1rem; font-weight: 600; margin: 20px 0 8px; color: var(--accent2); }
+  p { margin-bottom: 12px; color: var(--text-dim); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Code */
+  code, .cmd {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+  }
+  code {
+    background: var(--code-bg); padding: 2px 6px; border-radius: 4px;
+    color: var(--accent2);
+  }
+  .cmd {
+    display: block; background: var(--code-bg); padding: 12px 16px;
+    border-radius: 8px; border: 1px solid var(--border);
+    margin: 8px 0 16px; color: var(--text); overflow-x: auto;
+    white-space: pre; tab-size: 2;
+  }
+  .cmd .prompt { color: var(--accent2); }
+  .cmd .comment { color: var(--text-dim); font-style: italic; }
+  .cmd .output { color: var(--accent3); }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 24px; margin: 16px 0;
+  }
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px; margin: 16px 0;
+  }
+  .card-grid .card { margin: 0; }
+
+  /* Command table */
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0 20px;
+    font-size: 0.9rem;
+  }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { color: var(--text); }
+  td:first-child code { background: transparent; padding: 0; color: var(--accent); }
+
+  /* Concept boxes */
+  .concept {
+    background: var(--surface2); border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 12px 0;
+  }
+  .concept h4 { margin-top: 0; }
+  .concept p:last-child { margin-bottom: 0; }
+
+  /* TOC */
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; margin: 24px 0 40px; }
+  .toc h3 { margin-top: 0; color: var(--text); }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 6px 0; }
+  .toc a { color: var(--text-dim); }
+  .toc a:hover { color: var(--accent); }
+
+  /* Flow diagram */
+  .flow {
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 8px; margin: 20px 0;
+    font-size: 0.85rem;
+  }
+  .flow-step {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 16px; text-align: center;
+  }
+  .flow-arrow { color: var(--text-dim); font-size: 1.2rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  @media (max-width: 640px) {
+    .card-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 1.8rem; }
+    .cmd { font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>TradeCraft CLI</h1>
+<p class="subtitle">Natural language trading strategy creation, backtesting, performance analytics, and AI-powered learning — all from your terminal or Claude Code.</p>
+
+<!-- TOC -->
+<div class="toc">
+<h3>Contents</h3>
+<ol>
+  <li><a href="#quickstart">Quick Start</a></li>
+  <li><a href="#concepts">Key Concepts</a>
+    <ol>
+      <li><a href="#concept-dormant">Dormant Giant Screener</a></li>
+      <li><a href="#concept-quantgen">QuantGen Strategy Builder</a></li>
+      <li><a href="#concept-markov">Markov Chain Trader</a></li>
+      <li><a href="#concept-coach">Trade Coach</a></li>
+      <li><a href="#concept-wfo">Walk-Forward Optimization</a></li>
+    </ol>
+  </li>
+  <li><a href="#commands">Command Reference</a>
+    <ol>
+      <li><a href="#cmd-strategy">strategy — Natural Language Strategy Lab</a></li>
+      <li><a href="#cmd-coach">coach — Performance Analytics</a></li>
+      <li><a href="#cmd-markov">markov — Learning Agent</a></li>
+      <li><a href="#cmd-sectors">sectors — Sector Rotation Scanner</a></li>
+      <li><a href="#cmd-screener">screener — AI Stock Screener</a></li>
+      <li><a href="#cmd-quantgen">quantgen — Strategy Builder (Advanced)</a></li>
+      <li><a href="#cmd-other">Other Commands</a></li>
+    </ol>
+  </li>
+  <li><a href="#workflow">End-to-End Workflow</a></li>
+  <li><a href="#learning">Learning Loops</a></li>
+  <li><a href="#claude">Claude Code Integration</a></li>
+  <li><a href="#config">Configuration</a></li>
+</ol>
+</div>
+
+<!-- ============ QUICK START ============ -->
+<h2 id="quickstart">1. Quick Start</h2>
+
+<div class="cmd"><span class="prompt">$</span> pip install -e agent-harness/   <span class="comment"># Install the CLI</span>
+<span class="prompt">$</span> tradecraft --help                <span class="comment"># See all commands</span>
+<span class="prompt">$</span> tradecraft health                 <span class="comment"># Check backend is running</span>
+<span class="prompt">$</span> tradecraft sectors list           <span class="comment"># See sector performance</span>
+<span class="prompt">$</span> tradecraft strategy create "mean reversion on AAPL using RSI(30/70)" --tickers AAPL
+<span class="prompt">$</span> tradecraft coach kpis --period 30 <span class="comment"># Check your trading KPIs</span></div>
+
+<p>The CLI talks to a FastAPI backend (port 8000) and a PostgreSQL database. Make sure the backend is running before using most commands.</p>
+
+<p>All commands support <code>--json</code> for machine-readable output — this is how Claude Code consumes them:</p>
+<div class="cmd"><span class="prompt">$</span> tradecraft --json health</div>
+
+<!-- ============ KEY CONCEPTS ============ -->
+<h2 id="concepts">2. Key Concepts</h2>
+
+<div class="concept" id="concept-dormant">
+<h4><span class="badge badge-concept">Screener</span> Dormant Giant Screener</h4>
+<p><strong>What it finds:</strong> Stocks that are "sleeping giants" — quiet before a big move. It looks for three signals simultaneously:</p>
+<ul style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li><strong>Bollinger Band squeeze</strong> — volatility has contracted, suggesting an explosive move is coming</li>
+  <li><strong>OBV (On-Balance Volume) accumulation</strong> — smart money is quietly buying while price stays flat</li>
+  <li><strong>Resistance breakout</strong> — price is pushing through a key level</li>
+</ul>
+<p>It then verifies each candidate with <strong>EPS acceleration</strong> (earnings per share growing faster) as a fundamental catalyst. The idea: technical setup + fundamental catalyst = high-probability trade.</p>
+<p><strong>Best for:</strong> Swing traders looking for stocks before they break out. Scan the full S&P 1500 in one command.</p>
+</div>
+
+<div class="concept" id="concept-quantgen">
+<h4><span class="badge badge-concept">Builder</span> QuantGen Strategy Builder</h4>
+<p><strong>What it does:</strong> Takes a natural language description of a trading strategy and generates executable Python code using VectorBT. You describe the logic in plain English, and it writes the code, backtests it, and shows you the results.</p>
+<p><strong>Example:</strong> "Buy AAPL when RSI drops below 30 and the 20-day SMA is above the 50-day SMA. Sell when RSI crosses above 70." → generates a complete VectorBT strategy with entry/exit logic, portfolio simulation, and performance metrics.</p>
+<p><strong>Key features:</strong></p>
+<ul style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li>Generates Python code using <code>vbt.Portfolio.from_signals</code></li>
+  <li>Supports True Walk-Forward Optimization (simulates real trading — optimize on past data, trade one day at a time)</li>
+  <li>Multi-asset testing — run the same strategy on multiple tickers and compare</li>
+  <li>Lessons learned — the system remembers past code generation errors and avoids repeating them</li>
+</ul>
+</div>
+
+<div class="concept" id="concept-markov">
+<h4><span class="badge badge-learn">Learning</span> Markov Chain Trader</h4>
+<p><strong>What it is:</strong> An AI agent that continuously learns market patterns and generates trading signals. It uses two models that retrain on a schedule:</p>
+<ul style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li><strong>XGBoost</strong> (retrains daily) — fast gradient-boosted trees on a 1-year rolling window. Good at picking up recent regime changes.</li>
+  <li><strong>LSTM</strong> (retrains quarterly) — deep learning on 3+ years of data. Good at recognizing recurring multi-year patterns.</li>
+</ul>
+<p>The models analyze sector ETF regimes (bull/bear market states using a statistical jump model) and generate conviction scores for individual tickers. The signal provider is injected directly into QuantGen strategies so your generated code can use Markov signals as additional filters.</p>
+<p><strong>Best for:</strong> Adding a "market regime" filter to your strategies. For example: "only take this trade if Markov conviction is above 0.7."</p>
+</div>
+
+<div class="concept" id="concept-coach">
+<h4><span class="badge badge-learn">Analytics</span> Trade Coach</h4>
+<p><strong>What it is:</strong> Your personal trading performance analyst. It maintains a trade journal (every strategy run, every trade) and provides:</p>
+<ul style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li><strong>KPIs</strong> — win rate, Sharpe ratio, expectancy, max drawdown, equity curve</li>
+  <li><strong>LLM-generated critique reports</strong> — an AI analyzes your journal and gives specific recommendations ("Your mean reversion strategies on tech stocks win 60%, but trend-following on commodities wins 80% — consider reallocating")</li>
+  <li><strong>Trade CRUD</strong> — log trades manually or have them auto-logged from strategy runs</li>
+</ul>
+<p><strong>Best for:</strong> Answering "how am I doing?" with data, not gut feel.</p>
+</div>
+
+<div class="concept" id="concept-wfo">
+<h4><span class="badge badge-concept">Optimization</span> Walk-Forward Optimization (WFO)</h4>
+<p><strong>What it is:</strong> A backtesting methodology that simulates real trading conditions. Instead of optimizing on all historical data and testing on the same data (which overfits), WFO:</p>
+<ol style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li>Optimizes parameters on a training window (past N days)</li>
+  <li>Picks the best parameters from that window</li>
+  <li>Trades the NEXT day only (not the whole test period)</li>
+  <li>Shifts the window forward by 1 day and repeats</li>
+</ol>
+<p><strong>True WFO</strong> goes further: position state carries over between windows (like real trading), and it steps 1 day at a time rather than in large chunks. This is the most realistic backtesting method available.</p>
+</div>
+
+<!-- ============ COMMAND REFERENCE ============ -->
+<h2 id="commands">3. Command Reference</h2>
+
+<h3 id="cmd-strategy">3.1 <code>tradecraft strategy</code> — Natural Language Strategy Lab</h3>
+<p>The flagship workflow. Describe a strategy in plain English, review the generated code, backtest it, test on other assets, and save it.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>strategy create</code></td>
+    <td>Generate strategy code from a natural language description</td>
+    <td><code>tradecraft strategy create "buy when RSI &lt; 30, sell when &gt; 70" --tickers AAPL</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy review &lt;id&gt;</code></td>
+    <td>Show the summary and generated code for a strategy (reads from local session cache)</td>
+    <td><code>tradecraft strategy review a85aa5ab</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy backtest &lt;id&gt;</code></td>
+    <td>Run backtest and return full metrics (return, win rate, Sharpe, max DD, trades)</td>
+    <td><code>tradecraft strategy backtest a85aa5ab</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy test-on &lt;id&gt; --tickers</code></td>
+    <td>Run the same strategy on multiple tickers and compare results</td>
+    <td><code>tradecraft strategy test-on a85aa5ab --tickers MSFT,GOOG</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy save &lt;id&gt; --name</code></td>
+    <td>Save a strategy to the database for later use</td>
+    <td><code>tradecraft strategy save a85aa5ab --name "rsi-reversion-v1"</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy list</code></td>
+    <td>List all saved strategies</td>
+    <td><code>tradecraft strategy list</code></td>
+  </tr>
+  <tr>
+    <td><code>strategy show &lt;name&gt;</code></td>
+    <td>Show a saved strategy's full details</td>
+    <td><code>tradecraft strategy show rsi-reversion-v1</code></td>
+  </tr>
+</table>
+
+<p><strong>Options for <code>create</code>:</strong></p>
+<table>
+  <tr><th>Option</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>--tickers</code></td><td>required</td><td>Comma-separated ticker symbols</td></tr>
+  <tr><td><code>--start-date</code></td><td>2020-01-01</td><td>Start date for historical data</td></tr>
+  <tr><td><code>--end-date</code></td><td>today</td><td>End date for historical data</td></tr>
+</table>
+
+<h3 id="cmd-coach">3.2 <code>tradecraft coach</code> — Performance Analytics</h3>
+<p>Query your trade journal for KPIs, LLM-generated critique reports, and trade management.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>coach kpis</code></td>
+    <td>Get key performance indicators (win rate, Sharpe, expectancy, max DD, equity curve)</td>
+    <td><code>tradecraft coach kpis --period 90</code></td>
+  </tr>
+  <tr>
+    <td><code>coach report</code></td>
+    <td>Get an LLM-generated critique with specific recommendations</td>
+    <td><code>tradecraft coach report --period 90</code></td>
+  </tr>
+  <tr>
+    <td><code>coach trades list</code></td>
+    <td>List trades from the journal</td>
+    <td><code>tradecraft coach trades list</code></td>
+  </tr>
+  <tr>
+    <td><code>coach trades add</code></td>
+    <td>Log a trade manually</td>
+    <td><code>tradecraft coach trades add --ticker AAPL --side long --qty 100 --entry-px 150</code></td>
+  </tr>
+  <tr>
+    <td><code>coach trades close &lt;id&gt;</code></td>
+    <td>Close an open trade</td>
+    <td><code>tradecraft coach trades close abc123 --exit-px 160</code></td>
+  </tr>
+</table>
+
+<p><strong>Options:</strong> <code>--period</code> (days, default 90), <code>--strategy-id</code> (filter by strategy)</p>
+
+<h3 id="cmd-markov">3.3 <code>tradecraft markov</code> — Learning Agent</h3>
+<p>Check the health of the Markov Chain Trader models and trigger retraining.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>markov status</code></td>
+    <td>Show model training status, last trained dates, cached models count</td>
+    <td><code>tradecraft markov status</code></td>
+  </tr>
+  <tr>
+    <td><code>markov train</code></td>
+    <td>Trigger full retraining of all models</td>
+    <td><code>tradecraft markov train</code></td>
+  </tr>
+  <tr>
+    <td><code>markov retrain-status</code></td>
+    <td>Check retraining progress (progress %, current ticker, estimated time)</td>
+    <td><code>tradecraft markov retrain-status</code></td>
+  </tr>
+</table>
+
+<h3 id="cmd-sectors">3.4 <code>tradecraft sectors</code> — Sector Rotation Scanner</h3>
+<p>Analyze sector ETF momentum and find leading stocks within sectors.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>sectors list</code></td>
+    <td>List all 11 sector ETFs with 3m/6m performance and spread</td>
+    <td><code>tradecraft sectors list</code></td>
+  </tr>
+  <tr>
+    <td><code>sectors stocks &lt;sector&gt;</code></td>
+    <td>Get top stocks within a sector with technical indicators</td>
+    <td><code>tradecraft sectors stocks XLK --limit 20</code></td>
+  </tr>
+  <tr>
+    <td><code>sectors ohlcv &lt;ticker&gt;</code></td>
+    <td>Get OHLCV price data for a ticker</td>
+    <td><code>tradecraft sectors ohlcv AAPL --days 150</code></td>
+  </tr>
+</table>
+
+<p><strong>Sector ETF tickers:</strong> XLY (Consumer Cyclical), XLP (Consumer Defensive), XLE (Energy), XLF (Financials), XLV (Healthcare), XLI (Industrials), XLB (Materials), XLK (Technology), XLC (Communication), XLRE (Real Estate), XLU (Utilities)</p>
+
+<h3 id="cmd-screener">3.5 <code>tradecraft screener</code> — AI Stock Screener</h3>
+<p>Screen the S&P 1500 using technical and fundamental criteria, with optional AI multi-agent analysis.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>screener modes</code></td>
+    <td>List available screening modes</td>
+    <td><code>tradecraft screener modes</code></td>
+  </tr>
+  <tr>
+    <td><code>screener scan</code></td>
+    <td>Start a screening scan (async, returns scan ID)</td>
+    <td><code>tradecraft screener scan --mode dormant_giant --wait</code></td>
+  </tr>
+  <tr>
+    <td><code>screener list</code></td>
+    <td>List recent scans</td>
+    <td><code>tradecraft screener list</code></td>
+  </tr>
+  <tr>
+    <td><code>screener status &lt;id&gt;</code></td>
+    <td>Check scan status</td>
+    <td><code>tradecraft screener status abc123</code></td>
+  </tr>
+  <tr>
+    <td><code>screener results &lt;id&gt;</code></td>
+    <td>Get scan results</td>
+    <td><code>tradecraft screener results abc123</code></td>
+  </tr>
+  <tr>
+    <td><code>screener ai-report &lt;id&gt;</code></td>
+    <td>Get AI analysis report (only if --use-ai was used)</td>
+    <td><code>tradecraft screener ai-report abc123</code></td>
+  </tr>
+  <tr>
+    <td><code>screener delete &lt;id&gt;</code></td>
+    <td>Delete a scan</td>
+    <td><code>tradecraft screener delete abc123</code></td>
+  </tr>
+  <tr>
+    <td><code>screener health</code></td>
+    <td>Check screener service health</td>
+    <td><code>tradecraft screener health</code></td>
+  </tr>
+</table>
+
+<p><strong>Scan modes:</strong></p>
+<ul style="color: var(--text-dim); margin: 8px 0 8px 20px;">
+  <li><code>dormant_giant</code> — Bollinger squeeze + OBV accumulation + EPS acceleration</li>
+  <li><code>quant_strategy</code> — TA indicators + fundamental health + optional backtesting</li>
+</ul>
+<p><strong>Key options:</strong> <code>--use-ai</code> (adds AI multi-agent analysis), <code>--wait</code> (block until scan completes), <code>--prompt</code> (custom prompt for AI analysis)</p>
+
+<h3 id="cmd-quantgen">3.6 <code>tradecraft quantgen</code> — Strategy Builder (Advanced)</h3>
+<p>Lower-level access to the QuantGen engine. The <code>strategy</code> command group is the recommended high-level workflow; use these for advanced use cases like running raw strategy code.</p>
+
+<table>
+  <tr><th>Command</th><th>Description</th><th>Example</th></tr>
+  <tr>
+    <td><code>quantgen generate</code></td>
+    <td>Generate strategy code from a prompt (same as strategy create but returns raw API response)</td>
+    <td><code>tradecraft quantgen generate --prompt "..." --tickers AAPL</code></td>
+  </tr>
+  <tr>
+    <td><code>quantgen run</code></td>
+    <td>Execute raw strategy code (from string or file)</td>
+    <td><code>tradecraft quantgen run --file strategy.py</code></td>
+  </tr>
+  <tr>
+    <td><code>quantgen optimize</code></td>
+    <td>Run parameter optimization with WFO</td>
+    <td><code>tradecraft quantgen optimize --file strategy.py --mode true_wfo</code></td>
+  </tr>
+  <tr>
+    <td><code>quantgen chat</code></td>
+    <td>Chat about strategy code with the AI</td>
+    <td><code>tradecraft quantgen chat --message "optimize this" --file strategy.py</code></td>
+  </tr>
+  <tr>
+    <td><code>quantgen indicators</code></td>
+    <td>List all available technical indicators</td>
+    <td><code>tradecraft quantgen indicators</code></td>
+  </tr>
+</table>
+
+<h3 id="cmd-other">3.7 Other Commands</h3>
+
+<table>
+  <tr><th>Command</th><th>Description</th></tr>
+  <tr><td><code>health</code></td><td>Check API and database health</td></tr>
+  <tr><td><code>db-status</code></td><td>Check database connection status</td></tr>
+  <tr><td><code>strategies list</code></td><td>List saved strategies</td></tr>
+  <tr><td><code>strategies show &lt;name&gt;</code></td><td>Show a saved strategy's details</td></tr>
+  <tr><td><code>strategies delete &lt;name&gt;</code></td><td>Delete a saved strategy</td></tr>
+  <tr><td><code>projects create &lt;name&gt;</code></td><td>Create a project to group related scans and strategies</td></tr>
+  <tr><td><code>projects show &lt;name&gt;</code></td><td>Show project details</td></tr>
+  <tr><td><code>projects notes &lt;name&gt;</code></td><td>Get or set project notes</td></tr>
+  <tr><td><code>projects delete &lt;name&gt;</code></td><td>Delete a project</td></tr>
+  <tr><td><code>config show</code></td><td>Show current configuration</td></tr>
+  <tr><td><code>config get &lt;key&gt;</code></td><td>Get a config value</td></tr>
+  <tr><td><code>config set &lt;key&gt; &lt;value&gt;</code></td><td>Set a config value</td></tr>
+  <tr><td><code>repl</code></td><td>Start an interactive shell (type commands without "tradecraft" prefix)</td></tr>
+</table>
+
+<!-- ============ WORKFLOW ============ -->
+<h2 id="workflow">4. End-to-End Workflow</h2>
+
+<p>A typical session with Claude Code looks like this:</p>
+
+<div class="flow">
+  <span class="flow-step">🗣️ "Create a mean reversion strategy for AAPL"</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📝 Claude calls <code>strategy create</code></span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📄 Shows you summary + code</span>
+</div>
+<div class="flow">
+  <span class="flow-step">👍 You approve</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📊 Claude calls <code>strategy backtest</code></span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📈 Shows you metrics</span>
+</div>
+<div class="flow">
+  <span class="flow-step">💡 "Test on MSFT and GOOG too"</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📊 Claude calls <code>strategy test-on</code></span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">📋 Shows comparison table</span>
+</div>
+<div class="flow">
+  <span class="flow-step">💾 "Save it as rsi-reversion-v1"</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">💾 Claude calls <code>strategy save</code></span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">✅ Logged to journal</span>
+</div>
+
+<p style="margin-top: 20px;">Later, you can ask:</p>
+<div class="cmd"><span class="prompt">$</span> tradecraft coach kpis --period 90   <span class="comment"># "How am I doing?"</span>
+<span class="prompt">$</span> tradecraft coach report --period 90  <span class="comment"># "What should I improve?"</span>
+<span class="prompt">$</span> tradecraft markov status              <span class="comment"># "Is the AI learning?"</span></div>
+
+<!-- ============ LEARNING LOOPS ============ -->
+<h2 id="learning">5. Learning Loops</h2>
+
+<p>The system has three independent learning loops that compound over time:</p>
+
+<div class="card-grid">
+  <div class="card">
+    <h4 style="color: var(--accent3); margin-top: 0;">📝 Loop 1: Code Generation Quality</h4>
+    <p style="font-size: 0.9rem;">When a generated strategy fails to backtest (syntax error, VBT API misuse, etc.), the error is captured and stored in <code>~/.config/tradecraft/lessons.json</code>. Before generating future strategies, relevant lessons are injected into the prompt as "known pitfalls to avoid." The system literally gets better at writing code over time.</p>
+    <p style="font-size: 0.85rem; color: var(--text-dim);"><strong>Example lesson:</strong> "Use <code>.vbt.gt()</code> instead of <code>&gt;</code> for VBT comparisons, and <code>vbt.combine_logic</code> instead of <code>&amp;</code>"</p>
+  </div>
+  <div class="card">
+    <h4 style="color: var(--accent2); margin-top: 0;">📊 Loop 2: Trading Performance (Coach)</h4>
+    <p style="font-size: 0.9rem;">Every saved strategy run is logged to the trade journal. The Coach queries the journal to calculate KPIs and generate LLM critique reports. Over time, the Coach can identify which strategy types, sectors, or market conditions perform best for you personally.</p>
+    <p style="font-size: 0.85rem; color: var(--text-dim);"><strong>Example insight:</strong> "Your mean reversion strategies on tech stocks win 60%, but trend-following on commodities wins 80%"</p>
+  </div>
+  <div class="card">
+    <h4 style="color: var(--accent4); margin-top: 0;">🧠 Loop 3: Signal Improvement (Markov)</h4>
+    <p style="font-size: 0.9rem;">The Markov models retrain on a schedule (XGBoost daily, LSTM quarterly) incorporating new market data. The signal provider serves better conviction scores over time as it sees more market regimes and patterns.</p>
+    <p style="font-size: 0.85rem; color: var(--text-dim);"><strong>Example:</strong> After 6 months of daily retraining, the XGBoost model has learned which sector regimes produce the most reliable signals.</p>
+  </div>
+</div>
+
+<!-- ============ CLAUDE CODE ============ -->
+<h2 id="claude">6. Claude Code Integration</h2>
+
+<p>The CLI is registered as a tool in <code>.claude/settings.json</code>, so Claude Code discovers it automatically:</p>
+
+<div class="cmd">{<span class="output">
+  "tools": {</span>
+    "tradecraft": {
+      "command": "tradecraft",
+      "args": ["--json"],
+      "description": "TradeCraft CLI — strategy creation, backtesting, coach analytics, Markov learning"
+    }
+  }<span class="output">
+}</span></div>
+
+<p>This means you can have natural conversations like:</p>
+
+<div class="card" style="background: var(--code-bg);">
+<p style="color: var(--accent2); margin-bottom: 4px;"><strong>You:</strong></p>
+<p style="color: var(--text); margin-bottom: 12px;">"Create a mean reversion strategy for AAPL, backtest it, and tell me if it's any good."</p>
+<p style="color: var(--accent2); margin-bottom: 4px;"><strong>Claude:</strong></p>
+<p style="color: var(--text-dim);">[Calls <code>tradecraft strategy create</code>, shows you the summary and code, asks for approval, then calls <code>tradecraft strategy backtest</code>, presents the metrics conversationally, and offers next steps.]</p>
+</div>
+
+<p>The <code>.claude/skills/tradecraft/SKILL.md</code> file defines the conversation protocol — it tells Claude how to orchestrate the multi-step workflow, when to check lessons learned, and how to present results.</p>
+
+<!-- ============ CONFIG ============ -->
+<h2 id="config">7. Configuration</h2>
+
+<p>Configuration is stored in <code>~/.config/tradecraft/config.json</code>:</p>
+
+<table>
+  <tr><th>Key</th><th>Default</th><th>Description</th></tr>
+  <tr><td><code>backend_url</code></td><td><code>http://localhost:8000</code></td><td>FastAPI backend URL</td></tr>
+  <tr><td><code>output_format</code></td><td><code>table</code></td><td>Output format: <code>table</code>, <code>json</code>, or <code>csv</code></td></tr>
+  <tr><td><code>timeout</code></td><td><code>120</code></td><td>API request timeout in seconds</td></tr>
+  <tr><td><code>auto_save</code></td><td><code>true</code></td><td>Auto-save session state</td></tr>
+</table>
+
+<p>Override the backend URL at runtime with <code>--backend</code>:</p>
+<div class="cmd"><span class="prompt">$</span> tradecraft --backend http://other-server:8000 health</div>
+
+<hr>
+
+<p style="text-align: center; color: var(--text-dim); font-size: 0.9rem;">
+  TradeCraft CLI v0.2.0 — Built with ❤️ for algorithmic traders
+</p>
+
+</div>
+</body>
+</html>
