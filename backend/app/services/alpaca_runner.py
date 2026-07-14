@@ -16,8 +16,6 @@ from typing import List, Dict, Any
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
-from alpaca.trading.enums import OrderSide
-
 from app.services.alpaca_client import AlpacaClient
 
 logger = logging.getLogger(__name__)
@@ -242,7 +240,7 @@ class StrategyRunner:
             positions = self.alpaca.get_positions()
             for pos in positions:
                 try:
-                    self.alpaca.submit_market_order(pos["ticker"], pos["qty"], OrderSide.SELL)
+                    self.alpaca.submit_market_order(pos["ticker"], pos["qty"], "sell")
                     result["positions_closed"].append({
                         "ticker": pos["ticker"], "qty": pos["qty"], "reason": "Crisis Override"
                     })
@@ -270,7 +268,7 @@ class StrategyRunner:
             ticker = pos["ticker"]
             if ticker not in desired_tickers or self.check_death_cross(ticker, as_of_date):
                 try:
-                    self.alpaca.submit_market_order(ticker, pos["qty"], OrderSide.SELL)
+                    self.alpaca.submit_market_order(ticker, pos["qty"], "sell")
                     result["positions_closed"].append({
                         "ticker": ticker, "qty": pos["qty"],
                         "reason": "Death Cross" if self.check_death_cross(ticker, as_of_date) else "Rotated Out"
@@ -297,7 +295,7 @@ class StrategyRunner:
                 self.alpaca.submit_bracket_order(
                     symbol=ticker,
                     qty=qty,
-                    side=OrderSide.BUY,
+                    side="buy",
                     take_profit_pct=TAKE_PROFIT_PCT,
                     trailing_stop_pct=TRAILING_STOP_PCT,
                 )
