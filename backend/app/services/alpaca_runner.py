@@ -298,6 +298,7 @@ class StrategyRunner:
                     side="buy",
                     take_profit_pct=TAKE_PROFIT_PCT,
                     trailing_stop_pct=TRAILING_STOP_PCT,
+                    entry_price=price,
                 )
                 result["orders_placed"].append({
                     "ticker": ticker, "qty": qty, "price": price,

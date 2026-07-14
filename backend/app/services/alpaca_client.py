@@ -59,22 +59,36 @@ class AlpacaClient:
         side: str,
         take_profit_pct: float = 0.20,
         trailing_stop_pct: float = 0.08,
+        entry_price: float = 0.0,
     ) -> Dict[str, Any]:
         """Submit a bracket order with take profit and trailing stop.
 
         The bracket order enters at market-on-open and attaches OCO
         take-profit and trailing-stop orders managed by Alpaca.
         """
-        order = self.api.submit_order(
-            symbol=symbol,
-            qty=qty,
-            side=side,
-            type="market",
-            time_in_force="day",
-            order_class="bracket",
-            take_profit={"limit_price": None},  # Alpaca calculates from fill
-            stop_loss={"trail_percent": trailing_stop_pct * 100},
-        )
+        order_kwargs = {
+            "symbol": symbol,
+            "qty": qty,
+            "side": side,
+            "type": "market",
+            "time_in_force": "day",
+            "order_class": "bracket",
+        }
+
+        # Add take profit if specified (must be a valid price)
+        if take_profit_pct > 0 and entry_price > 0:
+            tp_price = round(entry_price * (1 + take_profit_pct), 2)
+            order_kwargs["take_profit"] = {"limit_price": str(tp_price)}
+
+        # Add trailing stop loss (requires both stop_price and trail_percent for bracket orders)
+        if trailing_stop_pct > 0 and entry_price > 0:
+            stop_price = round(entry_price * (1 - trailing_stop_pct), 2)
+            order_kwargs["stop_loss"] = {
+                "stop_price": str(stop_price),
+                "trail_percent": str(trailing_stop_pct * 100),
+            }
+
+        order = self.api.submit_order(**order_kwargs)
         return {
             "id": str(order.id),
             "symbol": order.symbol,
