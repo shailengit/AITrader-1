@@ -1,9 +1,9 @@
 #!/bin/bash
 # TradeCraft Golden Cross Rotation — Daily Alpaca Strategy Runner
-# Runs daily at 6:00 PM ET via cron
+# Runs weekdays at 8:00 PM ET via cron (after database update at 6 PM)
 #
 # Add to crontab:
-#   0 18 * * 1-5 /path/to/scripts/run_alpaca_strategy.sh
+#   0 20 * * 1-5 /path/to/scripts/run_alpaca_strategy.sh
 
 set -e
 
