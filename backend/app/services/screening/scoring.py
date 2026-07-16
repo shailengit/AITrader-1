@@ -123,7 +123,7 @@ def compute_base_setup_score(row: pd.Series, sub_weights: Optional[Dict[str, int
     return compute_base_setup_breakdown(row, sub_weights)['total']
 
 
-def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float:
+def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any], angle_weight: int = 0) -> float:
     """Compute 0-100 bonus for how strongly the stock satisfies user filters.
 
     For each indicator filter:
@@ -177,6 +177,14 @@ def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any]) -> float
                 if pd.isna(val):
                     continue
                 bonuses.append(100.0 if bool(val) else 0.0)
+                # If angle_weight > 0, also capture the raw angle for
+                # post-processing in apply_angle_scoring().
+                if angle_weight > 0:
+                    angle_col = f"cross_angle__{col}__{ref_col}"
+                    if angle_col in row.index:
+                        angle_val = row[angle_col]
+                        if pd.notna(angle_val):
+                            row['_raw_angle'] = angle_val
                 continue
             # Cross column not on the row — fall through to legacy
             # min/max logic below (which will likely append 0 if there's
@@ -251,6 +259,7 @@ def compute_quant_score(
     base_weight: int = 60,
     sub_weights: Optional[Dict[str, int]] = None,
     include_alignment: bool = False,
+    angle_weight: int = 0,
 ) -> Dict[str, Any]:
     """Compute the hybrid quant score and optional alignment diagnostic.
 
@@ -259,7 +268,7 @@ def compute_quant_score(
     (score minus the return clipped to [-100, 100]).
     """
     base = compute_base_setup_score(row, sub_weights)
-    bonus = compute_filter_match_bonus(row, filters)
+    bonus = compute_filter_match_bonus(row, filters, angle_weight)
     bw = max(0, min(100, base_weight)) / 100.0
     score = round(base * bw + bonus * (1 - bw), 1)
     out: Dict[str, Any] = {'score': score}
