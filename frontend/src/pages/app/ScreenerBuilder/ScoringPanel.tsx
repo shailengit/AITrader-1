@@ -18,9 +18,12 @@ interface ScoringPanelProps {
   baseWeight: number;
   subWeights: SubWeights;
   showAlignment: boolean;
+  angleWeight: number;
+  hasCrossFilters: boolean;
   onBaseWeightChange: (v: number) => void;
   onSubWeightChange: (key: keyof SubWeights, v: number) => void;
   onShowAlignmentChange: (v: boolean) => void;
+  onAngleWeightChange: (v: number) => void;
   onReset: () => void;
 }
 
@@ -31,7 +34,8 @@ interface ScoringPanelProps {
  */
 export default function ScoringPanel({
   baseWeight, subWeights, showAlignment,
-  onBaseWeightChange, onSubWeightChange, onShowAlignmentChange, onReset,
+  angleWeight, hasCrossFilters,
+  onBaseWeightChange, onSubWeightChange, onShowAlignmentChange, onAngleWeightChange, onReset,
 }: ScoringPanelProps) {
   const { isDarkMode } = useTheme();
   const [open, setOpen] = useState(true);
@@ -91,6 +95,11 @@ export default function ScoringPanel({
           <Field label="Volume weight" hint="How much the volume sub-score contributes">
             <Slider value={subWeights.volume} onChange={(v) => onSubWeightChange('volume', v)} min={0} max={100} ariaLabel="Volume weight" />
           </Field>
+          {hasCrossFilters && (
+            <Field label="Crossover angle weight" hint="0 = binary pass/fail, 100 = purely angle-based scoring">
+              <Slider value={angleWeight} onChange={onAngleWeightChange} min={0} max={100} ariaLabel="Crossover angle weight" />
+            </Field>
+          )}
           <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 10 }}>
             <Toggle
               checked={showAlignment}
