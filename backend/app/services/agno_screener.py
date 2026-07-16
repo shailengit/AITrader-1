@@ -34,6 +34,7 @@ from app.services.screening.scoring import (
     compute_filter_match_bonus,
     compute_quant_score,
     compute_cross_angle,
+    apply_angle_scoring,
 )
 
 
@@ -1549,6 +1550,7 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
                                 base_weight: int = 60,
                                 sub_weights: Optional[Dict[str, int]] = None,
                                 include_alignment: bool = False,
+                                angle_weight: int = 0,
                                 result_columns: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener without AI agents (fast, pure Python).
@@ -1612,10 +1614,15 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
     # gets a `score_minus_return` field too (computed post-enrich below).
     tech_df['score'] = tech_df.apply(
         lambda row: compute_quant_score(
-            row, filters or {}, base_weight, sub_weights, include_alignment
+            row, filters or {}, base_weight, sub_weights, include_alignment, angle_weight
         )['score'],
         axis=1,
     )
+
+    # Apply angle-based scoring post-processing (blends binary cross scores
+    # with angle-based scores when angle_weight > 0 and angle data exists).
+    tech_df = apply_angle_scoring(tech_df, angle_weight)
+
     tech_df = tech_df.sort_values(by='score', ascending=False)
 
     # Map ta column names to frontend-friendly names
