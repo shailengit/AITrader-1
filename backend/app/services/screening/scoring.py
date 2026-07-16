@@ -278,6 +278,42 @@ def compute_quant_score(
     return out
 
 
+def apply_angle_scoring(
+    df: pd.DataFrame,
+    angle_weight: int,
+) -> pd.DataFrame:
+    """Post-process scores: replace binary cross scores with angle-based scores.
+
+    Min-max normalizes _raw_angle across all results to 0-100, then blends:
+        final_score = (1 - aw) * binary_score + aw * angle_score
+
+    When angle_weight <= 0 or no _raw_angle column exists, returns df unchanged.
+    """
+    if angle_weight <= 0 or '_raw_angle' not in df.columns:
+        return df
+
+    angles = df['_raw_angle'].dropna()
+    if angles.empty:
+        return df
+
+    min_a, max_a = angles.min(), angles.max()
+    if max_a == min_a:
+        # All angles identical — assign midpoint score
+        df['_angle_score'] = 50.0
+    else:
+        df['_angle_score'] = (df['_raw_angle'] - min_a) / (max_a - min_a) * 100.0
+
+    aw = max(0, min(100, angle_weight)) / 100.0
+    df['score'] = df.apply(
+        lambda row: round(
+            row['score'] * (1 - aw) + row.get('_angle_score', row['score']) * aw,
+            1,
+        ) if pd.notna(row.get('_angle_score')) else row['score'],
+        axis=1,
+    )
+    return df
+
+
 def compute_cross_angle(
     fast_series: pd.Series,
     slow_series: pd.Series,
