@@ -40,6 +40,7 @@ export interface ScreenTemplate {
     volume: number;
   };
   showAlignment?: boolean;
+  angleWeight?: number;
 }
 
 // ---------------------------------------------------------------------------

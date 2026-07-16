@@ -50,6 +50,7 @@ export interface ScreenPreset {
     volume: number;    // 0–100, default 25
   };
   showAlignment?: boolean; // default false
+  angleWeight?: number; // 0–100, default 0
 }
 
 export interface UseScreensReturn {

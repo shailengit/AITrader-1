@@ -259,6 +259,15 @@ export default function ScreenerBuilder() {
     { trend: 30, momentum: 25, volatility: 20, volume: 25 },
   );
   const [showAlignment, setShowAlignment] = useState(false);
+  const [angleWeight, setAngleWeight] = useState(0);
+
+  // Derive whether any crossover filters are active (for angle weight slider visibility)
+  const hasCrossFilters = useMemo(
+    () => filters.conditions.some(
+      (c) => c.operator === 'crossed_above' || c.operator === 'crossed_below'
+    ),
+    [filters.conditions],
+  );
 
   // Scan state
   const [isScanning, setIsScanning] = useState(false);
@@ -382,6 +391,7 @@ export default function ScreenerBuilder() {
         baseWeight,
         subWeights,
         showAlignment,
+        angleWeight,
         // Persisted so the back button (which remounts the page)
         // returns to the same screen state, not a fresh builder.
         scanId,
@@ -394,7 +404,7 @@ export default function ScreenerBuilder() {
     } catch {
       // ignore
     }
-  }, [hasRestored, filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, scanId]);
+  }, [hasRestored, filters, screenName, cutoffDate, sortBy, sortOrder, maxResults, useAi, baseWeight, subWeights, showAlignment, angleWeight, scanId]);
 
   // Persist scanResults separately to avoid re-serializing on every
   // render (which would happen if we put it in the main draft effect).
@@ -459,6 +469,7 @@ export default function ScreenerBuilder() {
           if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
           if (draft.subWeights) setSubWeights(draft.subWeights);
           if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
+          if (typeof draft.angleWeight === 'number') setAngleWeight(draft.angleWeight);
           if (draft.drawerTicker) setDrawerTicker(draft.drawerTicker);
           if (draft.scanId) restoredScanId = draft.scanId;
           if (Array.isArray(draft.scanResults)) {
@@ -482,6 +493,7 @@ export default function ScreenerBuilder() {
           if (typeof draft.baseWeight === 'number') setBaseWeight(draft.baseWeight);
           if (draft.subWeights) setSubWeights(draft.subWeights);
           if (typeof draft.showAlignment === 'boolean') setShowAlignment(draft.showAlignment);
+          if (typeof draft.angleWeight === 'number') setAngleWeight(draft.angleWeight);
         }
       }
     } catch {
@@ -652,6 +664,7 @@ export default function ScreenerBuilder() {
     if (typeof preset.baseWeight === 'number') setBaseWeight(preset.baseWeight);
     if (preset.subWeights) setSubWeights(preset.subWeights);
     if (typeof preset.showAlignment === 'boolean') setShowAlignment(preset.showAlignment);
+    if (typeof preset.angleWeight === 'number') setAngleWeight(preset.angleWeight);
   };
 
   // ── Save ───────────────────────────────────────────────
@@ -668,6 +681,7 @@ export default function ScreenerBuilder() {
       baseWeight,
       subWeights,
       showAlignment,
+      angleWeight,
     });
     setScreenName(name);
   };
@@ -681,6 +695,7 @@ export default function ScreenerBuilder() {
     maxResults,
     cutoffDate: cutoffDate || undefined,
     useAi,
+    angleWeight,
   };
 
   // ── Scan pipeline ───────────────────────────────────────
@@ -722,6 +737,7 @@ export default function ScreenerBuilder() {
           base_weight: baseWeight,
           sub_weights: subWeights,
           include_alignment: showAlignment,
+          angle_weight: angleWeight,
           // Tell the backend which result-row keys the UI needs values for
           // (e.g. the user's chosen SMA 200 with window=200). The worker
           // computes each column at the requested params and includes the
@@ -1151,6 +1167,7 @@ export default function ScreenerBuilder() {
             if (tpl.sort?.order) setSortOrder(tpl.sort.order);
             if (tpl.maxResults) setMaxResults(tpl.maxResults);
             if (tpl.useAi !== undefined) setUseAi(tpl.useAi);
+            if (typeof tpl.angleWeight === 'number') setAngleWeight(tpl.angleWeight);
           }}
           activeFilters={filters}
         />
@@ -1341,13 +1358,17 @@ export default function ScreenerBuilder() {
           baseWeight={baseWeight}
           subWeights={subWeights}
           showAlignment={showAlignment}
+          angleWeight={angleWeight}
+          hasCrossFilters={hasCrossFilters}
           onBaseWeightChange={setBaseWeight}
           onSubWeightChange={(key, v) => setSubWeights((prev) => ({ ...prev, [key]: v }))}
           onShowAlignmentChange={setShowAlignment}
+          onAngleWeightChange={setAngleWeight}
           onReset={() => {
             setBaseWeight(DEFAULT_BASE_WEIGHT);
             setSubWeights(DEFAULT_SUB_WEIGHTS);
             setShowAlignment(DEFAULT_SHOW_ALIGNMENT);
+            setAngleWeight(0);
           }}
         />
 
