@@ -1716,7 +1716,8 @@ def run_quant_strategy_screener_with_ai(prompt: str, cutoff_date: Optional[str] 
                                         filters: Optional[Dict[str, Any]] = None,
                                         base_weight: int = 60,
                                         sub_weights: Optional[Dict[str, int]] = None,
-                                        include_alignment: bool = False) -> Dict[str, Any]:
+                                        include_alignment: bool = False,
+                                        angle_weight: int = 0) -> Dict[str, Any]:
     """
     Run the Quant Strategy screener with AI multi-agent analysis.
     Uses user-defined QuantFilters to pre-filter candidates before AI synthesis.
@@ -1757,6 +1758,7 @@ Screening criteria applied:
             base_weight=base_weight,
             sub_weights=sub_weights,
             include_alignment=include_alignment,
+            angle_weight=angle_weight,
         )
 
         log_capture.log_system(f"Technical screen complete: {structured['technical_candidates']} candidates found")
@@ -1790,4 +1792,4 @@ Screening criteria applied:
         logger.error("AI screener failed: %s", e)
         log_capture.log_system(f"Error in AI analysis: {str(e)[:100]}... Falling back to non-AI mode.")
         logger.info("Falling back to non-AI screener...")
-        return run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback, base_weight=base_weight)
+        return run_quant_strategy_screener(prompt, cutoff_date, progress_callback=progress_callback, base_weight=base_weight, angle_weight=angle_weight)
