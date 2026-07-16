@@ -269,4 +269,27 @@ def compute_quant_score(
     return out
 
 
+def compute_cross_angle(
+    fast_series: pd.Series,
+    slow_series: pd.Series,
+    close_series: pd.Series,
+    cross_index: int,
+) -> float:
+    """Compute crossover angle using backward differencing.
+
+    gap(t) = fast(t) - slow(t)
+    angle = (gap(cross_index) - gap(cross_index - 1)) / close(cross_index) * 100
+
+    Returns percentage (e.g., 0.5 = 0.5% gap widening per bar).
+    """
+    if cross_index < 1 or cross_index >= len(fast_series):
+        return 0.0
+    gap_now = fast_series.iloc[cross_index] - slow_series.iloc[cross_index]
+    gap_prev = fast_series.iloc[cross_index - 1] - slow_series.iloc[cross_index - 1]
+    close_now = close_series.iloc[cross_index]
+    if close_now == 0 or pd.isna(close_now):
+        return 0.0
+    return float((gap_now - gap_prev) / close_now * 100)
+
+
 # =============================================================================
