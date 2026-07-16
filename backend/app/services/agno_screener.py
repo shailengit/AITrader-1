@@ -33,6 +33,7 @@ from app.services.screening.scoring import (
     compute_base_setup_score,
     compute_filter_match_bonus,
     compute_quant_score,
+    compute_cross_angle,
 )
 
 
@@ -604,18 +605,44 @@ def _recompute_indicator(df: pd.DataFrame, column: str, custom_params: Optional[
         'default_lbp': 'lbp',
         'default_pow1': 'pow1',
         'default_pow2': 'pow2',
+        # pandas-ta indicator defaults
+        'default_length': 'length',
+        'default_signal': 'signal',
+        'default_multiplier': 'multiplier',
+        'default_bb_mult': 'bb_mult',
+        'default_kc_mult': 'kc_mult',
+        # PSAR
+        'default_step': 'step',
+        'default_max_step': 'max_step',
     }
     for default_key, actual_key in param_map.items():
         if default_key in defaults:
             params[actual_key] = defaults[default_key]
 
-    # Apply custom overrides
+    # Apply custom overrides. New keys (not in the registry's `params`
+    # dict) are added so the constructor kwarg still resolves. This
+    # handles indicators where the catalog param name differs from
+    # the registry's param name (e.g. Williams %R's `lbp` is set via
+    # `default_lbp` and arrives in `params` after the param_map, but
+    # if the catalog used a different name we'd need this branch).
     if custom_params:
         for k, v in custom_params.items():
             if k in params:
                 params[k] = v
+            else:
+                # Only set keys that look like valid ta-library params
+                # (scalars). Skip if v is a DataFrame/Series.
+                if not isinstance(v, (pd.DataFrame, pd.Series)):
+                    params[k] = v
 
     try:
+        # Custom compute path — preferred for indicators that don't fit
+        # the ta-library module/class shape (e.g. pandas_ta-only
+        # indicators: KDJ, Supertrend, TTM Squeeze). The function takes
+        # the OHLCV DataFrame plus merged params and returns a Series.
+        if 'compute' in registry:
+            return registry['compute'](df, params)
+
         # Dynamic import: e.g. ta.momentum.RSIIndicator
         module_path = registry['module']
         class_name = registry['class']
@@ -739,7 +766,7 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
         # stripping in `technical_screener` below and the raise guard in
         # `parsers.apply_quant_filters`. `apply_quant_filters` is NOT expected
         # to see a cross item; it raises loudly if it does.
-        cross_booleans: Dict[str, bool] = {}
+        cross_booleans: Dict[str, Any] = {}
         for cf in (cross_filters or []):
             if not isinstance(cf, dict):
                 continue
@@ -760,6 +787,19 @@ def _worker_ta_analysis(ticker: str, requested_indicators: List[str], cutoff_dat
                 crossed = (col_s < ref_s) & (col_s.shift(lookback) >= ref_s.shift(lookback))
             last = crossed.iloc[-1]
             cross_booleans[_cross_column_name(cf)] = bool(last) if pd.notna(last) else False
+
+            # Compute crossover angle for scoring (use 1-bar lookback for angle)
+            if bool(last) if pd.notna(last) else False:
+                if op == 'crossed_above':
+                    cross_mask = (col_s > ref_s) & (col_s.shift(1) <= ref_s.shift(1))
+                else:
+                    cross_mask = (col_s < ref_s) & (col_s.shift(1) >= ref_s.shift(1))
+                cross_indices = cross_mask[cross_mask].index
+                if len(cross_indices) > 0:
+                    cross_idx = df.index.get_loc(cross_indices[-1])
+                    angle = compute_cross_angle(col_s, ref_s, df['Close'], cross_idx)
+                    angle_col = f"cross_angle__{col}__{ref}"
+                    cross_booleans[angle_col] = round(angle, 4)
 
         latest = df.iloc[-1]
         res = {'ticker': ticker.upper(), 'close': round(latest['Close'], 2)}
@@ -1175,6 +1215,73 @@ def create_quant_strategy_team():
 from app.services.screening.enrich import enrich_results  # noqa: F401
 
 
+def _populate_return_pct(records: List[Dict[str, Any]], cutoff_date: Optional[str]) -> None:
+    """For each record, attach `return_pct` = (current_price - buy_price) / buy_price * 100.
+
+    `buy_price` is the price at `cutoff_date` (the `close` already in the
+    record from `_worker_ta_analysis` is the price on that date). The
+    current price is the most recent close for the same ticker. Records
+    with no `close` (no data) or no `cutoff_date` get `return_pct = None`
+    so the alignment diagnostic can skip them gracefully.
+
+    Mutates each input record in place; matches `enrich_results` style.
+    Only the top N records (typically <50) are passed in, so a single
+    batched query is sufficient.
+    """
+    if not records or not cutoff_date:
+        return
+    tickers = [r.get('ticker', '').upper() for r in records if r.get('ticker')]
+    if not tickers:
+        return
+    # Fetch the latest close for each ticker in one query. Rows whose
+    # Date is > cutoff_date are what we want; max(Date) per ticker
+    # gives us the current price.
+    try:
+        from app.utils.security import get_safe_table_name
+        # Build a UNION of per-ticker SELECTs because ticker table names
+        # are dynamic and we can't use ANY() across heterogeneous tables.
+        # The `LIMIT 1` per subquery is wrapped in parens so the SQL
+        # parses correctly with UNION ALL.
+        union_parts = []
+        for t in tickers:
+            try:
+                safe = get_safe_table_name(t)
+            except ValueError:
+                continue
+            union_parts.append(
+                f'(SELECT \'{t}\' AS ticker, "Date", "Close" FROM "{safe}" '
+                f'ORDER BY "Date" DESC LIMIT 1)'
+            )
+        if not union_parts:
+            return
+        query = ' UNION ALL '.join(union_parts)
+        cur_df = pd.read_sql(query, ENGINE)
+    except Exception as e:
+        logger.warning("Failed to fetch current prices for return_pct: %s", e)
+        return
+    if cur_df.empty:
+        return
+    price_map: Dict[str, float] = {}
+    for _, r in cur_df.iterrows():
+        t = str(r['ticker']).upper()
+        v = r['Close']
+        if pd.notnull(v):
+            price_map[t] = float(v)
+    for record in records:
+        t = (record.get('ticker') or '').upper()
+        buy_price = record.get('close')
+        if buy_price is None or t not in price_map:
+            continue
+        try:
+            buy = float(buy_price)
+            cur = price_map[t]
+            if buy <= 0:
+                continue
+            record['return_pct'] = round((cur - buy) / buy * 100, 2)
+        except (TypeError, ValueError):
+            continue
+
+
 # =============================================================================
 # SERVICE FUNCTIONS
 # =============================================================================
@@ -1574,6 +1681,16 @@ def run_quant_strategy_screener(prompt: str, cutoff_date: Optional[str] = None, 
 
     # Apply earnings calendar filter if specified
     top_records = _apply_earnings_filter(top_records, filters)
+
+    # Populate `return_pct` per record so the alignment diagnostic has
+    # something to compare the score against. Reads `close` (the price
+    # on the cutoff date, already in the record) and the current price
+    # for the same ticker. Only runs when a cutoff_date is set and the
+    # alignment diagnostic is requested — otherwise it's wasted work
+    # for the (common) case of "show me today's top by score, no
+    # alignment needed".
+    if include_alignment and cutoff_date:
+        _populate_return_pct(top_records, cutoff_date)
 
     # When alignment diagnostic is requested, attach `score_minus_return` to each
     # record now that enrichment has populated `return_pct`.
