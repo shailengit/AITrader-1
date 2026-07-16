@@ -177,14 +177,6 @@ def compute_filter_match_bonus(row: pd.Series, filters: Dict[str, Any], angle_we
                 if pd.isna(val):
                     continue
                 bonuses.append(100.0 if bool(val) else 0.0)
-                # If angle_weight > 0, also capture the raw angle for
-                # post-processing in apply_angle_scoring().
-                if angle_weight > 0:
-                    angle_col = f"cross_angle__{col}__{ref_col}"
-                    if angle_col in row.index:
-                        angle_val = row[angle_col]
-                        if pd.notna(angle_val):
-                            row['_raw_angle'] = angle_val
                 continue
             # Cross column not on the row — fall through to legacy
             # min/max logic below (which will likely append 0 if there's
@@ -284,15 +276,28 @@ def apply_angle_scoring(
 ) -> pd.DataFrame:
     """Post-process scores: replace binary cross scores with angle-based scores.
 
-    Min-max normalizes _raw_angle across all results to 0-100, then blends:
+    Scans for `cross_angle__*` columns on the DataFrame (added by the worker
+    when crossover filters are active). Min-max normalizes across all results
+    to 0-100, then blends:
         final_score = (1 - aw) * binary_score + aw * angle_score
 
-    When angle_weight <= 0 or no _raw_angle column exists, returns df unchanged.
+    When angle_weight <= 0 or no cross_angle columns exist, returns df unchanged.
     """
-    if angle_weight <= 0 or '_raw_angle' not in df.columns:
+    if angle_weight <= 0:
         return df
 
-    angles = df['_raw_angle'].dropna()
+    # Find cross_angle columns added by the worker
+    angle_cols = [c for c in df.columns if c.startswith('cross_angle__')]
+    if not angle_cols:
+        return df
+
+    # Average multiple angle columns if several crossover filters are active
+    if len(angle_cols) == 1:
+        angles = df[angle_cols[0]]
+    else:
+        angles = df[angle_cols].mean(axis=1)
+
+    angles = angles.dropna()
     if angles.empty:
         return df
 
@@ -301,7 +306,7 @@ def apply_angle_scoring(
         # All angles identical — assign midpoint score
         df['_angle_score'] = 50.0
     else:
-        df['_angle_score'] = (df['_raw_angle'] - min_a) / (max_a - min_a) * 100.0
+        df['_angle_score'] = (angles - min_a) / (max_a - min_a) * 100.0
 
     aw = max(0, min(100, angle_weight)) / 100.0
     df['score'] = df.apply(
