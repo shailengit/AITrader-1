@@ -32,3 +32,30 @@ def test_strategy_config_imports():
     assert config.as_of == "2022-01-01"
     assert config.end == "2024-01-01"
     assert config.max_holdings == 5  # default
+
+
+def test_engine_smoke_runs():
+    """Engine should run with a stub config and produce a summary dict."""
+    engine = _load_module("strategies_engine", os.path.join(STRATEGIES_DIR, "engine.py"))
+
+    def fake_precompute(tickers, start, end):
+        return {"AAPL": {
+            "close": [100.0, 101.0, 102.0],
+            "dates": ["2022-01-01", "2022-01-02", "2022-01-03"],
+            "crossovers": [],
+            "market_cap": 1e12,
+            "sector": "Tech",
+        }}
+
+    config = engine.StrategyConfig(
+        as_of="2022-01-01", end="2022-01-03", capital=10_000.0,
+        precompute_fn=fake_precompute,
+        entry_score_fn=lambda c, s: 0.5,
+        holding_score_fn=lambda t, d, h, s: 0.5,
+        exit_check_fn=lambda t, d, h, db: None,
+    )
+    runner = engine.StrategyEngine(config)
+    result = runner.run()
+    assert "summary" in result
+    assert "trades" in result
+    assert "daily_equity" in result
