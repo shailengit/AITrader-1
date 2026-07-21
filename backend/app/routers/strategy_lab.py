@@ -3,9 +3,12 @@
 Phase 1 scope: no LLM calls, no experiment orchestration, no deploy.
 Those land in Phases 2-4. This router establishes the foundation.
 """
+import asyncio
+import json
 import logging
+import threading
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -260,3 +263,256 @@ def post_apply_diff(
         raise HTTPException(status_code=400, detail={"error": "diff_apply_failed", "details": str(e)})
     svc_update_session(db, session_id, code_text=new_code)
     return {"code": new_code}
+
+
+# ── Experiment endpoints (Phase 3) ────────────────────────────────────────
+
+class ExperimentRequest(BaseModel):
+    n_runs: int = Field(10, ge=1, le=500)
+    end_date: str = Field(..., description="YYYY-MM-DD, e.g. '2024-12-31'")
+    start_date_min: str = Field("2002-01-01", description="Earliest random start date")
+    start_date_max: str = Field("2024-01-01", description="Latest random start date")
+    model: Optional[str] = None  # currently unused, kept for future per-run model selection
+
+
+class ExperimentStartResponse(BaseModel):
+    batch_id: str
+
+
+class ExperimentRow(BaseModel):
+    id: str
+    session_id: str
+    batch_id: str
+    run_index: int
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    status: str
+    error_message: Optional[str] = None
+    kpis: Optional[Dict[str, Any]] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class BatchStats(BaseModel):
+    n_total: int
+    n_completed: int
+    n_failed: int
+    mean_sharpe: Optional[float] = None
+    best_sharpe: Optional[float] = None
+    best_experiment_id: Optional[str] = None
+    top_3: List[Dict[str, Any]] = []
+    worst_3: List[Dict[str, Any]] = []
+
+
+@router.post("/sessions/{session_id}/experiments", response_model=ExperimentStartResponse, status_code=202)
+def start_experiments(
+    session_id: uuid.UUID,
+    body: ExperimentRequest,
+    db: Session = Depends(get_db),
+):
+    """Kick off a batch of N backtest runs with random as_of_date windows."""
+    from app.services.strategy_lab_orchestrator import run_batch
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    if not sess.code_text:
+        raise HTTPException(status_code=400, detail="no code_text — generate code first")
+    batch_id = run_batch(
+        session_id=str(session_id),
+        n_runs=body.n_runs,
+        code_text=sess.code_text,
+        end_date=body.end_date,
+        start_date_min=body.start_date_min,
+        start_date_max=body.start_date_max,
+    )
+    return ExperimentStartResponse(batch_id=batch_id)
+
+
+@router.get("/sessions/{session_id}/experiments", response_model=List[ExperimentRow])
+def list_session_experiments(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """List all experiments for a session (across batches), newest first."""
+    from app.services.strategy_lab_experiments import list_experiments
+    rows = list_experiments(db, session_id=session_id, limit=200)
+    return [ExperimentRow(**r.to_dict()) for r in rows]
+
+
+@router.get("/sessions/{session_id}/batches/{batch_id}/experiments", response_model=List[ExperimentRow])
+def list_batch_experiments(
+    session_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """List experiments in a specific batch."""
+    from app.services.strategy_lab_experiments import list_experiments
+    rows = list_experiments(db, session_id=session_id, batch_id=batch_id, limit=500)
+    return [ExperimentRow(**r.to_dict()) for r in rows]
+
+
+@router.get("/sessions/{session_id}/batches/{batch_id}/stats", response_model=BatchStats)
+def batch_stats(
+    session_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Summary statistics for a batch (mean Sharpe, top 3, worst 3)."""
+    from app.services.strategy_lab_experiments import get_batch_stats
+    return BatchStats(**get_batch_stats(db, batch_id))
+
+
+@router.get("/sessions/{session_id}/batches/{batch_id}/events")
+async def batch_events(
+    session_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Server-Sent Events stream for a running batch.
+
+    Polls the in-memory batch queue (thread-safe) every 0.5s and yields
+    events until the batch is done.
+    """
+    from fastapi.responses import StreamingResponse
+    from app.services.strategy_lab_orchestrator import get_batch, drain_events
+    from app.services.strategy_lab_experiments import create_experiment
+
+    # Verify the session exists
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    async def event_generator():
+        import time
+        try:
+            while True:
+                # Drain whatever's available right now
+                evts = drain_events(batch_id, timeout=0.0)
+                for event in evts:
+                    if isinstance(event, dict) and event.get("done"):
+                        yield f"data: {json.dumps(event)}\n\n"
+                        return
+                    # Persist this run's result
+                    try:
+                        exp = create_experiment(
+                            db,
+                            session_id=session_id,
+                            batch_id=uuid.UUID(batch_id),
+                            run_index=event["run_index"],
+                            start_date=event.get("start_date"),
+                            end_date=event.get("end_date"),
+                            status=event["status"],
+                            kpis=event.get("kpis"),
+                            error_message=event.get("error_message"),
+                        )
+                        yield f"data: {json.dumps({**event, 'id': str(exp.id)})}\n\n"
+                    except Exception as persist_err:
+                        logger.error("Failed to persist experiment: %s", persist_err)
+                        yield f"data: {json.dumps(event)}\n\n"
+                # Sleep briefly before next poll
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            logger.info("Client disconnected from batch %s events", batch_id)
+            raise
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+class SummarizeRequest(BaseModel):
+    model: Optional[str] = None
+
+
+class SummarizeResponse(BaseModel):
+    summary_id: str
+    summary_text: str
+    winner_run_id: Optional[str] = None
+
+
+@router.post("/sessions/{session_id}/batches/{batch_id}/summarize", response_model=SummarizeResponse)
+def summarize_batch(
+    session_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    body: SummarizeRequest,
+    db: Session = Depends(get_db),
+):
+    """LLM analyzes the completed batch and writes a 3-paragraph summary."""
+    from app.services.strategy_lab_experiments import list_experiments, get_batch_stats, create_batch_summary
+    from app.services.strategy_lab_llm import summarize_batch
+    import json
+
+    exps = list_experiments(db, session_id=session_id, batch_id=batch_id, limit=500)
+    if not exps:
+        raise HTTPException(status_code=400, detail="batch has no experiments yet")
+    # Build a compact table
+    rows = []
+    for e in exps:
+        k = e.kpis or {}
+        rows.append({
+            "run": e.run_index,
+            "start": e.start_date.isoformat() if e.start_date else "",
+            "ret": k.get("total_return_pct"),
+            "wr": k.get("win_rate"),
+            "dd": k.get("max_drawdown_pct"),
+            "trades": k.get("total_trades"),
+            "status": e.status,
+        })
+    kpis_table = json.dumps(rows, indent=2)
+    summary, err = summarize_batch(kpis_table, len(exps), model=body.model)
+    if err or summary is None:
+        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+    stats = get_batch_stats(db, batch_id)
+    winner_id = uuid.UUID(stats["best_experiment_id"]) if stats.get("best_experiment_id") else None
+    saved = create_batch_summary(
+        db,
+        session_id=session_id,
+        batch_id=batch_id,
+        summary_text=summary,
+        winner_run_id=winner_id,
+        model_id=body.model or "",
+    )
+    return SummarizeResponse(
+        summary_id=str(saved.id),
+        summary_text=summary,
+        winner_run_id=str(winner_id) if winner_id else None,
+    )
+
+
+class RefineStrategyRequest(BaseModel):
+    model: Optional[str] = None
+
+
+class RefineStrategyResponse(BaseModel):
+    diff: str
+    summary: str
+    rationale: str  # the LLM's reasoning
+
+
+@router.post("/sessions/{session_id}/batches/{batch_id}/refine", response_model=RefineStrategyResponse)
+def refine_strategy_after_batch(
+    session_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    body: RefineStrategyRequest,
+    db: Session = Depends(get_db),
+):
+    """LLM proposes a code change based on the worst-performing runs of a batch."""
+    from app.services.strategy_lab_experiments import list_experiments, get_batch_stats, list_batch_summaries
+    from app.services.strategy_lab_llm import refine_strategy
+    from app.services.strategy_lab_diff import diff_summary
+    sess = svc_get_session(db, session_id)
+    if sess is None or not sess.code_text:
+        raise HTTPException(status_code=400, detail="session has no code_text")
+    stats = get_batch_stats(db, batch_id)
+    if not stats["worst_3"]:
+        raise HTTPException(status_code=400, detail="no completed runs in batch")
+    # Get the most recent summary
+    summaries = list_batch_summaries(db, session_id=session_id, batch_id=batch_id)
+    summary_text = summaries[0].summary_text if summaries else ""
+    worst_table = json.dumps(stats["worst_3"], indent=2, default=str)
+    diff, err = refine_strategy(sess.code_text, summary_text, worst_table, model=body.model)
+    if err or diff is None:
+        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+    return RefineStrategyResponse(
+        diff=diff,
+        summary=diff_summary(diff),
+        rationale=summary_text[:200] + "..." if summary_text else "",
+    )
