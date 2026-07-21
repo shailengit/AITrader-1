@@ -69,3 +69,7 @@ backend/RESULTS.md
 # Superpowers
 .superpowers/
 *.backup
+
+# AI Strategy Builder — generated strategy files
+strategies/_generated/
+backend/logs/strategy_lab/
