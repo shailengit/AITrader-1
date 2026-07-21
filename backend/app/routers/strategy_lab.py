@@ -504,7 +504,6 @@ def refine_strategy_after_batch(
     stats = get_batch_stats(db, batch_id)
     if not stats["worst_3"]:
         raise HTTPException(status_code=400, detail="no completed runs in batch")
-    # Get the most recent summary
     summaries = list_batch_summaries(db, session_id=session_id, batch_id=batch_id)
     summary_text = summaries[0].summary_text if summaries else ""
     worst_table = json.dumps(stats["worst_3"], indent=2, default=str)
@@ -516,3 +515,103 @@ def refine_strategy_after_batch(
         summary=diff_summary(diff),
         rationale=summary_text[:200] + "..." if summary_text else "",
     )
+
+
+# ── Deploy endpoints (Phase 4) ───────────────────────────────────────────
+
+class DeployRequest(BaseModel):
+    experiment_id: uuid.UUID
+    class_name: Optional[str] = None  # auto-generated if not provided
+
+
+class DeploymentResponse(BaseModel):
+    deployment_id: str
+    class_name: str
+    class_file_path: str
+    is_active: bool
+    deployed_at: Optional[str] = None
+    rolled_back_at: Optional[str] = None
+    experiment_id: Optional[str] = None
+    session_id: str
+    verification: Dict[str, bool] = {}
+
+
+class DeploymentListItem(BaseModel):
+    deployment_id: str
+    class_name: str
+    class_file_path: str
+    is_active: bool
+    deployed_at: Optional[str] = None
+    rolled_back_at: Optional[str] = None
+    experiment_id: Optional[str] = None
+    session_id: str
+
+
+@router.post("/sessions/{session_id}/deploy", response_model=DeploymentResponse)
+def deploy(
+    session_id: uuid.UUID,
+    body: DeployRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate a pluggable Strategy class from the session's code and deploy to paper."""
+    from app.services.strategy_lab_deploy import deploy_strategy
+    from app.models.strategy_lab import StrategyExperiment
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    experiment = db.get(StrategyExperiment, body.experiment_id)
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="experiment not found")
+    try:
+        result = deploy_strategy(db, sess, experiment, class_name=body.class_name)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return DeploymentResponse(
+        deployment_id=result["deployment_id"],
+        class_name=result["class_name"],
+        class_file_path=result["class_file_path"],
+        is_active=True,
+        experiment_id=str(body.experiment_id),
+        session_id=str(session_id),
+        verification=result["verification"],
+    )
+
+
+@router.get("/deployments", response_model=List[DeploymentListItem])
+def list_deployments(
+    active_only: bool = Query(False, description="Only return currently-active deployments"),
+    db: Session = Depends(get_db),
+):
+    """List all deployments, newest first."""
+    from app.models.strategy_lab import StrategyDeployment
+    q = db.query(StrategyDeployment)
+    if active_only:
+        q = q.filter(StrategyDeployment.is_active == True)
+    rows = q.order_by(StrategyDeployment.deployed_at.desc()).all()
+    return [
+        DeploymentListItem(
+            deployment_id=str(r.id),
+            class_name=r.class_name,
+            class_file_path=r.class_file_path,
+            is_active=r.is_active,
+            deployed_at=r.deployed_at.isoformat() if r.deployed_at else None,
+            rolled_back_at=r.rolled_back_at.isoformat() if r.rolled_back_at else None,
+            experiment_id=str(r.experiment_id) if r.experiment_id else None,
+            session_id=str(r.session_id),
+        )
+        for r in rows
+    ]
+
+
+@router.post("/deployments/{deployment_id}/rollback")
+def rollback_deployment(
+    deployment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Roll back a deployment and restore the previous one."""
+    from app.services.strategy_lab_deploy import rollback_deployment as do_rollback
+    try:
+        result = do_rollback(db, deployment_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return result
