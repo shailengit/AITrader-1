@@ -309,6 +309,10 @@ class StrategyEngine:
                             "market_cap": s.get("market_cap", 0),
                             "sector": s.get("sector", "Unknown"),
                             "volume_ratio": s.get("volume_ratio", 0),
+                            # Inject the stock_db entry so strategy-specific
+                            # holding_score / exit_check can re-score based on
+                            # current indicator values without re-querying the DB.
+                            "_stock_data": stock_db.get(s["ticker"]),
                         }
                         trades.append({
                             "ticker": s["ticker"], "side": "BUY",

@@ -84,3 +84,63 @@ def test_safe_import_missing_file():
     result = safe.safe_import_strategy("/nonexistent/path/does_not_exist.py")
     assert result.error is not None
     assert result.module is None
+
+
+def test_golden_cross_parity():
+    """Refactored golden_cross.py must produce KPIs within tolerance of the baseline.
+
+    Loads the baseline_kpis.json captured in Task 2, runs the new golden_cross
+    over the same window, and asserts aggregate KPIs match.
+    """
+    import json
+
+    BASELINE = os.path.join(os.path.dirname(__file__), "baseline_kpis.json")
+    if not os.path.exists(BASELINE):
+        pytest.skip("baseline_kpis.json not yet captured — run _capture_baseline.py first")
+
+    with open(BASELINE) as f:
+        baseline = json.load(f)
+
+    # Load the new golden_cross module (it uses _load_module for its own deps)
+    gc = _load_module("golden_cross_under_test", os.path.join(STRATEGIES_DIR, "golden_cross.py"))
+
+    # Override the window to match the baseline
+    cfg = gc.build_config(
+        as_of=baseline["window"]["as_of"],
+        end=baseline["window"]["end"],
+        capital=100_000.0,
+    )
+
+    # Load the engine and run
+    engine = _load_module("strategies_engine", os.path.join(STRATEGIES_DIR, "engine.py"))
+    result = engine.StrategyEngine(cfg).run()
+    kpis = result["summary"]
+
+    # Total return within 1% relative (or 1pp absolute if base is near zero)
+    base_ret = baseline["kpis"]["total_return_pct"]
+    new_ret = kpis["total_return_pct"]
+    tol = max(1.0, abs(base_ret) * 0.01)
+    assert abs(new_ret - base_ret) <= tol, (
+        f"total_return_pct regression: baseline={base_ret}, new={new_ret}, tol={tol}"
+    )
+
+    # Trade count within 5 absolute
+    base_n = baseline["kpis"]["n_trades"]
+    new_n = kpis["total_trades"]
+    assert abs(new_n - base_n) <= 5, (
+        f"n_trades regression: baseline={base_n}, new={new_n}"
+    )
+
+    # Win rate within 5pp absolute
+    base_wr = baseline["kpis"]["win_rate"]
+    new_wr = kpis["win_rate"]
+    assert abs(new_wr - base_wr) <= 5.0, (
+        f"win_rate regression: baseline={base_wr}, new={new_wr}"
+    )
+
+    # Exit reason distribution should be qualitatively similar
+    base_reasons = baseline["exit_reason_counts"]
+    new_reasons = kpis["exit_reasons"]
+    if "Death Cross" in base_reasons and base_reasons["Death Cross"] > 10:
+        assert "Death Cross" in new_reasons, "Death Cross exits missing"
+        assert new_reasons["Death Cross"] > 0, "No Death Cross exits generated"
