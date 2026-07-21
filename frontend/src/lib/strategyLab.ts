@@ -61,6 +61,43 @@ export interface ApplyDiffResponse {
   code: string;
 }
 
+export interface ExperimentRow {
+  id: string;
+  session_id: string;
+  batch_id: string;
+  run_index: number;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  error_message: string | null;
+  kpis: Record<string, any> | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface BatchStats {
+  n_total: number;
+  n_completed: number;
+  n_failed: number;
+  mean_sharpe: number | null;
+  best_sharpe: number | null;
+  best_experiment_id: string | null;
+  top_3: Array<{ id: string; run_index: number; start_date: string; sharpe: number; kpis: any }>;
+  worst_3: Array<{ id: string; run_index: number; start_date: string; sharpe: number; kpis: any }>;
+}
+
+export interface SummarizeResponse {
+  summary_id: string;
+  summary_text: string;
+  winner_run_id: string | null;
+}
+
+export interface RefineStrategyResponse {
+  diff: string;
+  summary: string;
+  rationale: string;
+}
+
 const base = "/api/strategy-lab";
 
 async function getJson<T>(url: string): Promise<T> {
@@ -127,4 +164,21 @@ export const strategyLabApi = {
 
   applyDiff: (id: string, body: { instruction: string; current_code?: string }) =>
     postJson<ApplyDiffResponse>(`${base}/sessions/${id}/apply-diff`, body),
+
+  startExperiments: (id: string, body: { n_runs: number; end_date: string; start_date_min?: string; start_date_max?: string; model?: string }) =>
+    postJson<{ batch_id: string }>(`${base}/sessions/${id}/experiments`, body),
+
+  listExperiments: (id: string) => getJson<ExperimentRow[]>(`${base}/sessions/${id}/experiments`),
+
+  listBatchExperiments: (id: string, batchId: string) =>
+    getJson<ExperimentRow[]>(`${base}/sessions/${id}/batches/${batchId}/experiments`),
+
+  getBatchStats: (id: string, batchId: string) =>
+    getJson<BatchStats>(`${base}/sessions/${id}/batches/${batchId}/stats`),
+
+  summarizeBatch: (id: string, batchId: string, body: { model?: string } = {}) =>
+    postJson<SummarizeResponse>(`${base}/sessions/${id}/batches/${batchId}/summarize`, body),
+
+  refineAfterBatch: (id: string, batchId: string, body: { model?: string } = {}) =>
+    postJson<RefineStrategyResponse>(`${base}/sessions/${id}/batches/${batchId}/refine`, body),
 };

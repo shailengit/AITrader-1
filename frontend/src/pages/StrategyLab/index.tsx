@@ -5,6 +5,7 @@ import { StepSidebar, type Step } from "../../components/strategy-lab/StepSideba
 import { StepIdea } from "./StepIdea";
 import { StepPlan } from "./StepPlan";
 import { StepCode } from "./StepCode";
+import { StepBacktest } from "./StepBacktest";
 import { StepPlaceholder } from "./StepPlaceholder";
 import { strategyLabApi } from "../../lib/strategyLab";
 
@@ -20,6 +21,7 @@ export default function StrategyLabPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get("session");
   const [activeStep, setActiveStep] = useState<number>(1);
+  const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(null);
 
   const session = useQuery({
     queryKey: ["strategy-lab-session", sessionId],
@@ -27,18 +29,18 @@ export default function StrategyLabPage() {
     enabled: !!sessionId,
   });
 
-  // Auto-advance: Step 1 -> 2 after session created
   useEffect(() => {
     if (session.data && activeStep === 1) {
       setActiveStep(2);
     }
   }, [session.data, activeStep]);
 
-  // Auto-advance: Step 2 -> 3 after plan approved
   const handlePlanApproved = () => setActiveStep(3);
-
-  // Auto-advance: Step 3 -> 4 after code is ready
   const handleCodeReady = () => setActiveStep(4);
+  const handleWinnerPicked = (experimentId: string) => {
+    setSelectedExperimentId(experimentId);
+    setActiveStep(5);
+  };
 
   const handleCreated = (newSessionId: string) => {
     setSearchParams({ session: newSessionId });
@@ -46,8 +48,8 @@ export default function StrategyLabPage() {
 
   const handleSelectStep = (stepId: number) => {
     if (!sessionId && stepId !== 1) return;
-    // Don't allow going past 3 if code not generated yet
     if (stepId >= 3 && !session.data?.code_text) return;
+    if (stepId >= 4 && !session.data?.code_text) return;
     setActiveStep(stepId);
   };
 
@@ -79,19 +81,21 @@ export default function StrategyLabPage() {
               model={session.data.model_id}
               onCodeReady={handleCodeReady}
             />
-          ) : activeStep === 4 ? (
-            <StepPlaceholder
-              stepNumber={4}
-              title={STEPS[3].label}
-              comingIn={STEPS[3].comingIn}
-              description={STEPS[3].description}
+          ) : activeStep === 4 && session.data ? (
+            <StepBacktest
+              session={session.data}
+              onWinnerPicked={handleWinnerPicked}
             />
           ) : (
             <StepPlaceholder
               stepNumber={5}
               title={STEPS[4].label}
               comingIn={STEPS[4].comingIn}
-              description={STEPS[4].description}
+              description={
+                selectedExperimentId
+                  ? `Winner selected: ${selectedExperimentId.slice(0, 8)}... — ready to deploy.`
+                  : STEPS[4].description
+              }
             />
           )}
         </div>
