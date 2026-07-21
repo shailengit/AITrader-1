@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { StepSidebar, type Step } from "../../components/strategy-lab/StepSidebar";
 import { StepIdea } from "./StepIdea";
+import { StepPlan } from "./StepPlan";
+import { StepCode } from "./StepCode";
 import { StepPlaceholder } from "./StepPlaceholder";
 import { strategyLabApi } from "../../lib/strategyLab";
 
@@ -19,29 +21,33 @@ export default function StrategyLabPage() {
   const sessionId = searchParams.get("session");
   const [activeStep, setActiveStep] = useState<number>(1);
 
-  // If no session, default to Step 1. If session exists, allow step navigation.
   const session = useQuery({
     queryKey: ["strategy-lab-session", sessionId],
     queryFn: () => strategyLabApi.getSession(sessionId!),
     enabled: !!sessionId,
   });
 
+  // Auto-advance: Step 1 -> 2 after session created
   useEffect(() => {
-    // When a session loads, jump to its "current" step (Phase 1: always Step 2 once created)
-    if (session.data) {
+    if (session.data && activeStep === 1) {
       setActiveStep(2);
     }
-  }, [session.data]);
+  }, [session.data, activeStep]);
+
+  // Auto-advance: Step 2 -> 3 after plan approved
+  const handlePlanApproved = () => setActiveStep(3);
+
+  // Auto-advance: Step 3 -> 4 after code is ready
+  const handleCodeReady = () => setActiveStep(4);
 
   const handleCreated = (newSessionId: string) => {
     setSearchParams({ session: newSessionId });
   };
 
   const handleSelectStep = (stepId: number) => {
-    if (!sessionId && stepId !== 1) {
-      // Can't go past Step 1 without a session
-      return;
-    }
+    if (!sessionId && stepId !== 1) return;
+    // Don't allow going past 3 if code not generated yet
+    if (stepId >= 3 && !session.data?.code_text) return;
     setActiveStep(stepId);
   };
 
@@ -49,8 +55,8 @@ export default function StrategyLabPage() {
     id: s.id,
     label: s.label,
     completed: sessionId
-      ? s.id === 1
-      : false, // Phase 1: only step 1 is "completable"
+      ? s.id <= (session.data?.plan_text ? (session.data?.code_text ? 3 : 2) : 1)
+      : false,
     active: s.id === activeStep,
   }));
 
@@ -58,22 +64,20 @@ export default function StrategyLabPage() {
     <div className="flex h-full min-h-[calc(100vh-4rem)]">
       <StepSidebar steps={steps} onSelect={handleSelectStep} />
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1024px]">
+        <div className="mx-auto max-w-[1280px]">
           {activeStep === 1 || !sessionId ? (
             <StepIdea onCreated={handleCreated} />
-          ) : activeStep === 2 ? (
-            <StepPlaceholder
-              stepNumber={2}
-              title={STEPS[1].label}
-              comingIn={STEPS[1].comingIn}
-              description={`Session created: ${session.data?.name ?? ""} (id ${sessionId?.slice(0, 8)}...).`}
+          ) : activeStep === 2 && session.data ? (
+            <StepPlan
+              session={session.data}
+              model={session.data.model_id}
+              onPlanApproved={handlePlanApproved}
             />
-          ) : activeStep === 3 ? (
-            <StepPlaceholder
-              stepNumber={3}
-              title={STEPS[2].label}
-              comingIn={STEPS[2].comingIn}
-              description={STEPS[2].description}
+          ) : activeStep === 3 && session.data ? (
+            <StepCode
+              session={session.data}
+              model={session.data.model_id}
+              onCodeReady={handleCodeReady}
             />
           ) : activeStep === 4 ? (
             <StepPlaceholder

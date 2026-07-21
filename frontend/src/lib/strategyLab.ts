@@ -44,6 +44,23 @@ export interface ListSessionsParams {
   offset?: number;
 }
 
+export interface PlanResponse {
+  plan_text: string;
+}
+
+export interface GenerateCodeResponse {
+  code: string;
+}
+
+export interface RefineCodeResponse {
+  diff: string;
+  summary: string;
+}
+
+export interface ApplyDiffResponse {
+  code: string;
+}
+
 const base = "/api/strategy-lab";
 
 async function getJson<T>(url: string): Promise<T> {
@@ -98,4 +115,16 @@ export const strategyLabApi = {
     patchJson<StrategySession>(`${base}/sessions/${id}`, body),
 
   deleteSession: (id: string) => deleteJson(`${base}/sessions/${id}`),
+
+  generatePlan: (id: string, body: { model?: string } = {}) =>
+    postJson<PlanResponse>(`${base}/sessions/${id}/plan`, body),
+
+  generateCode: (id: string, body: { model?: string; plan_text?: string } = {}) =>
+    postJson<GenerateCodeResponse>(`${base}/sessions/${id}/generate-code`, body),
+
+  refineCode: (id: string, body: { model?: string; current_code?: string; instruction: string }) =>
+    postJson<RefineCodeResponse>(`${base}/sessions/${id}/refine-code`, body),
+
+  applyDiff: (id: string, body: { instruction: string; current_code?: string }) =>
+    postJson<ApplyDiffResponse>(`${base}/sessions/${id}/apply-diff`, body),
 };
