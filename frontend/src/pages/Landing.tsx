@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar, BookOpen } from 'lucide-react'
+import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar, BookOpen, FlaskConical } from 'lucide-react'
 import { ThemeToggle } from '../components/ui'
 import { useTheme } from '../context/ThemeContext'
 
@@ -53,6 +53,16 @@ const tools = [
     link: '/quantgen',
     stat: 'VectorBT engine',
     detail: 'True walk-forward optimization with position-aware tracking',
+  },
+  {
+    id: 'strategy-lab',
+    title: 'AI Strategy Builder',
+    description: 'Describe a strategy in natural language; the LLM plans, codes, and runs 100s of backtests. Deploy the winner to Alpaca paper.',
+    icon: FlaskConical,
+    accent: '#10B981',
+    link: '/strategy-lab',
+    stat: '5-step workflow',
+    detail: 'Auto-generated strategy code with OOS-validated deploy',
   },
 ]
 

@@ -11,6 +11,7 @@ const pageTitles: Record<string, string> = {
   "/quantgen": "QuantGen Strategy Builder",
   "/markov": "Markov Chain Trader",
   "/coach": "Trade Coach",
+  "/strategy-lab": "AI Strategy Builder",
 };
 
 const REFERRER_KEY = "tc_last_app_referrer";

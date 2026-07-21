@@ -12,6 +12,7 @@ import Markov from './pages/Markov'
 import MarkovChartView from './pages/Markov/MarkovChartView'
 import CoachIndex from './pages/Coach'
 import CoachTrades from './pages/Coach/trades'
+import StrategyLabPage from './pages/StrategyLab'
 
 function App() {
   return (
@@ -70,6 +71,11 @@ function App() {
             <Route path="coach/trades" element={
               <ErrorBoundary>
                 <CoachTrades />
+              </ErrorBoundary>
+            } />
+            <Route path="strategy-lab" element={
+              <ErrorBoundary>
+                <StrategyLabPage />
               </ErrorBoundary>
             } />
           </Route>
