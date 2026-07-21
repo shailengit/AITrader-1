@@ -98,6 +98,29 @@ export interface RefineStrategyResponse {
   rationale: string;
 }
 
+export interface DeploymentInfo {
+  deployment_id: string;
+  class_name: string;
+  class_file_path: string;
+  is_active: boolean;
+  deployed_at: string | null;
+  rolled_back_at: string | null;
+  experiment_id: string | null;
+  session_id: string;
+  verification?: Record<string, boolean>;
+}
+
+export interface DeploymentListItem {
+  deployment_id: string;
+  class_name: string;
+  class_file_path: string;
+  is_active: boolean;
+  deployed_at: string | null;
+  rolled_back_at: string | null;
+  experiment_id: string | null;
+  session_id: string;
+}
+
 const base = "/api/strategy-lab";
 
 async function getJson<T>(url: string): Promise<T> {
@@ -181,4 +204,20 @@ export const strategyLabApi = {
 
   refineAfterBatch: (id: string, batchId: string, body: { model?: string } = {}) =>
     postJson<RefineStrategyResponse>(`${base}/sessions/${id}/batches/${batchId}/refine`, body),
+
+  deploy: (id: string, body: { experiment_id: string; class_name?: string }) =>
+    postJson<DeploymentInfo>(`${base}/sessions/${id}/deploy`, body),
+
+  listDeployments: (params: { active_only?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (params.active_only) q.set("active_only", "true");
+    const qs = q.toString();
+    return getJson<DeploymentListItem[]>(`${base}/deployments${qs ? `?${qs}` : ""}`);
+  },
+
+  rollbackDeployment: (deploymentId: string) =>
+    postJson<{ rolled_back_deployment_id: string; new_active_class_name: string }>(
+      `${base}/deployments/${deploymentId}/rollback`,
+      {},
+    ),
 };

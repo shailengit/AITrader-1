@@ -6,7 +6,7 @@ import { StepIdea } from "./StepIdea";
 import { StepPlan } from "./StepPlan";
 import { StepCode } from "./StepCode";
 import { StepBacktest } from "./StepBacktest";
-import { StepPlaceholder } from "./StepPlaceholder";
+import { StepDeploy } from "./StepDeploy";
 import { strategyLabApi } from "../../lib/strategyLab";
 
 const STEPS: { id: number; label: string; comingIn: string; description: string }[] = [
@@ -86,17 +86,22 @@ export default function StrategyLabPage() {
               session={session.data}
               onWinnerPicked={handleWinnerPicked}
             />
-          ) : (
-            <StepPlaceholder
-              stepNumber={5}
-              title={STEPS[4].label}
-              comingIn={STEPS[4].comingIn}
-              description={
-                selectedExperimentId
-                  ? `Winner selected: ${selectedExperimentId.slice(0, 8)}... — ready to deploy.`
-                  : STEPS[4].description
-              }
+          ) : activeStep === 5 && session.data && selectedExperimentId ? (
+            <StepDeploy
+              session={session.data}
+              experimentId={selectedExperimentId}
+              onDeployed={() => {}}
             />
+          ) : (
+            <div className="space-y-6 p-6">
+              <h2 className="text-xl font-semibold text-zinc-100">5. Deploy to Alpaca</h2>
+              <div className="rounded-lg border border-dashed border-zinc-700 bg-zinc-900/30 p-8 text-center">
+                <div className="text-sm text-zinc-300">No winner selected yet</div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Go back to Step 4 and click "pick" on a row to select the winner.
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>
