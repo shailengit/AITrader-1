@@ -1,0 +1,54 @@
+{
+  "window": {
+    "as_of": "2022-01-01",
+    "end": "2024-01-01"
+  },
+  "kpis": {
+    "total_return_pct": 32.7,
+    "cagr_pct": 15.21,
+    "n_trades": 324,
+    "win_rate": 53.7,
+    "profit_factor": 1.2,
+    "spy_return_pct": 2.65
+  },
+  "exit_reason_counts": {
+    "Death Cross Warning": 12,
+    "Rotated Out": 282,
+    "Take Profit": 1,
+    "Trailing Stop": 3,
+    "Death Cross": 17,
+    "Time Stop": 9
+  },
+  "first_5_trade_signatures": [
+    {
+      "ticker": "PEN",
+      "entry_date": "2022-01-03",
+      "exit_date": "2022-01-05",
+      "return_pct": -8.44
+    },
+    {
+      "ticker": "MNST",
+      "entry_date": "2022-01-03",
+      "exit_date": "2022-01-10",
+      "return_pct": -3.95
+    },
+    {
+      "ticker": "AMKR",
+      "entry_date": "2022-01-03",
+      "exit_date": "2022-01-10",
+      "return_pct": -9.68
+    },
+    {
+      "ticker": "CTRE",
+      "entry_date": "2022-01-03",
+      "exit_date": "2022-01-10",
+      "return_pct": 0.0
+    },
+    {
+      "ticker": "KEX",
+      "entry_date": "2022-01-05",
+      "exit_date": "2022-01-12",
+      "return_pct": 2.14
+    }
+  ]
+}
