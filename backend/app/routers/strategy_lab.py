@@ -144,3 +144,119 @@ def delete_one_session(session_id: uuid.UUID, db: Session = Depends(get_db)):
     if not svc_delete_session(db, session_id):
         raise HTTPException(status_code=404, detail="session not found")
     return None
+
+
+# ── LLM endpoints (Phase 2) ─────────────────────────────────────────────
+
+class PlanRequest(BaseModel):
+    model: Optional[str] = None  # defaults to OLLAMA_MODEL env var
+
+
+class PlanResponse(BaseModel):
+    plan_text: str
+
+
+class GenerateCodeRequest(BaseModel):
+    model: Optional[str] = None
+    plan_text: Optional[str] = None  # if not provided, uses session's stored plan
+
+
+class GenerateCodeResponse(BaseModel):
+    code: str
+
+
+class RefineCodeRequest(BaseModel):
+    model: Optional[str] = None
+    current_code: Optional[str] = None  # if not provided, uses session's stored code
+    instruction: str = Field(..., min_length=1)
+
+
+class RefineCodeResponse(BaseModel):
+    diff: str
+    summary: str  # e.g. "+3 -1 in 1 hunk(s)"
+
+
+@router.post("/sessions/{session_id}/plan", response_model=PlanResponse)
+def post_plan(
+    session_id: uuid.UUID,
+    body: PlanRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate a structured plan for the session's prompt. Persists to plan_text."""
+    from app.services.strategy_lab_llm import generate_plan
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    plan, err = generate_plan(sess.prompt, model=body.model)
+    if err or plan is None:
+        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+    # Persist
+    svc_update_session(db, session_id, plan_text=plan)
+    return PlanResponse(plan_text=plan)
+
+
+@router.post("/sessions/{session_id}/generate-code", response_model=GenerateCodeResponse)
+def post_generate_code(
+    session_id: uuid.UUID,
+    body: GenerateCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate strategy code (4 filter functions + CONFIG) from the plan. Persists to code_text."""
+    from app.services.strategy_lab_llm import generate_code
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    plan = body.plan_text or sess.plan_text
+    if not plan:
+        raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
+    code, err = generate_code(plan, model=body.model)
+    if err or code is None:
+        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+    svc_update_session(db, session_id, code_text=code)
+    return GenerateCodeResponse(code=code)
+
+
+@router.post("/sessions/{session_id}/refine-code", response_model=RefineCodeResponse)
+def post_refine_code(
+    session_id: uuid.UUID,
+    body: RefineCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Generate a unified diff that refines the session's current code per the instruction."""
+    from app.services.strategy_lab_llm import generate_refine_diff
+    from app.services.strategy_lab_diff import diff_summary
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    current = body.current_code or sess.code_text
+    if not current:
+        raise HTTPException(status_code=400, detail="no code_text available — generate code first")
+    diff, err = generate_refine_diff(current, body.instruction, model=body.model)
+    if err or diff is None:
+        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+    return RefineCodeResponse(diff=diff, summary=diff_summary(diff))
+
+
+@router.post("/sessions/{session_id}/apply-diff")
+def post_apply_diff(
+    session_id: uuid.UUID,
+    body: RefineCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Apply a refine diff to the session's code and persist the result.
+
+    Useful when the user accepts a refinement in the UI.
+    """
+    from app.services.strategy_lab_diff import apply_diff as apply_diff_fn
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    current = body.current_code or sess.code_text
+    if not current:
+        raise HTTPException(status_code=400, detail="no code_text available")
+    try:
+        new_code = apply_diff_fn(current, body.instruction)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "diff_apply_failed", "details": str(e)})
+    svc_update_session(db, session_id, code_text=new_code)
+    return {"code": new_code}
