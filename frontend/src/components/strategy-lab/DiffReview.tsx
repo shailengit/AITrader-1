@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Check, X } from "lucide-react";
 
 interface DiffReviewProps {
   diff: string;
@@ -9,67 +10,81 @@ interface DiffReviewProps {
 }
 
 interface ParsedLine {
-  type: "context" | "add" | "remove";
+  type: "context" | "add" | "remove" | "hunk";
   text: string;
   oldNum?: number;
   newNum?: number;
 }
 
-/**
- * Simple unified-diff renderer: parses hunk lines and shows them as a
- * stacked view with green/red color coding. No per-line accept/reject —
- * the user accepts the whole diff or rejects it (per Q23 in the plan).
- */
 export function DiffReview({ diff, summary, onAccept, onReject, isApplying }: DiffReviewProps) {
   const lines = useMemo(() => parseDiffLines(diff), [diff]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-zinc-400">
-          <span className="font-mono">{summary}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="slab-eyebrow slab-eyebrow--gold">// Proposed diff</span>
+          <span className="slab-mono slab-mono--sm slab-mono--dim">{summary}</span>
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: 8 }}>
           <button
+            type="button"
             onClick={onReject}
             disabled={isApplying}
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+            className="slab-btn slab-btn--sm"
           >
+            <X size={10} />
             Reject
           </button>
           <button
+            type="button"
             onClick={onAccept}
             disabled={isApplying}
-            className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-50"
+            className="slab-btn slab-btn--sm slab-btn--primary"
           >
-            {isApplying ? "Applying..." : "Accept changes"}
+            <Check size={10} />
+            {isApplying ? "Applying…" : "Accept"}
           </button>
         </div>
       </div>
 
-      <div className="max-h-96 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 font-mono text-xs">
+      <div className="slab-diff">
         {lines.length === 0 ? (
-          <div className="p-4 text-zinc-500">No changes parsed.</div>
+          <div style={{ padding: 16, color: "var(--slab-paper-faint)" }} className="slab-mono slab-mono--sm">
+            No changes parsed.
+          </div>
         ) : (
           lines.map((l, i) => (
             <div
               key={i}
               className={
                 l.type === "add"
-                  ? "bg-emerald-950/50 text-emerald-300"
+                  ? "slab-diff__row slab-diff__row--add"
                   : l.type === "remove"
-                    ? "bg-red-950/50 text-red-300"
-                    : "text-zinc-400"
+                    ? "slab-diff__row slab-diff__row--remove"
+                    : l.type === "hunk"
+                      ? "slab-diff__row slab-diff__row--hunk"
+                      : "slab-diff__row"
               }
             >
-              <span className="inline-block w-8 select-none text-right text-zinc-600">
-                {l.oldNum ?? ""}
-              </span>
-              <span className="inline-block w-8 select-none text-right text-zinc-600">
-                {l.newNum ?? ""}
-              </span>
-              <span className="ml-2">
-                {l.type === "add" ? "+" : l.type === "remove" ? "-" : " "} {l.text}
+              <span className="slab-diff__gutter">{l.oldNum ?? ""}</span>
+              <span className="slab-diff__gutter">{l.newNum ?? ""}</span>
+              <span className="slab-diff__text">
+                {l.type === "add"
+                  ? "+ "
+                  : l.type === "remove"
+                    ? "- "
+                    : l.type === "hunk"
+                      ? "@@ "
+                      : "  "}
+                {l.text}
               </span>
             </div>
           ))
@@ -87,11 +102,10 @@ function parseDiffLines(diff: string): ParsedLine[] {
   let inHunk = false;
 
   for (const line of lines) {
-    if (line.startsWith("---") || line.startsWith("+++")) {
-      continue;
-    }
+    if (line.startsWith("---") || line.startsWith("+++")) continue;
     const hunkMatch = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
     if (hunkMatch) {
+      out.push({ type: "hunk", text: line });
       oldNum = parseInt(hunkMatch[1], 10);
       newNum = parseInt(hunkMatch[2], 10);
       inHunk = true;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button } from "../../components/ui/Button";
+import { motion, AnimatePresence } from "framer-motion";
+import { Rocket, Check, X, AlertCircle, History, FileCode, RotateCcw } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
 
 interface StepDeployProps {
@@ -41,158 +42,317 @@ export function StepDeploy({ session, experimentId, onDeployed }: StepDeployProp
   });
 
   return (
-    <div className="space-y-6 p-6">
-      <header>
-        <h2 className="text-xl font-semibold text-zinc-100">5. Deploy to Alpaca</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Promote the winning experiment to a live Strategy class on Alpaca paper.
-        </p>
-      </header>
-
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-        <h3 className="mb-2 text-sm font-semibold text-zinc-200">Selected experiment</h3>
-        <div className="font-mono text-xs text-zinc-400">
-          {experimentId.slice(0, 8)}…
+    <>
+      <div className="slab-page-head">
+        <div>
+          <div className="slab-eyebrow slab-eyebrow--gold">// 05 · Deploy</div>
+          <h1 className="slab-page-head__title">Ship to paper.</h1>
+          <p className="slab-page-head__lede">
+            Promote the winning experiment to a live Strategy class on the
+            Alpaca paper account. Previous deployments are deactivated and
+            can be rolled back.
+          </p>
         </div>
-        <div className="mt-3">
-          <label className="mb-1 block text-sm text-zinc-300">
-            Class name (optional — auto-generated from session name + date)
-          </label>
-          <input
-            type="text"
-            value={className}
-            onChange={(e) => setClassName(e.target.value)}
-            placeholder="e.g. GoldenCrossV20240615"
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
-          />
+        <div className="slab-page-head__meta">
+          <span>Phase · Ship</span>
+          <span className="slab-mono slab-mono--gold">READY</span>
         </div>
-        <div className="mt-4">
-          <Button onClick={() => setConfirmOpen(true)} disabled={deployMut.isPending}>
-            {deployMut.isPending ? "Deploying…" : "🚀 Deploy to Alpaca"}
-          </Button>
-        </div>
-        {deployMut.isError && (
-          <div className="mt-3 text-sm text-red-400">
-            {String((deployMut.error as Error)?.message ?? "Deploy failed")}
-          </div>
-        )}
-        {deployMut.isSuccess && deployMut.data && (
-          <div className="mt-3 rounded-md border border-emerald-800 bg-emerald-950/30 p-3 text-sm">
-            <div className="font-semibold text-emerald-300">
-              ✓ Deployed {deployMut.data.class_name}
-            </div>
-            <div className="mt-1 text-xs text-zinc-400">
-              <div>File: <span className="font-mono">{deployMut.data.class_file_path}</span></div>
-              <div className="mt-1">
-                Verification:{" "}
-                {Object.entries(deployMut.data.verification ?? {}).map(([k, v]) => (
-                  <span
-                    key={k}
-                    className={`mr-2 rounded px-1.5 py-0.5 text-xs ${v ? "bg-emerald-900/50 text-emerald-300" : "bg-red-900/50 text-red-300"}`}
-                  >
-                    {k}: {v ? "✓" : "✗"}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-2 text-xs text-zinc-500">
-                The Alpaca runner is now using this class. To trade live, run{" "}
-                <code className="rounded bg-zinc-800 px-1 py-0.5">
-                  python -m app.services.alpaca_runner
-                </code>{" "}
-                on your paper account.
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-zinc-200">Deployment history</h3>
-        {deployments.isLoading ? (
-          <div className="text-sm text-zinc-400">Loading…</div>
-        ) : !deployments.data || deployments.data.length === 0 ? (
-          <div className="text-sm text-zinc-500">No deployments yet.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="text-zinc-400">
-              <tr>
-                <th className="px-2 py-1 text-left">Class</th>
-                <th className="px-2 py-1 text-left">Deployed</th>
-                <th className="px-2 py-1 text-left">Status</th>
-                <th className="px-2 py-1 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deployments.data.map((d) => (
-                <tr key={d.deployment_id} className="border-t border-zinc-800">
-                  <td className="px-2 py-1 font-mono text-zinc-200">{d.class_name}</td>
-                  <td className="px-2 py-1 text-xs text-zinc-400">
-                    {d.deployed_at?.slice(0, 19).replace("T", " ") ?? "—"}
-                  </td>
-                  <td className="px-2 py-1">
-                    {d.is_active ? (
-                      <span className="rounded bg-emerald-900/50 px-2 py-0.5 text-xs text-emerald-300">active</span>
-                    ) : (
-                      <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">rolled back</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1 text-right">
-                    {d.is_active && (
-                      <button
-                        onClick={() => rollback.mutate(d.deployment_id)}
-                        disabled={rollback.isPending}
-                        className="text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50"
+      <div className="slab-page-body">
+        {/* Selected experiment summary */}
+        <div className="slab-corner-marks slab-panel" style={{ maxWidth: 920, position: "relative" }}>
+          <div className="slab-panel__head">
+            <span className="slab-eyebrow slab-eyebrow--gold">// Selected experiment</span>
+            <span className="slab-mono slab-mono--xs slab-mono--dim">id · {experimentId.slice(0, 8)}</span>
+          </div>
+          <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div className="slab-field">
+              <label className="slab-field__label">Class name</label>
+              <input
+                type="text"
+                value={className}
+                onChange={(e) => setClassName(e.target.value)}
+                placeholder="auto · derived from session name + as-of date"
+                className="slab-input"
+              />
+              <div className="slab-field__hint">
+                A valid Python identifier. Leave blank to use the auto-generated name.
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                padding: 14,
+                background: "var(--slab-ink-3)",
+                border: "1px solid var(--slab-rule)",
+              }}
+            >
+              <div>
+                <div className="slab-eyebrow">Target</div>
+                <div className="slab-mono slab-mono--md slab-mono--gold" style={{ marginTop: 4 }}>
+                  📄 Paper account
+                </div>
+              </div>
+              <div>
+                <div className="slab-eyebrow">Side effects</div>
+                <div className="slab-mono slab-mono--md slab-mono--dim" style={{ marginTop: 4 }}>
+                  writes 1 file · updates runner import
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={deployMut.isPending}
+                className="slab-btn slab-btn--terminal"
+                style={{ padding: "12px 24px" }}
+              >
+                <Rocket size={12} />
+                {deployMut.isPending ? "Deploying…" : "Deploy to paper"}
+              </button>
+              {deployMut.isError && (
+                <span className="slab-mono slab-mono--sm slab-mono--rose" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <AlertCircle size={12} />
+                  {String((deployMut.error as Error)?.message ?? "Deploy failed")}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Deploy result */}
+        <AnimatePresence>
+          {deployMut.isSuccess && deployMut.data && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="slab-corner-marks slab-panel"
+              style={{ maxWidth: 920, marginTop: 24, position: "relative" }}
+            >
+              <div className="slab-panel__head">
+                <span className="slab-eyebrow slab-eyebrow--gold">// Live</span>
+                <span className="slab-status slab-status--terminal">
+                  <span className="slab-status__dot" />
+                  Deployed
+                </span>
+              </div>
+              <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <div className="slab-eyebrow">Class</div>
+                  <div className="slab-mono slab-mono--xl slab-mono--terminal" style={{ marginTop: 4 }}>
+                    {deployMut.data.class_name}
+                  </div>
+                </div>
+                <div>
+                  <div className="slab-eyebrow">File path</div>
+                  <div className="slab-mono slab-mono--md slab-mono--dim" style={{ marginTop: 4 }}>
+                    <FileCode size={11} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                    {deployMut.data.class_file_path}
+                  </div>
+                </div>
+                <div>
+                  <div className="slab-eyebrow">Verification</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                    {Object.entries(deployMut.data.verification ?? {}).map(([k, v]) => (
+                      <span
+                        key={k}
+                        className={`slab-tag ${v ? "slab-tag--terminal" : "slab-tag--rose"}`}
                       >
-                        {rollback.isPending ? "rolling back…" : "rollback"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+                        {v ? <Check size={9} /> : <X size={9} />}
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: 12,
+                    background: "var(--slab-ink-3)",
+                    border: "1px solid var(--slab-rule)",
+                  }}
+                >
+                  <div className="slab-mono slab-mono--sm slab-mono--dim">
+                    The Alpaca runner is using this class. To trade live, run:
+                  </div>
+                  <pre
+                    className="slab-mono slab-mono--md"
+                    style={{
+                      color: "var(--slab-gold)",
+                      marginTop: 8,
+                      background: "var(--slab-ink-2)",
+                      padding: "8px 12px",
+                      border: "1px solid var(--slab-rule)",
+                    }}
+                  >
+                    python -m app.services.alpaca_runner
+                  </pre>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {confirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setConfirmOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-zinc-700 bg-zinc-900 p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-zinc-100">Confirm deploy</h3>
-            <p className="mt-2 text-sm text-zinc-400">
-              This will write a new Strategy class file to{" "}
-              <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs">
-                backend/app/services/strategies/
-              </code>{" "}
-              and update <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs">alpaca_runner.py</code>{" "}
-              to import it. Any active deployment will be deactivated.
-            </p>
-            <p className="mt-3 text-sm text-zinc-400">Target: 📄 Paper account only.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmOpen(false)}
-                className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setConfirmOpen(false);
-                  deployMut.mutate();
-                }}
-                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-black hover:bg-emerald-400"
-              >
-                Yes, deploy
-              </button>
-            </div>
+        {/* History */}
+        <div className="slab-panel" style={{ maxWidth: 920, marginTop: 32 }}>
+          <div className="slab-panel__head">
+            <span className="slab-eyebrow slab-eyebrow--gold">
+              <History size={11} style={{ verticalAlign: "middle", marginRight: 6 }} />
+              Deployment history
+            </span>
+            <span className="slab-mono slab-mono--xs slab-mono--dim">
+              {deployments.data?.length ?? 0} records
+            </span>
+          </div>
+          <div style={{ maxHeight: 360, overflow: "auto" }}>
+            {deployments.isLoading ? (
+              <div style={{ padding: 16 }} className="slab-mono slab-mono--sm slab-mono--dim">Loading…</div>
+            ) : !deployments.data || deployments.data.length === 0 ? (
+              <div style={{ padding: 16 }} className="slab-mono slab-mono--sm slab-mono--faint">
+                No deployments yet.
+              </div>
+            ) : (
+              <table className="slab-table">
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Deployed at</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deployments.data.map((d) => (
+                    <tr key={d.deployment_id} className={d.is_active ? "slab-table__row--winner" : ""}>
+                      <td style={{ color: d.is_active ? "var(--slab-gold)" : "var(--slab-paper-dim)" }}>
+                        {d.class_name}
+                      </td>
+                      <td>{d.deployed_at?.slice(0, 19).replace("T", " ") ?? "—"}</td>
+                      <td>
+                        {d.is_active ? (
+                          <span className="slab-tag slab-tag--gold">ACTIVE</span>
+                        ) : (
+                          <span className="slab-tag">rolled back</span>
+                        )}
+                      </td>
+                      <td>
+                        {d.is_active && (
+                          <button
+                            type="button"
+                            onClick={() => rollback.mutate(d.deployment_id)}
+                            disabled={rollback.isPending}
+                            className="slab-btn slab-btn--xs"
+                          >
+                            <RotateCcw size={9} />
+                            {rollback.isPending ? "rolling back…" : "rollback"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Confirm modal */}
+      <AnimatePresence>
+        {confirmOpen && (
+          <ConfirmModal
+            className={className.trim() || "<auto>"}
+            onCancel={() => setConfirmOpen(false)}
+            onConfirm={() => {
+              setConfirmOpen(false);
+              deployMut.mutate();
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+function ConfirmModal({
+  className,
+  onCancel,
+  onConfirm,
+}: {
+  className: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.7)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 50,
+      }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ y: 8, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 8, opacity: 0 }}
+        className="slab-corner-marks slab-panel"
+        style={{ position: "relative", width: "100%", maxWidth: 520 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="slab-panel__head">
+          <span className="slab-eyebrow slab-eyebrow--gold">// Confirm deploy</span>
+          <span className="slab-mono slab-mono--xs slab-mono--dim">paper only</span>
+        </div>
+        <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p className="slab-prose">
+            This will write a new Strategy class to{" "}
+            <span className="slab-mono" style={{ color: "var(--slab-gold)" }}>
+              backend/app/services/strategies/
+            </span>{" "}
+            and update <span className="slab-mono">alpaca_runner.py</span> to
+            import it. Any active deployment will be deactivated.
+          </p>
+          <div
+            style={{
+              padding: 12,
+              background: "var(--slab-ink-3)",
+              border: "1px solid var(--slab-rule)",
+            }}
+          >
+            <div className="slab-eyebrow">Target class</div>
+            <div className="slab-mono slab-mono--md slab-mono--gold" style={{ marginTop: 4 }}>
+              {className}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button type="button" onClick={onCancel} className="slab-btn">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="slab-btn slab-btn--terminal"
+            >
+              <Rocket size={11} />
+              Deploy
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

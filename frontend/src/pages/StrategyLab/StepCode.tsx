@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Editor from "@monaco-editor/react";
-import { Button } from "../../components/ui/Button";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle } from "lucide-react";
 import { DiffReview } from "../../components/strategy-lab/DiffReview";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
 
@@ -17,21 +18,18 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
   const [code, setCode] = useState(session.code_text ?? DEFAULT_CODE);
   const [refineInstruction, setRefineInstruction] = useState("");
   const [pendingDiff, setPendingDiff] = useState<{ diff: string; summary: string } | null>(null);
+  const [showRefine, setShowRefine] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync to session's code when it loads
   useEffect(() => {
     if (session.code_text) setCode(session.code_text);
   }, [session.code_text]);
 
-  // Debounced auto-save (1s)
   useEffect(() => {
-    if (!session.code_text) return; // don't save the default placeholder
+    if (!session.code_text) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (code !== session.code_text) {
-        save.mutate();
-      }
+      if (code !== session.code_text) save.mutate();
     }, 1000);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -39,18 +37,15 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  // Generate code from plan
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generateCode(session.id, { model }),
     onSuccess: (r) => setCode(r.code),
   });
 
-  // Auto-save (separate hook so debounce effect can call it)
   const save = useMutation({
     mutationFn: () => strategyLabApi.updateSession(session.id, { code_text: code }),
   });
 
-  // Generate a refinement diff
   const refine = useMutation({
     mutationFn: () =>
       strategyLabApi.refineCode(session.id, {
@@ -61,7 +56,6 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
     onSuccess: (r) => setPendingDiff({ diff: r.diff, summary: r.summary }),
   });
 
-  // Apply the pending diff
   const apply = useMutation({
     mutationFn: (diff: string) =>
       strategyLabApi.applyDiff(session.id, { instruction: diff, current_code: code }),
@@ -69,98 +63,219 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
       setCode(r.code);
       setPendingDiff(null);
       setRefineInstruction("");
+      setShowRefine(false);
     },
   });
 
+  const isDirty = code !== (session.code_text ?? DEFAULT_CODE) && code !== DEFAULT_CODE;
+  const isInitialState = code === DEFAULT_CODE;
+
+  // Build a synthetic class file name from the session name
+  const fileName = (session.name || "strategy")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .slice(0, 32) + ".py";
+
   return (
-    <div className="space-y-6 p-6">
-      <header>
-        <h2 className="text-xl font-semibold text-zinc-100">3. Edit the strategy code</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          The LLM has written 4 filter functions + a StrategyConfig. Edit freely or ask
-          the AI to refine.
-        </p>
-      </header>
-
-      <div className="rounded-lg border border-zinc-800 overflow-hidden">
-        <Editor
-          height="500px"
-          language="python"
-          theme="vs-dark"
-          value={code}
-          onChange={(v) => setCode(v ?? "")}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 13,
-            tabSize: 4,
-            wordWrap: "on",
-            automaticLayout: true,
-          }}
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        {generate.isPending ? (
-          <Button disabled>Generating code…</Button>
-        ) : (
-          <Button onClick={() => generate.mutate()} disabled={!session.plan_text}>
-            {code === DEFAULT_CODE ? "Generate code" : "Regenerate code"}
-          </Button>
-        )}
-        {save.isPending && <span className="text-xs text-zinc-400">Saving…</span>}
-        {save.isSuccess && <span className="text-xs text-emerald-400">Saved</span>}
-        {session.code_text && code !== DEFAULT_CODE && (
-          <Button onClick={onCodeReady} variant="secondary">
-            Run Backtest →
-          </Button>
-        )}
-      </div>
-
-      {/* Refinement panel */}
-      {session.code_text && code !== DEFAULT_CODE && (
-        <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
-          <h3 className="text-sm font-semibold text-zinc-200">Refine with AI</h3>
-          <p className="text-xs text-zinc-500">
-            Tell the AI what to change (e.g. "widen trailing stop to 25%", "rank by RSI not market cap").
-            It'll produce a diff you can review.
+    <>
+      <div className="slab-page-head">
+        <div>
+          <div className="slab-eyebrow slab-eyebrow--gold">// 03 · Code</div>
+          <h1 className="slab-page-head__title">Edit the strategy.</h1>
+          <p className="slab-page-head__lede">
+            Four filter functions plus a <span className="slab-mono">StrategyConfig</span>.
+            Edit freely or ask the AI to refine.
           </p>
-          <textarea
-            value={refineInstruction}
-            onChange={(e) => setRefineInstruction(e.target.value)}
-            rows={2}
-            placeholder="What should change?"
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-blue-500 focus:outline-none"
-          />
-          <Button
-            onClick={() => refine.mutate()}
-            disabled={!refineInstruction.trim() || refine.isPending}
-          >
-            {refine.isPending ? "Refining…" : "Generate diff"}
-          </Button>
-          {refine.isError && (
-            <div className="text-sm text-red-400">
-              {String((refine.error as Error)?.message ?? "Refine failed")}
-            </div>
-          )}
+        </div>
+        <div className="slab-page-head__meta">
+          <span>Phase · Edit</span>
+          <span className="slab-mono slab-mono--gold">
+            {save.isPending ? "SAVING…" : isDirty ? "UNSAVED" : "SAVED"}
+          </span>
+        </div>
+      </div>
 
-          {pendingDiff && (
-            <div className="mt-3">
-              <DiffReview
-                diff={pendingDiff.diff}
-                summary={pendingDiff.summary}
-                onAccept={() => apply.mutate(pendingDiff.diff)}
-                onReject={() => setPendingDiff(null)}
-                isApplying={apply.isPending}
-              />
-              {apply.isError && (
-                <div className="mt-2 text-sm text-red-400">
-                  {String((apply.error as Error)?.message ?? "Apply failed")}
-                </div>
+      <div className="slab-page-body">
+        {/* File-tab header above the editor */}
+        <div
+          className="slab-panel"
+          style={{ position: "relative", maxWidth: 1280 }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              background: "var(--slab-ink-3)",
+              borderBottom: "1px solid var(--slab-rule)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <FileCode size={12} style={{ color: "var(--slab-gold)" }} />
+              <span className="slab-mono slab-mono--sm">{fileName}</span>
+              {isDirty && (
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 0,
+                    background: "var(--slab-gold)",
+                    display: "inline-block",
+                  }}
+                  title="Unsaved changes"
+                />
               )}
             </div>
+            <div className="slab-mono slab-mono--xs slab-mono--faint">
+              python · 4 spaces · unix lf
+            </div>
+          </div>
+
+          <div style={{ background: "var(--slab-ink-2)" }}>
+            <Editor
+              height="540px"
+              language="python"
+              theme="vs-dark"
+              value={code}
+              onChange={(v) => setCode(v ?? "")}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                tabSize: 4,
+                wordWrap: "on",
+                automaticLayout: true,
+                lineNumbers: "on",
+                renderLineHighlight: "gutter",
+                scrollBeyondLastLine: false,
+                padding: { top: 16, bottom: 16 },
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Action row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, maxWidth: 1280 }}>
+          {generate.isPending ? (
+            <span className="slab-status slab-status--live">
+              <span className="slab-status__dot" />
+              Generating code
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => generate.mutate()}
+              disabled={!session.plan_text}
+              className="slab-btn"
+            >
+              <RefreshCw size={11} />
+              {isInitialState ? "Generate code" : "Regenerate code"}
+            </button>
+          )}
+
+          {save.isPending && (
+            <span className="slab-mono slab-mono--xs slab-mono--dim">
+              <Save size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />
+              saving
+            </span>
+          )}
+          {save.isSuccess && !isDirty && (
+            <span className="slab-mono slab-mono--xs slab-mono--terminal">✓ saved</span>
+          )}
+
+          {!isInitialState && (
+            <button
+              type="button"
+              onClick={() => setShowRefine(!showRefine)}
+              className={`slab-btn ${showRefine ? "slab-btn--primary" : ""}`}
+              style={{ marginLeft: 12 }}
+            >
+              <Wand2 size={11} />
+              Refine with AI
+            </button>
+          )}
+
+          {!isInitialState && (
+            <button
+              type="button"
+              onClick={onCodeReady}
+              className="slab-btn slab-btn--terminal"
+              style={{ marginLeft: "auto" }}
+            >
+              Run backtest
+              <ArrowRight size={12} />
+            </button>
           )}
         </div>
-      )}
-    </div>
+
+        {/* Refine panel (toggled) */}
+        <AnimatePresence>
+          {showRefine && !isInitialState && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: "hidden", marginTop: 16, maxWidth: 1280 }}
+            >
+              <div className="slab-panel">
+                <div className="slab-panel__head">
+                  <span className="slab-eyebrow slab-eyebrow--gold">// Refine</span>
+                  <span className="slab-mono slab-mono--xs slab-mono--dim">
+                    LLM returns a diff for review
+                  </span>
+                </div>
+                <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <textarea
+                    value={refineInstruction}
+                    onChange={(e) => setRefineInstruction(e.target.value)}
+                    rows={3}
+                    placeholder="widen trailing stop to 25%"
+                    className="slab-textarea"
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => refine.mutate()}
+                      disabled={!refineInstruction.trim() || refine.isPending}
+                      className="slab-btn slab-btn--primary"
+                    >
+                      {refine.isPending ? "Drafting diff…" : "Generate diff"}
+                    </button>
+                    {refine.isError && (
+                      <span className="slab-mono slab-mono--sm slab-mono--rose" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <AlertCircle size={12} />
+                        {String((refine.error as Error)?.message ?? "Refine failed")}
+                      </span>
+                    )}
+                  </div>
+
+                  {pendingDiff && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <DiffReview
+                        diff={pendingDiff.diff}
+                        summary={pendingDiff.summary}
+                        onAccept={() => apply.mutate(pendingDiff.diff)}
+                        onReject={() => setPendingDiff(null)}
+                        isApplying={apply.isPending}
+                      />
+                      {apply.isError && (
+                        <div className="slab-mono slab-mono--sm slab-mono--rose" style={{ marginTop: 8 }}>
+                          × {String((apply.error as Error)?.message ?? "Apply failed")}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }

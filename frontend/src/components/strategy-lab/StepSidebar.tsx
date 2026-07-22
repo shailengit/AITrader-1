@@ -1,8 +1,9 @@
-import { Check, Circle } from "lucide-react";
+import { Check } from "lucide-react";
 
 export interface Step {
   id: number;
   label: string;
+  meta: string;
   completed: boolean;
   active: boolean;
 }
@@ -10,42 +11,67 @@ export interface Step {
 interface StepSidebarProps {
   steps: Step[];
   onSelect: (id: number) => void;
+  sessionName?: string | null;
+  modelId?: string | null;
 }
 
-export function StepSidebar({ steps, onSelect }: StepSidebarProps) {
+export function StepSidebar({ steps, onSelect, sessionName, modelId }: StepSidebarProps) {
   return (
-    <nav className="flex w-60 flex-col gap-1 border-r border-zinc-800 bg-zinc-900/50 p-4">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-        Steps
-      </h2>
-      {steps.map((s) => (
-        <button
-          key={s.id}
-          onClick={() => onSelect(s.id)}
-          className={`flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
-            s.active
-              ? "bg-zinc-800 text-zinc-100"
-              : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-          }`}
-        >
-          <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-            {s.completed ? (
-              <Check size={16} className="text-green-500" />
-            ) : (
-              <Circle
-                size={16}
-                className={s.active ? "text-blue-400" : "text-zinc-600"}
-                fill={s.active ? "currentColor" : "none"}
-              />
-            )}
+    <aside className="slab-rail">
+      <div className="slab-rail__brand">
+        <div className="slab-rail__brand-mark">Strategy Lab · v0.1</div>
+        <div className="slab-rail__brand-name">The Workshop</div>
+      </div>
+
+      {sessionName && (
+        <div className="slab-rail__session">
+          <div className="slab-eyebrow">Session</div>
+          <div className="slab-mono slab-mono--md" style={{ color: "var(--slab-paper)" }}>
+            {sessionName.length > 32 ? sessionName.slice(0, 32) + "…" : sessionName}
           </div>
-          <div className="flex-1">
-            <div className="font-medium">
-              {s.id}. {s.label}
+          {modelId && (
+            <div className="slab-mono slab-mono--xs slab-mono--dim">model · {modelId}</div>
+          )}
+        </div>
+      )}
+
+      <div style={{ flex: 1, paddingTop: 8 }}>
+        {steps.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onSelect(s.id)}
+            className={`slab-rail__step${s.active ? " slab-rail__step--active" : ""}${s.completed ? " slab-rail__step--complete" : ""}`}
+            type="button"
+          >
+            <div className="slab-rail__step-num">
+              {s.completed ? (
+                <Check size={12} strokeWidth={3} style={{ verticalAlign: "middle" }} />
+              ) : (
+                String(s.id).padStart(2, "0")
+              )}
             </div>
-          </div>
-        </button>
-      ))}
-    </nav>
+            <div>
+              <div className="slab-rail__step-label">{s.label}</div>
+              <div className="slab-rail__step-meta">{s.meta}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div
+        style={{
+          padding: "16px 22px",
+          borderTop: "1px solid var(--slab-rule)",
+          fontFamily: "var(--slab-font-mono)",
+          fontSize: 9,
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color: "var(--slab-paper-ghost)",
+        }}
+      >
+        <div>Paper only</div>
+        <div style={{ marginTop: 2 }}>α · v4 · build 2026.07</div>
+      </div>
+    </aside>
   );
 }
