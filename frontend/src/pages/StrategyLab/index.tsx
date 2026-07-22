@@ -77,39 +77,52 @@ export default function StrategyLabPage() {
         modelId={session.data?.model_id}
       />
       <main className="flex-1 overflow-y-auto">
+        {/*
+          IMPORTANT: do NOT add `key={activeStep}` here. Doing so remounts the
+          entire step subtree on every navigation, which kills any in-flight
+          fetch and causes Chrome to log "The message port closed before a
+          response was received" — and (more importantly) re-fires the
+          StepPlan / StepCode useEffect that auto-generates content, leading
+          to duplicate LLM calls. The step components themselves are
+          unmounted by the conditional rendering below when their step is no
+          longer active.
+        */}
         <motion.div
-          key={activeStep}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
           {activeStep === 1 || !sessionId ? (
-            <StepIdea onCreated={handleCreated} />
+            <StepIdea key="step-1" onCreated={handleCreated} />
           ) : activeStep === 2 && session.data ? (
             <StepPlan
+              key={`step-2-${session.data.id}`}
               session={session.data}
               model={session.data.model_id}
               onPlanApproved={handlePlanApproved}
             />
           ) : activeStep === 3 && session.data ? (
             <StepCode
+              key={`step-3-${session.data.id}`}
               session={session.data}
               model={session.data.model_id}
               onCodeReady={handleCodeReady}
             />
           ) : activeStep === 4 && session.data ? (
             <StepBacktest
+              key={`step-4-${session.data.id}`}
               session={session.data}
               onWinnerPicked={handleWinnerPicked}
             />
           ) : activeStep === 5 && session.data && selectedExperimentId ? (
             <StepDeploy
+              key={`step-5-${session.data.id}`}
               session={session.data}
               experimentId={selectedExperimentId}
               onDeployed={() => {}}
             />
           ) : (
-            <StepNoWinner />
+            <StepNoWinner key="step-no-winner" />
           )}
         </motion.div>
       </main>

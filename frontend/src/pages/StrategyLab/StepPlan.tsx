@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowRight, RefreshCw, FileText } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
@@ -12,16 +12,38 @@ interface StepPlanProps {
 
 export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
   const [planText, setPlanText] = useState(session.plan_text ?? "");
+  const qc = useQueryClient();
 
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generatePlan(session.id, { model }),
-    onSuccess: (r) => setPlanText(r.plan_text),
+    onSuccess: (r) => {
+      setPlanText(r.plan_text);
+      // Invalidate the session query so the next mount of StepPlan sees
+      // the populated plan_text and does NOT re-fire generation.
+      qc.invalidateQueries({ queryKey: ["strategy-lab-session", session.id] });
+    },
   });
 
+  // Auto-generate the plan once per session.id. We use a ref to guarantee
+  // we only fire once per component instance even if the parent re-renders
+  // the step subtree (the previous design fired a duplicate POST on every
+  // re-mount, generating two parallel LLM calls). The `onSuccess` invalidates
+  // the session query, so subsequent mounts will see the populated
+  // plan_text and skip the call.
+  const attemptedRef = useRef(false);
   useEffect(() => {
-    if (!session.plan_text && !generate.isPending && !generate.isError) {
-      generate.mutate();
+    if (attemptedRef.current) return;
+    if (session.plan_text) {
+      // Already have a plan — nothing to do
+      attemptedRef.current = true;
+      return;
     }
+    if (generate.isPending) {
+      attemptedRef.current = true;
+      return;
+    }
+    attemptedRef.current = true;
+    generate.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
