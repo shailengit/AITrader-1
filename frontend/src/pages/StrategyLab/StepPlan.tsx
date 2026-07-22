@@ -12,31 +12,55 @@ interface StepPlanProps {
 
 export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
   const [planText, setPlanText] = useState(session.plan_text ?? "");
+  // We tried using React Query's `generate.isPending` / `generate.isError`
+  // directly, but in dev (StrictMode) the mutation observer can call
+  // onError without triggering a re-render — leaving the page stuck on
+  // DRAFTING. Tracking the status in local state with explicit setters
+  // bypasses that and is reliable.
+  const [status, setStatus] = useState<"drafting" | "ready" | "error" | "waiting">(
+    session.plan_text ? "ready" : "waiting",
+  );
+  const [errorMsg, setErrorMsg] = useState<string>("");
   const qc = useQueryClient();
 
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generatePlan(session.id, { model }),
     onSuccess: (r) => {
       setPlanText(r.plan_text);
+      setStatus("ready");
+      setErrorMsg("");
       // Invalidate the session query so the next mount of StepPlan sees
       // the populated plan_text and does NOT re-fire generation.
       qc.invalidateQueries({ queryKey: ["strategy-lab-session", session.id] });
     },
+    onError: (e: unknown) => {
+      setStatus("error");
+      // Parse the fetch error. The backend returns one of:
+      //   { "detail": "..." }                                          — string detail
+      //   { "detail": { "error": "...", "details": "..." } }          — nested object
+      // The postJson wrapper adds another layer: err.detail is the body,
+      // so we have err.detail.detail.{error,details} for the nested case.
+      const err = e as { detail?: unknown; message?: string };
+      let msg = err.message ?? "Generation failed";
+      let d: unknown = err.detail;
+      // Unwrap if the body itself is a {detail: ...} wrapper
+      if (typeof d === "object" && d !== null && "detail" in (d as object)) {
+        d = (d as { detail: unknown }).detail;
+      }
+      if (typeof d === "object" && d !== null) {
+        const obj = d as { details?: string; error?: string };
+        if (obj.details) msg = obj.details;
+        else if (obj.error) msg = obj.error;
+      } else if (typeof d === "string") {
+        msg = d;
+      }
+      setErrorMsg(msg);
+    },
   });
 
-  // Derive a stable "phase" string from local state instead of mutation
-  // flags. We tried `generate.isPending` directly, but a re-render between
-  // onSuccess and the mutation's state update left `isPending` reporting
-  // `true` indefinitely even after the plan had arrived and `planText` was
-  // set. Checking `planText` first means a successful plan takes priority
-  // over a stale "still pending" flag.
-  const phase: "drafting" | "ready" | "waiting" | "error" = planText
-    ? "ready"
-    : generate.isError
-      ? "error"
-      : generate.isPending
-        ? "drafting"
-        : "waiting";
+  // For backwards compat: derive a phase string. With local `status`,
+  // the values are mutually exclusive and update synchronously.
+  const phase = status;
 
   // Auto-generate the plan once per session.id. We use a ref to guarantee
   // we only fire once per component instance even if the parent re-renders
@@ -50,6 +74,7 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
     if (session.plan_text) {
       // Already have a plan — nothing to do
       attemptedRef.current = true;
+      setStatus("ready");
       return;
     }
     if (generate.isPending) {
@@ -57,6 +82,8 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
       return;
     }
     attemptedRef.current = true;
+    setStatus("drafting");
+    setErrorMsg("");
     generate.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
@@ -100,16 +127,34 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
         {phase === "error" && (
           <div className="slab-panel">
             <div className="slab-panel__head">
-              <span className="slab-eyebrow slab-eyebrow--gold" style={{ color: "var(--slab-rose)" }}>
-                × Generation failed
+              <span className="slab-status slab-status--error">
+                <span className="slab-status__dot" />
+                Generation failed
               </span>
-              <button onClick={() => generate.mutate()} className="slab-btn slab-btn--sm">
+              <button
+                onClick={() => {
+                  setStatus("drafting");
+                  setErrorMsg("");
+                  generate.mutate();
+                }}
+                className="slab-btn slab-btn--sm"
+              >
                 <RefreshCw size={11} /> Retry
               </button>
             </div>
             <div className="slab-panel__body">
-              <p className="slab-mono slab-mono--sm slab-mono--rose">
-                {String((generate.error as Error)?.message ?? "Unknown error")}
+              <p
+                className="slab-mono slab-mono--sm slab-mono--rose"
+                style={{ wordBreak: "break-word", whiteSpace: "pre-wrap" }}
+              >
+                {errorMsg || "Unknown error"}
+              </p>
+              <p className="slab-field__hint" style={{ marginTop: 12 }}>
+                The LLM service returned an error. Common causes: the chosen
+                model is unavailable on the Ollama cloud, the response was
+                truncated (the prompt is too large for the model's
+                max_tokens), or the model returned an empty result. Try a
+                different model from the model picker, or click Retry.
               </p>
             </div>
           </div>

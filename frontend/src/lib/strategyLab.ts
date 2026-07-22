@@ -135,7 +135,20 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${url} -> ${res.status}`);
+  if (!res.ok) {
+    // Try to parse the error body so the UI can show a useful message
+    // instead of a bare "POST ... -> 502".
+    let detail: unknown = null;
+    try {
+      detail = await res.json();
+    } catch {
+      detail = await res.text().catch(() => null);
+    }
+    const err = new Error(`POST ${url} -> ${res.status}`);
+    (err as Error & { detail?: unknown; status?: number }).detail = detail;
+    (err as Error & { detail?: unknown; status?: number }).status = res.status;
+    throw err;
+  }
   return res.json() as Promise<T>;
 }
 

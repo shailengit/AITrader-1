@@ -70,6 +70,18 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
   const isDirty = code !== (session.code_text ?? DEFAULT_CODE) && code !== DEFAULT_CODE;
   const isInitialState = code === DEFAULT_CODE;
 
+  // Live timer so the user knows the request is alive during the 30-90s
+  // the LLM takes to write the strategy code (or fails).
+  const [codeElapsed, setCodeElapsed] = useState(0);
+  useEffect(() => {
+    if (!generate.isPending && !refine.isPending) return;
+    const startedAt = Date.now();
+    setCodeElapsed(0);
+    const id = setInterval(() => setCodeElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generate.isPending, refine.isPending]);
+
   // Build a synthetic class file name from the session name
   const fileName = (session.name || "strategy")
     .toLowerCase()
@@ -156,11 +168,14 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
         </div>
 
         {/* Action row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, maxWidth: 1280 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, maxWidth: 1280, flexWrap: "wrap" }}>
           {generate.isPending ? (
             <span className="slab-status slab-status--live">
               <span className="slab-status__dot" />
               Generating code
+              <span className="slab-mono slab-mono--xs slab-mono--dim" style={{ marginLeft: 12 }}>
+                {codeElapsed}s · typical 30–60s
+              </span>
             </span>
           ) : (
             <button
@@ -208,6 +223,42 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
             </button>
           )}
         </div>
+
+        {/* Generation error — only shown when generate mutation has failed. */}
+        {generate.isError && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="slab-panel"
+            style={{ maxWidth: 1280, marginTop: 16, position: "relative" }}
+          >
+            <div className="slab-panel__head">
+              <span className="slab-status slab-status--error">
+                <span className="slab-status__dot" />
+                Code generation failed
+              </span>
+              <button
+                type="button"
+                onClick={() => generate.mutate()}
+                className="slab-btn slab-btn--sm"
+              >
+                <RefreshCw size={11} /> Retry
+              </button>
+            </div>
+            <div className="slab-panel__body">
+              <p className="slab-mono slab-mono--sm slab-mono--rose" style={{ wordBreak: "break-word" }}>
+                {extractErrorMessage(generate.error)}
+              </p>
+              <p className="slab-field__hint" style={{ marginTop: 12 }}>
+                The model returned a 502 from the LLM provider. Common causes:
+                the chosen model is unavailable on the Ollama cloud, the
+                response was truncated (the prompt is large), or the model
+                returned an empty result. Try a different model, or click
+                Retry to attempt again.
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* Refine panel (toggled) */}
         <AnimatePresence>
@@ -278,4 +329,28 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
       </div>
     </>
   );
+}
+
+// Parse a FastAPI error response into a user-friendly string.
+// Backend shapes:
+//   { detail: "..." }                                            — string
+//   { detail: { error: "...", details: "..." } }                — nested
+// postJson wraps the body in err.detail, so we have err.detail.detail for
+// the nested case.
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "Unknown error";
+  const e = err as { message?: string; detail?: unknown };
+  // Unwrap if the body itself is a {detail: ...} wrapper
+  let d: unknown = e.detail;
+  if (typeof d === "object" && d !== null && "detail" in (d as object)) {
+    d = (d as { detail: unknown }).detail;
+  }
+  if (typeof d === "object" && d !== null) {
+    const obj = d as { details?: string; error?: string };
+    if (obj.details) return obj.details;
+    if (obj.error) return obj.error;
+  }
+  if (typeof d === "string") return d;
+  if (e.message) return e.message;
+  return String(err);
 }
