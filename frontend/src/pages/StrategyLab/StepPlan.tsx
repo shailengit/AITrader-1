@@ -24,6 +24,20 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
     },
   });
 
+  // Derive a stable "phase" string from local state instead of mutation
+  // flags. We tried `generate.isPending` directly, but a re-render between
+  // onSuccess and the mutation's state update left `isPending` reporting
+  // `true` indefinitely even after the plan had arrived and `planText` was
+  // set. Checking `planText` first means a successful plan takes priority
+  // over a stale "still pending" flag.
+  const phase: "drafting" | "ready" | "waiting" | "error" = planText
+    ? "ready"
+    : generate.isError
+      ? "error"
+      : generate.isPending
+        ? "drafting"
+        : "waiting";
+
   // Auto-generate the plan once per session.id. We use a ref to guarantee
   // we only fire once per component instance even if the parent re-renders
   // the step subtree (the previous design fired a duplicate POST on every
@@ -64,16 +78,26 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
         </div>
         <div className="slab-page-head__meta">
           <span>Phase · Review</span>
-          <span className={generate.isPending ? "slab-status slab-status--live" : "slab-status slab-status--gold"}>
+          <span
+            className={
+              phase === "drafting"
+                ? "slab-status slab-status--live"
+                : phase === "ready"
+                  ? "slab-status slab-status--gold"
+                  : phase === "error"
+                    ? "slab-status slab-status--error"
+                    : "slab-status slab-status--dim"
+            }
+          >
             <span className="slab-status__dot" />
-            {generate.isPending ? "DRAFTING" : planText ? "DRAFT READY" : "WAITING"}
+            {phase === "drafting" ? "DRAFTING" : phase === "ready" ? "DRAFT READY" : phase === "error" ? "ERROR" : "WAITING"}
           </span>
         </div>
       </div>
 
       <div className="slab-page-body">
-        {generate.isPending && <DraftingState />}
-        {generate.isError && (
+        {phase === "drafting" && <DraftingState />}
+        {phase === "error" && (
           <div className="slab-panel">
             <div className="slab-panel__head">
               <span className="slab-eyebrow slab-eyebrow--gold" style={{ color: "var(--slab-rose)" }}>
@@ -91,7 +115,7 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
           </div>
         )}
 
-        {planText && !generate.isPending && (
+        {phase === "ready" && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -162,6 +186,16 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
 }
 
 function DraftingState() {
+  // Live elapsed-time counter so the user knows the request is alive,
+  // not stalled. Cloud model latencies for this prompt are typically
+  // 15–30s end-to-end.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const startedAt = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="slab-panel" style={{ maxWidth: 920, position: "relative" }}>
       <div className="slab-panel__head">
@@ -169,7 +203,9 @@ function DraftingState() {
           <span className="slab-status__dot" />
           Drafting plan
         </span>
-        <span className="slab-mono slab-mono--xs slab-mono--dim">usually 5–15 s</span>
+        <span className="slab-mono slab-mono--xs slab-mono--dim">
+          {elapsed}s · typical 15–30s
+        </span>
       </div>
       <div style={{ padding: 32 }}>
         {/* Skeleton lines that look like the LLM is typing */}
