@@ -281,24 +281,23 @@ def make_refine_strategy_prompt(current_code: str, summary: str, worst_runs_tabl
 
 
 def make_debug_prompt(code: str, error: str) -> List[Dict[str, str]]:
-    """Prompt the LLM to debug a failing strategy and produce a surgical fix diff."""
+    """Prompt the LLM to debug a failing strategy and produce a complete fixed file."""
     return [
         {
             "role": "system",
             "content": (
                 "You are a debugger for quant strategy code. The code below failed "
-                "with a specific error. Analyze the error and produce a MINIMAL unified "
-                "diff that fixes it.\n\n"
-                "OUTPUT FORMAT: a unified diff in standard unified-diff format, "
-                "wrapped in a markdown ```diff block. Do NOT include any prose.\n\n"
+                "with a specific error. Analyze the error and output the COMPLETE "
+                "fixed file.\n\n"
+                "OUTPUT FORMAT: a single Python file wrapped in a markdown ```python block. "
+                "Do NOT include any prose before or after the code block.\n\n"
                 "CRITICAL IMPORT RULES (these are the most common bugs):\n"
                 "- `get_safe_table_name` is in `app.utils.security`, NOT `app.db.database`\n"
                 "- `engine` is in `app.db.database` — do NOT use `create_engine()`\n"
                 "- `text` is from `sqlalchemy`\n\n"
                 "Rules:\n"
                 "- Fix ONLY the specific issue causing the error — do not rewrite unrelated code\n"
-                "- Include exactly 2 lines of context before and after each change\n"
-                "- The diff must apply cleanly (no conflicts)\n"
+                "- Keep ALL imports, engine wiring, and CONFIG exactly as they are\n"
                 "- Common issues to check:\n"
                 "  1. NoneType comparison: guard with `if x is None: continue`\n"
                 "  2. Missing import: add the correct import at the top\n"
@@ -315,7 +314,7 @@ def make_debug_prompt(code: str, error: str) -> List[Dict[str, str]]:
             "content": (
                 f"Code that failed:\n\n```python\n{code}\n```\n\n"
                 f"Error:\n{error}\n\n"
-                "Produce a unified diff that fixes the specific issue causing this error."
+                "Output the COMPLETE fixed Python file in a ```python block."
             ),
         },
     ]

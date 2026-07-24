@@ -284,21 +284,27 @@ def refine_strategy(current_code: str, summary: str, worst_runs_table: str,
 
 
 def debug_code(code: str, error: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
-    """Given a failing strategy and its error, ask the LLM to produce a surgical fix diff.
+    """Given a failing strategy and its error, ask the LLM to produce a fixed version.
 
-    Returns (diff, error). The diff can be applied to the original code with
-    the strategy_lab_diff module.
+    Returns (fixed_code, error). The debugger outputs the COMPLETE fixed file
+    (not a diff) to avoid fragile diff-application issues.
     """
     from app.services.strategy_lab_prompts import make_debug_prompt
     messages = make_debug_prompt(code, error)
     content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.0)
     if err:
         return None, err
-    diff = _extract_diff_block(content or "")
-    if diff is None:
+    fixed = _extract_code_block(content or "")
+    if fixed is None:
         if finish_reason == "length":
-            detail = "response was truncated (finish_reason=length) before closing the ```diff fence"
+            detail = "response was truncated (finish_reason=length) before closing the ```python fence"
         else:
-            detail = "response contained no ```diff block"
+            detail = "response contained no ```python code block"
         return None, f"LLM {detail} (content length={len(content or '')})"
-    return diff, None
+    # Validate syntax
+    import ast
+    try:
+        ast.parse(fixed)
+    except SyntaxError as e:
+        return None, f"Debugger produced invalid syntax: {e}"
+    return fixed, None

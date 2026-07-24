@@ -214,7 +214,6 @@ def post_generate_code(
     """
     from app.services.strategy_lab_llm import generate_code, debug_code
     from app.services.strategy_lab_orchestrator import _run_one
-    from app.services.strategy_lab_diff import apply_diff as apply_diff_fn
     sess = svc_get_session(db, session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -281,19 +280,14 @@ def post_generate_code(
         if cycle >= max_debug_cycles:
             break
 
-        # Stage 3: Debug — call LLM with error to produce a surgical fix
+        # Stage 3: Debug — call LLM with error to produce a complete fixed file
         try:
-            diff, debug_err = debug_code(code, last_error, model=body.model)
-            if debug_err or diff is None:
+            fixed, debug_err = debug_code(code, last_error, model=body.model)
+            if debug_err or fixed is None:
                 validation_log.append(f"Debug cycle {cycle}: debugger failed — {debug_err}")
                 continue
-            # Apply the diff
-            try:
-                code = apply_diff_fn(code, diff)
-                validation_log.append(f"Debug cycle {cycle}: applied fix diff")
-            except ValueError as apply_err:
-                validation_log.append(f"Debug cycle {cycle}: diff apply failed — {apply_err}")
-                continue
+            code = fixed
+            validation_log.append(f"Debug cycle {cycle}: debugger produced fixed code ({len(fixed)} chars)")
         except Exception as debug_exc:
             validation_log.append(f"Debug cycle {cycle}: debugger crashed — {debug_exc}")
             continue
