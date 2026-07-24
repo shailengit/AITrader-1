@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, User, RefreshCw, AlertCircle, MessageSquare } from "lucide-react";
 import { strategyLabApi, type ChatMessage } from "../../lib/strategyLab";
-import { ModelPicker } from "../../pages/StrategyLab/StepIdea";
 
 interface ChatPanelProps {
   sessionId: string;
@@ -16,7 +15,22 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
   const [selectedModel, setSelectedModel] = useState(defaultModelId);
   const [critiquingId, setCritiquingId] = useState<string | null>(null);
   const [critiqueModel, setCritiqueModel] = useState("");
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Load available models for the dropdown
+  useEffect(() => {
+    strategyLabApi.listModels().then((models) => {
+      const flat: string[] = [];
+      for (const m of models) {
+        for (const v of m.variants) {
+          flat.push(`${m.id}:${v.name}`);
+        }
+      }
+      flat.sort();
+      setModelOptions(flat);
+    }).catch(() => {});
+  }, []);
 
   // Load existing chat history
   const { data: history } = useQuery({
@@ -167,7 +181,17 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
                   <span className="slab-mono slab-mono--xs" style={{ color: "var(--slab-paper-faint)" }}>
                     Critique with:
                   </span>
-                  <ModelPicker value={critiqueModel} onChange={setCritiqueModel} />
+                  <select
+                    value={critiqueModel}
+                    onChange={(e) => setCritiqueModel(e.target.value)}
+                    className="slab-input"
+                    style={{ width: 180, fontSize: 11, padding: "4px 6px" }}
+                  >
+                    <option value="">Select model…</option>
+                    {modelOptions.filter((m) => m !== selectedModel).map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={handleCritique}
@@ -226,10 +250,15 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
           value={selectedModel}
           onChange={(e) => setSelectedModel(e.target.value)}
           className="slab-input"
-          style={{ width: 160, fontSize: 11, padding: "6px 8px", flexShrink: 0 }}
+          style={{ width: 180, fontSize: 11, padding: "6px 8px", flexShrink: 0 }}
           disabled={send.isPending}
         >
-          <option value={selectedModel}>{selectedModel}</option>
+          {modelOptions.length === 0 && (
+            <option value={selectedModel}>{selectedModel}</option>
+          )}
+          {modelOptions.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
         </select>
         <input
           type="text"

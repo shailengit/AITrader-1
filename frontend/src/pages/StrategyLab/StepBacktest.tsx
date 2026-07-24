@@ -30,6 +30,7 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const [summary, setSummary] = useState<SummarizeResponse | null>(null);
   const [refine, setRefine] = useState<RefineStrategyResponse | null>(null);
   const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // On mount, load existing experiments so navigating back shows previous results
@@ -114,8 +115,21 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const apply = useMutation({
     mutationFn: (diff: string) => strategyLabApi.applyDiff(session.id, { instruction: diff }),
     onSuccess: () => {
+      setApplyError(null);
       setRefine(null);
       setTimeout(() => start.mutate(), 500);
+    },
+    onError: (e) => {
+      const err = e as { detail?: unknown; message?: string };
+      const d = err.detail;
+      if (typeof d === "object" && d !== null) {
+        const obj = d as { details?: string };
+        setApplyError(obj.details || JSON.stringify(d));
+      } else if (typeof d === "string") {
+        setApplyError(d);
+      } else {
+        setApplyError(err.message || "Apply failed");
+      }
     },
   });
 
@@ -201,6 +215,7 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
                   onAcceptRefine={(d) => apply.mutate(d)}
                   onRejectRefine={() => setRefine(null)}
                   isApplying={apply.isPending}
+                  applyError={applyError}
                 />
                 <ChatPanel
                   sessionId={session.id}
@@ -451,6 +466,7 @@ function PostBatchActions(props: {
   refine: RefineStrategyResponse | null;
   onAcceptRefine: (diff: string) => void; onRejectRefine: () => void;
   isApplying: boolean;
+  applyError: string | null;
 }) {
   return (
     <div style={{ maxWidth: 1280, marginTop: 32, display: "flex", flexDirection: "column", gap: 24 }}>
@@ -530,6 +546,12 @@ function PostBatchActions(props: {
                 onReject={props.onRejectRefine}
                 isApplying={props.isApplying}
               />
+              {props.applyError && (
+                <div className="slab-mono slab-mono--sm slab-mono--rose" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+                  <AlertCircle size={12} />
+                  {props.applyError}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
