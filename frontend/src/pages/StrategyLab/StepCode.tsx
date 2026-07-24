@@ -37,9 +37,23 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
+  const [validationLog, setValidationLog] = useState<string[]>([]);
+  const [validationAttempts, setValidationAttempts] = useState(0);
+
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generateCode(session.id, { model }),
-    onSuccess: (r) => setCode(r.code),
+    onSuccess: (r) => {
+      if (r.code) {
+        setCode(r.code);
+      }
+      if (r.validation_log && r.validation_log.length > 0) {
+        setValidationLog(r.validation_log);
+        setValidationAttempts(r.validation_attempts ?? 1);
+      } else {
+        setValidationLog([]);
+        setValidationAttempts(0);
+      }
+    },
   });
 
   const save = useMutation({
@@ -223,6 +237,42 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
             </button>
           )}
         </div>
+
+        {/* Validation log — shown when code was generated with retries */}
+        {validationLog.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="slab-panel"
+            style={{ maxWidth: 1280, marginTop: 16 }}
+          >
+            <div className="slab-panel__head">
+              <span className="slab-eyebrow slab-eyebrow--gold">// Validation</span>
+              <span className="slab-mono slab-mono--xs slab-mono--dim">
+                {validationAttempts > 1
+                  ? `Passed after ${validationAttempts} attempts`
+                  : "Passed on first attempt"}
+              </span>
+            </div>
+            <div className="slab-panel__body">
+              {validationLog.map((entry, i) => (
+                <div
+                  key={i}
+                  className="slab-mono slab-mono--sm"
+                  style={{
+                    color: entry.includes("failed") || entry.includes("FAILED")
+                      ? "var(--slab-rose)"
+                      : "var(--slab-terminal)",
+                    padding: "4px 0",
+                    borderBottom: i < validationLog.length - 1 ? "1px solid var(--slab-rule)" : "none",
+                  }}
+                >
+                  {entry}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* Generation error — only shown when generate mutation has failed. */}
         {generate.isError && (

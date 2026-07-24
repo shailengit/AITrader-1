@@ -221,15 +221,22 @@ def post_generate_code(
     if not plan:
         raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
 
-    max_generate_attempts = 2
+    max_generate_attempts = 3
     max_debug_cycles = 3
     last_error = None
     validation_log = []
     code = None
 
-    # Stage 1: Generate
+    # Stage 1: Generate (with retries and backoff)
+    import time as _time
     for attempt in range(1, max_generate_attempts + 1):
-        code, err = generate_code(plan, model=body.model)
+        if attempt > 1:
+            _time.sleep(2)  # brief backoff before retry
+        try:
+            code, err = generate_code(plan, model=body.model)
+        except Exception as gen_err:
+            err = f"{type(gen_err).__name__}: {gen_err}"
+            code = None
         if err or code is None:
             last_error = err
             validation_log.append(f"Generate attempt {attempt}: LLM failed — {err}")
@@ -238,13 +245,14 @@ def post_generate_code(
         break
 
     if not code:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": "code_generation_failed",
-                "details": f"All {max_generate_attempts} LLM calls failed. Last error: {last_error}",
-                "validation_log": validation_log,
-            },
+        # Never throw 502 — return graceful failure so the user sees a clear
+        # message with retry button instead of a cryptic server error.
+        logger.error("Code generation failed after %d attempts: %s", max_generate_attempts, last_error)
+        return GenerateCodeResponse(
+            code="",
+            validation_status="failed",
+            validation_attempts=max_generate_attempts,
+            validation_log=validation_log,
         )
 
     # Stage 2: Validate + Stage 3: Debug loop
