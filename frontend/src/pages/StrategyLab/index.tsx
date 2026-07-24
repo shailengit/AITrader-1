@@ -40,6 +40,7 @@ export default function StrategyLabPage() {
 
   const handleCreated = (newSessionId: string) => {
     setSearchParams({ session: newSessionId });
+    setActiveStep(2);
   };
 
   const handleSelectStep = (stepId: number) => {
