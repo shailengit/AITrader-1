@@ -212,8 +212,9 @@ def post_generate_code(
     backtest — if validation fails, retries up to 3 times with the error
     message fed back to the LLM so it can fix the issue.
     """
-    from app.services.strategy_lab_llm import generate_code
+    from app.services.strategy_lab_llm import generate_code, debug_code
     from app.services.strategy_lab_orchestrator import _run_one
+    from app.services.strategy_lab_diff import apply_diff as apply_diff_fn
     sess = svc_get_session(db, session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -221,18 +222,34 @@ def post_generate_code(
     if not plan:
         raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
 
-    max_attempts = 2
+    max_generate_attempts = 2
+    max_debug_cycles = 3
     last_error = None
     validation_log = []
+    code = None
 
-    for attempt in range(1, max_attempts + 1):
+    # Stage 1: Generate
+    for attempt in range(1, max_generate_attempts + 1):
         code, err = generate_code(plan, model=body.model)
         if err or code is None:
             last_error = err
-            validation_log.append(f"Attempt {attempt}: LLM failed — {err}")
+            validation_log.append(f"Generate attempt {attempt}: LLM failed — {err}")
             continue
+        validation_log.append(f"Generate attempt {attempt}: code generated ({len(code)} chars)")
+        break
 
-        # Validate: run a single backtest
+    if not code:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "code_generation_failed",
+                "details": f"All {max_generate_attempts} LLM calls failed. Last error: {last_error}",
+                "validation_log": validation_log,
+            },
+        )
+
+    # Stage 2: Validate + Stage 3: Debug loop
+    for cycle in range(max_debug_cycles + 1):
         try:
             result = _run_one(
                 code_text=code,
@@ -241,51 +258,57 @@ def post_generate_code(
                 end_date="2024-01-01",
                 run_index=0,
             )
-            if result["status"] == "completed":
-                k = result.get("kpis", {})
-                logger.info(
-                    "Code validation passed on attempt %d: ret=%.2f%% trades=%d",
-                    attempt, k.get("total_return_pct", 0), k.get("total_trades", 0),
-                )
-                svc_update_session(db, session_id, code_text=code)
-                return GenerateCodeResponse(
-                    code=code,
-                    validation_status="passed",
-                    validation_attempts=attempt,
-                    validation_log=validation_log,
-                )
-            else:
-                last_error = result.get("error_message", "unknown error")
-                validation_log.append(
-                    f"Attempt {attempt}: backtest failed — {last_error}"
-                )
-                # Feed the error back into the plan so the LLM can fix it
-                plan = (
-                    f"{sess.plan_text}\n\n"
-                    f"PREVIOUS ATTEMPT FAILED with error: {last_error}\n"
-                    f"Fix this error and regenerate the complete code."
-                )
         except Exception as validate_err:
-            last_error = f"{type(validate_err).__name__}: {validate_err}"
-            validation_log.append(f"Attempt {attempt}: validation crashed — {last_error}")
-            plan = (
-                f"{sess.plan_text}\n\n"
-                f"PREVIOUS ATTEMPT FAILED with error: {last_error}\n"
-                f"Fix this error and regenerate the complete code."
+            result = {"status": "failed", "error_message": f"{type(validate_err).__name__}: {validate_err}"}
+
+        if result["status"] == "completed":
+            k = result.get("kpis", {})
+            logger.info(
+                "Code validation passed on cycle %d: ret=%.2f%% trades=%d",
+                cycle, k.get("total_return_pct", 0), k.get("total_trades", 0),
+            )
+            svc_update_session(db, session_id, code_text=code)
+            return GenerateCodeResponse(
+                code=code,
+                validation_status="passed",
+                validation_attempts=cycle + 1,
+                validation_log=validation_log,
             )
 
-    # All attempts exhausted — save the last code anyway so the user can
-    # see and fix it, rather than blocking with a 502.
+        last_error = result.get("error_message", "unknown error")
+        validation_log.append(f"Debug cycle {cycle}: backtest failed — {last_error}")
+
+        if cycle >= max_debug_cycles:
+            break
+
+        # Stage 3: Debug — call LLM with error to produce a surgical fix
+        try:
+            diff, debug_err = debug_code(code, last_error, model=body.model)
+            if debug_err or diff is None:
+                validation_log.append(f"Debug cycle {cycle}: debugger failed — {debug_err}")
+                continue
+            # Apply the diff
+            try:
+                code = apply_diff_fn(code, diff)
+                validation_log.append(f"Debug cycle {cycle}: applied fix diff")
+            except ValueError as apply_err:
+                validation_log.append(f"Debug cycle {cycle}: diff apply failed — {apply_err}")
+                continue
+        except Exception as debug_exc:
+            validation_log.append(f"Debug cycle {cycle}: debugger crashed — {debug_exc}")
+            continue
+
+    # All cycles exhausted — save the last code anyway
     if code:
         svc_update_session(db, session_id, code_text=code)
         logger.warning(
-            "Code validation failed after %d attempts, but saving last code. "
-            "Last error: %s", max_attempts, last_error,
+            "Code validation failed after %d debug cycles, but saving last code. "
+            "Last error: %s", max_debug_cycles, last_error,
         )
         return GenerateCodeResponse(
             code=code,
             validation_status="failed",
-            validation_attempts=max_attempts,
+            validation_attempts=max_debug_cycles + 1,
             validation_log=validation_log,
         )
 
@@ -293,7 +316,7 @@ def post_generate_code(
         status_code=502,
         detail={
             "error": "code_generation_failed",
-            "details": f"All {max_attempts} LLM calls failed. Last error: {last_error}",
+            "details": f"All attempts failed. Last error: {last_error}",
             "validation_log": validation_log,
         },
     )

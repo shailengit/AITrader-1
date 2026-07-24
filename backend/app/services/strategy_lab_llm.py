@@ -281,3 +281,24 @@ def refine_strategy(current_code: str, summary: str, worst_runs_table: str,
             detail = "response contained no ```diff block"
         return None, f"LLM {detail} (content length={len(content or '')})"
     return diff, None
+
+
+def debug_code(code: str, error: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """Given a failing strategy and its error, ask the LLM to produce a surgical fix diff.
+
+    Returns (diff, error). The diff can be applied to the original code with
+    the strategy_lab_diff module.
+    """
+    from app.services.strategy_lab_prompts import make_debug_prompt
+    messages = make_debug_prompt(code, error)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.0)
+    if err:
+        return None, err
+    diff = _extract_diff_block(content or "")
+    if diff is None:
+        if finish_reason == "length":
+            detail = "response was truncated (finish_reason=length) before closing the ```diff fence"
+        else:
+            detail = "response contained no ```diff block"
+        return None, f"LLM {detail} (content length={len(content or '')})"
+    return diff, None

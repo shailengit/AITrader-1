@@ -9,6 +9,7 @@ strategies/engine.py and the LLM must not reproduce it.
 These prompts replace the generic "write a vectorbt strategy" prompt used
 by the standalone QuantGen flow.
 """
+from pathlib import Path
 from typing import List, Dict, Any
 
 
@@ -73,7 +74,7 @@ def exit_check(ticker: str, date_str: str, holding: dict, stock_db: dict) -> Opt
 # === At the bottom of the file ===
 
 import importlib.util, sys
-_engine_path = os.path.join(os.path.dirname(__file__), "engine.py")
+_engine_path = os.path.join(os.path.dirname(__file__), "..", "..", "engine.py")
 _spec = importlib.util.spec_from_file_location("strategies_engine_inline", _engine_path)
 _engine = importlib.util.module_from_spec(_spec)
 sys.modules["strategies_engine_inline"] = _engine
@@ -122,49 +123,69 @@ def make_plan_prompt(user_prompt: str) -> List[Dict[str, str]]:
 
 # ── CODE_PROMPT: produces ONLY the 4 filter functions + config ───────────
 def make_code_prompt(plan: str) -> List[Dict[str, str]]:
+    # Load the reference template to give the LLM a known-working starting point
+    _template_path = Path(__file__).resolve().parent.parent.parent.parent / "strategies" / "_template.py"
+    try:
+        template_code = _template_path.read_text()
+    except Exception:
+        template_code = "# (template not found)"
+
+    # Load learnings from the ever-evolving reference file
+    _learnings_path = Path(__file__).resolve().parent / "strategy_lab_learnings.md"
+    try:
+        learnings = _learnings_path.read_text()
+        # Only include the Golden Rules and Anti-Patterns sections
+        learnings_sections = []
+        capture = False
+        for line in learnings.split("\n"):
+            if line.startswith("## Golden Rules"):
+                capture = True
+            if line.startswith("## Known Anti-Patterns"):
+                capture = True
+            if line.startswith("## Validation Checklist"):
+                capture = False
+            if capture:
+                learnings_sections.append(line)
+        learnings_text = "\n".join(learnings_sections)
+    except Exception:
+        learnings_text = ""
+
     return [
         {
             "role": "system",
             "content": (
                 "You are a quant strategy coder. You write the 4 strategy-specific "
-                "filter functions for TradeCraft's StrategyEngine. You do NOT write "
-                "the engine itself — that is provided.\n\n"
+                "filter functions for TradeCraft's StrategyEngine.\n\n"
                 "OUTPUT FORMAT: a single Python file wrapped in a markdown ```python block. "
                 "Do NOT include any prose before or after the code block.\n\n"
-                "The file must contain EXACTLY these 4 functions (signatures must match):\n"
-                "1. precompute(tickers, start, end) -> dict[ticker, stock_data]\n"
-                "2. entry_score(candidate, market_cap_stats) -> float\n"
-                "3. holding_score(ticker, date_str, holding, market_cap_stats) -> float\n"
-                "4. exit_check(ticker, date_str, holding, stock_db) -> str | None\n\n"
-                "Plus at the bottom, a CONFIG = StrategyConfig(...) instantiation that "
-                "wires the 4 functions into the engine. Load engine.py via importlib.util.\n\n"
+                "START FROM THE TEMPLATE below. Keep ALL imports, the engine wiring at "
+                "the bottom, and the CONFIG instantiation EXACTLY as they are. "
+                "Only fill in the bodies of the 4 functions: precompute, entry_score, "
+                "holding_score, exit_check.\n\n"
+                "REFERENCE TEMPLATE (fill in the TODO sections):\n"
+                f"```python\n{template_code}\n```\n\n"
+                "ACCUMULATED LEARNINGS (follow these rules):\n"
+                f"{learnings_text}\n\n"
+                "CRITICAL RULES — violations cause backtest failures:\n"
+                "1. IMPORT `get_safe_table_name` from `app.utils.security`, NOT `app.db.database`\n"
+                "2. IMPORT `engine` from `app.db.database` — do NOT use `create_engine()`\n"
+                "3. `market_cap` can be NULL — always check `if market_cap is None: continue`\n"
+                "4. Use single-line f-strings for SQL, NOT triple-quoted f-strings\n"
+                "5. Use `np.searchsorted(dates, np.datetime64(date_str))` for date lookups\n"
+                "6. Use `pd.Timestamp(x).strftime(\"%Y-%m-%d\")` to convert numpy datetime64 to strings\n"
+                "7. Use `float()`, `int()`, or `round()` to convert numpy types before storing in dicts\n"
+                "8. Never compare `None` with `>` or `<` — guard all nullable values\n"
+                "9. All KPI values must be JSON-safe — no Infinity or NaN\n"
+                "10. Wrap `get_safe_table_name(ticker)` in try/except ValueError and `continue`\n\n"
                 "ENGINE CONTRACT (do not reproduce this code, just match the signatures):\n"
-                f"{ENGINE_CONTRACT}\n\n"
-                "RULES:\n"
-                "- Use pandas and numpy. Read from `app.db.database.engine` and `app.utils.security.get_safe_table_name`.\n"
-                "- For 'precompute', query each ticker's OHLCV table, compute indicators, "
-                "  and populate 'crossovers' with entries like {\"date\": \"YYYY-MM-DD\", "
-                "  \"price\": float, \"angle\": float, \"volatility\": float, "
-                "  \"volume_ratio\": float} for golden crosses, and add "
-                "  {\"date\": ..., \"death_cross\": True} for death crosses.\n"
-                "- For 'entry_score', return a float in [0, 1]. Higher = better candidate.\n"
-                "- For 'holding_score', use holding.get('_stock_data') to access the "
-                "  precomputed indicator arrays (close, ema20, ema200, dates).\n"
-                "- For 'exit_check', return a short reason string like 'Death Cross', "
-                "  'Take Profit', 'Trailing Stop (24.3%)', 'Time Stop (60d)', "
-                "  'Death Cross Warning', or None to hold.\n"
-                "- At module top, set env defaults: DB_USER, DB_PASSWORD, DB_HOST, "
-                "  DB_PORT, DB_NAME.\n"
-                "- Constants (CAPITAL, AS_OF, END, parameter weights) go above the "
-                "  functions, with reasonable defaults.\n"
-                "- For the CONFIG instantiation, use importlib.util.spec_from_file_location "
-                "  to load the engine module (don't rely on sys.path being set).\n"
-                "- Do NOT use any VBT (vectorbt) APIs. This is a pure daily-rotation engine."
+                f"{ENGINE_CONTRACT}"
             ),
         },
         {
             "role": "user",
-            "content": f"Here is the structured plan to implement:\n\n{plan}\n\nNow write the Python code.",
+            "content": f"Here is the structured plan to implement:\n\n{plan}\n\n"
+                       "Now write the Python code. Fill in the 4 functions in the template. "
+                       "Keep all imports and engine wiring unchanged.",
         },
     ]
 
@@ -251,6 +272,45 @@ def make_refine_strategy_prompt(current_code: str, summary: str, worst_runs_tabl
                 f"Backtest analysis:\n{summary}\n\n"
                 f"Worst-performing runs (lowest Sharpe):\n{worst_runs_table}\n\n"
                 "Propose the unified diff."
+            ),
+        },
+    ]
+
+
+def make_debug_prompt(code: str, error: str) -> List[Dict[str, str]]:
+    """Prompt the LLM to debug a failing strategy and produce a surgical fix diff."""
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are a debugger for quant strategy code. The code below failed "
+                "with a specific error. Analyze the error and produce a MINIMAL unified "
+                "diff that fixes it.\n\n"
+                "OUTPUT FORMAT: a unified diff in standard unified-diff format, "
+                "wrapped in a markdown ```diff block. Do NOT include any prose.\n\n"
+                "CRITICAL IMPORT RULES (these are the most common bugs):\n"
+                "- `get_safe_table_name` is in `app.utils.security`, NOT `app.db.database`\n"
+                "- `engine` is in `app.db.database` — do NOT use `create_engine()`\n"
+                "- `text` is from `sqlalchemy`\n\n"
+                "Rules:\n"
+                "- Fix ONLY the specific issue causing the error — do not rewrite unrelated code\n"
+                "- Include exactly 2 lines of context before and after each change\n"
+                "- The diff must apply cleanly (no conflicts)\n"
+                "- Common issues to check:\n"
+                "  1. NoneType comparison: guard with `if x is None: continue`\n"
+                "  2. Missing import: add the correct import at the top\n"
+                "  3. Wrong function signature: match the expected parameters\n"
+                "  4. JSON safety: use float()/int() on numpy types, avoid Infinity/NaN\n"
+                "  5. Database: use shared engine, not create_engine()\n"
+                "  6. Date lookup: use np.searchsorted(dates, np.datetime64(date_str))"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Code that failed:\n\n```python\n{code}\n```\n\n"
+                f"Error:\n{error}\n\n"
+                "Produce a unified diff that fixes the specific issue causing this error."
             ),
         },
     ]
