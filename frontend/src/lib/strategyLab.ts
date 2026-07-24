@@ -50,6 +50,9 @@ export interface PlanResponse {
 
 export interface GenerateCodeResponse {
   code: string;
+  validation_status?: string;
+  validation_attempts?: number;
+  validation_log?: string[];
 }
 
 export interface RefineCodeResponse {
@@ -96,6 +99,20 @@ export interface RefineStrategyResponse {
   diff: string;
   summary: string;
   rationale: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: string;
+  content: string;
+  model_id: string;
+  critique_of?: string;
+  created_at: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  history: ChatMessage[];
 }
 
 export interface DeploymentInfo {
@@ -233,4 +250,10 @@ export const strategyLabApi = {
       `${base}/deployments/${deploymentId}/rollback`,
       {},
     ),
+
+  chat: (id: string, body: { message: string; model: string; critique_of?: string }) =>
+    postJson<ChatResponse>(`${base}/sessions/${id}/chat`, body),
+
+  getChatHistory: (id: string) =>
+    getJson<ChatMessage[]>(`${base}/sessions/${id}/chat`),
 };

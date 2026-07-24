@@ -15,6 +15,7 @@ module state.
 import logging
 import os
 import re
+import textwrap
 from typing import List, Dict, Any, Optional, Tuple
 
 from openai import OpenAI  # type: ignore[import-untyped]
@@ -50,8 +51,8 @@ def _get_client_and_model(model: Optional[str] = None) -> Tuple[Optional[OpenAI]
 
 
 def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
-          max_tokens: int = 2048, temperature: float = 0.0,
-          timeout: int = 90) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+          max_tokens: int = 16384, temperature: float = 0.0,
+          timeout: int = 180) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Call the LLM with messages, return (content, finish_reason, error).
 
     finish_reason is one of: "stop" (clean), "length" (truncated — max_tokens
@@ -72,14 +73,41 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
         choice = response.choices[0]
         content = choice.message.content
         finish_reason = getattr(choice, "finish_reason", None)
+
+        # Some reasoning models (deepseek-v4-flash, kimi-k2.6 observed) put
+        # their response in a "reasoning" field and leave content empty.
+        # Fall back to reasoning when content is None or empty.
+        if not content:
+            reasoning = getattr(choice.message, "reasoning", None)
+            if reasoning and reasoning.strip():
+                logger.info(
+                    "LLM returned empty content but has reasoning field — "
+                    "using reasoning as content (model=%s, finish_reason=%s)",
+                    model_name, finish_reason,
+                )
+                content = reasoning
+
         if content is None:
+            logger.warning(
+                "LLM returned None content: model=%s, finish_reason=%s, usage=%s",
+                model_name, finish_reason, getattr(response, "usage", None),
+            )
             return None, finish_reason, f"LLM returned no content (finish_reason={finish_reason})"
         content = content.strip()
         if not content:
-            # Some cloud models (kimi-k2.6, kimi-k2.7-code observed) finish
-            # with a 200 status but emit zero content — usually a token-
-            # budget or moderation cutoff. Surface this as an error rather
-            # than silently persisting an empty plan.
+            # Some cloud models finish with a 200 status but emit zero
+            # content — usually a token-budget or moderation cutoff.
+            # Surface this as an error rather than silently persisting
+            # an empty plan.
+            usage = getattr(response, "usage", None)
+            logger.warning(
+                "LLM returned empty content: model=%s, finish_reason=%s, "
+                "prompt_tokens=%s, completion_tokens=%s, total_tokens=%s",
+                model_name, finish_reason,
+                getattr(usage, "prompt_tokens", None) if usage else None,
+                getattr(usage, "completion_tokens", None) if usage else None,
+                getattr(usage, "total_tokens", None) if usage else None,
+            )
             return None, finish_reason, f"LLM returned empty content (finish_reason={finish_reason})"
         return content, finish_reason, None
     except Exception as e:
@@ -90,11 +118,11 @@ def _extract_code_block(text: str) -> Optional[str]:
     """Extract the first ```python ... ``` block from text. Returns None if no block."""
     m = re.search(r"```python\s*\n(.*?)```", text, re.DOTALL)
     if m:
-        return m.group(1).rstrip() + "\n"
+        return textwrap.dedent(m.group(1).rstrip()) + "\n"
     # Fallback: any fenced block
     m = re.search(r"```\s*\n(.*?)```", text, re.DOTALL)
     if m:
-        return m.group(1).rstrip() + "\n"
+        return textwrap.dedent(m.group(1).rstrip()) + "\n"
     return None
 
 
@@ -111,7 +139,54 @@ def _extract_diff_block(text: str) -> Optional[str]:
 def generate_plan(user_prompt: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Generate a structured plan for a strategy idea. Returns (plan_text, error)."""
     messages = make_plan_prompt(user_prompt)
-    content, _finish, err = _chat(messages, model=model, max_tokens=1024, temperature=0.2)
+    content, _finish, err = _chat(messages, model=model, max_tokens=16384, temperature=0.2)
+    if err:
+        return None, err
+    if content is None:
+        return None, "LLM returned no content"
+
+    # Check if the response is the model's chain-of-thought (reasoning) rather
+    # than a structured plan. Reasoning output is full of meta-cognition like
+    # "We need to...", "I'll propose...", "But the user didn't specify...".
+    # If it looks like reasoning, make a second call to structure it.
+    reasoning_markers = [
+        "we need to", "i'll propose", "let's keep it simple",
+        "but the user didn't", "alternatively,", "to be safe,",
+        "however", "or we can say", "the instruction says",
+    ]
+    content_lower = content.lower()
+    reasoning_score = sum(1 for m in reasoning_markers if m in content_lower)
+
+    if reasoning_score >= 3:
+        logger.info(
+            "Plan response appears to be chain-of-thought (score=%d) — "
+            "restructuring into structured plan", reasoning_score
+        )
+        # Second call: ask the model to format the reasoning as a structured plan
+        structure_prompt = (
+            "Below is a reasoning/analysis about a trading strategy. "
+            "Extract the key decisions and format them as a STRUCTURED PLAN "
+            "with these exact sections:\n\n"
+            "## Signal\n"
+            "## Entry scoring\n"
+            "## Holding re-score\n"
+            "## Exits\n"
+            "## Parameters\n"
+            "## Edge cases\n\n"
+            "Be concrete and specific. Use exact percentages. "
+            "Do NOT include meta-commentary, reasoning, or alternatives. "
+            "Just the plan.\n\n"
+            f"Reasoning to structure:\n\n{content}"
+        )
+        structured, _finish2, err2 = _chat(
+            [{"role": "user", "content": structure_prompt}],
+            model=model, max_tokens=16384, temperature=0.0,
+        )
+        if err2:
+            logger.warning("Structuring call failed: %s — falling back to raw content", err2)
+        elif structured and structured.strip():
+            content = structured
+
     return content, err
 
 
@@ -125,22 +200,40 @@ def generate_code(plan: str, model: Optional[str] = None) -> Tuple[Optional[str]
     # the response gets cut off mid-code-block (finish_reason=length)
     # and the regex can't find a closing ``` fence, surfacing as a
     # confusing "no code block" error after a 30-40s wait.
-    content, finish_reason, err = _chat(messages, model=model, max_tokens=8192, temperature=0.0)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=32768, temperature=0.0, timeout=300)
     if err:
         return None, err
     code = _extract_code_block(content or "")
-    if code is None:
-        # Log the first 200 chars so the user (or backend logs) can see
-        # what the LLM returned. Two common failure modes:
-        #   1. finish_reason="length" — the model ran out of tokens before
-        #      closing the ```python fence. Bumping max_tokens helps.
-        #   2. The model returned prose without any fence.
-        preview = (content or "")[:200].replace("\n", " ")
-        if finish_reason == "length":
-            detail = "response was truncated (finish_reason=length) — likely ran out of tokens before closing the ```python fence"
-        else:
-            detail = "response contained no ```python code block"
-        return None, f"LLM {detail} (first 200 chars: {preview!r})"
+
+    # If the first call produced reasoning instead of code (common with
+    # kimi-k2.6 and deepseek models that put chain-of-thought in the content
+    # field), try extracting from the full response. These models tend to
+    # output reasoning first, then a code block near the end.
+    if code is None or len(code) < 1000:
+        # Try to find the LAST code block in the response (models often put
+        # the complete code at the end after reasoning through it)
+        all_blocks = re.findall(r"```python\s*\n(.*?)```", content or "", re.DOTALL)
+        if not all_blocks:
+            all_blocks = re.findall(r"```\s*\n(.*?)```", content or "", re.DOTALL)
+        if all_blocks:
+            # Take the longest block (likely the complete code)
+            all_blocks.sort(key=len, reverse=True)
+            best = textwrap.dedent(all_blocks[0].rstrip()) + "\n"
+            if len(best) > len(code or ""):
+                code = best
+
+    if code is None or len(code) < 1000:
+            # Log the first 200 chars so the user (or backend logs) can see
+            # what the LLM returned. Two common failure modes:
+            #   1. finish_reason="length" — the model ran out of tokens before
+            #      closing the ```python fence. Bumping max_tokens helps.
+            #   2. The model returned prose without any fence.
+            preview = (content or "")[:200].replace("\n", " ")
+            if finish_reason == "length":
+                detail = "response was truncated (finish_reason=length) — likely ran out of tokens before closing the ```python fence"
+            else:
+                detail = "response contained no ```python code block"
+            return None, f"LLM {detail} (first 200 chars: {preview!r})"
     # Validate Python syntax
     import ast
     try:
@@ -153,7 +246,7 @@ def generate_code(plan: str, model: Optional[str] = None) -> Tuple[Optional[str]
 def generate_refine_diff(current_code: str, instruction: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Generate a unified diff that refines current_code per the instruction. Returns (diff, error)."""
     messages = make_refine_prompt(current_code, instruction)
-    content, finish_reason, err = _chat(messages, model=model, max_tokens=2048, temperature=0.0)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.0)
     if err:
         return None, err
     diff = _extract_diff_block(content or "")
@@ -169,7 +262,7 @@ def generate_refine_diff(current_code: str, instruction: str, model: Optional[st
 def summarize_batch(kpis_table: str, n_runs: int, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Generate a 3-paragraph analysis of N backtest runs. Returns (summary, error)."""
     messages = make_summarize_prompt(kpis_table, n_runs)
-    content, _finish, err = _chat(messages, model=model, max_tokens=1024, temperature=0.3)
+    content, _finish, err = _chat(messages, model=model, max_tokens=16384, temperature=0.2)
     return content, err
 
 
@@ -177,7 +270,7 @@ def refine_strategy(current_code: str, summary: str, worst_runs_table: str,
                     model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Generate a diff that tweaks current_code to address worst-performing runs. Returns (diff, error)."""
     messages = make_refine_strategy_prompt(current_code, summary, worst_runs_table)
-    content, finish_reason, err = _chat(messages, model=model, max_tokens=2048, temperature=0.2)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.2)
     if err:
         return None, err
     diff = _extract_diff_block(content or "")

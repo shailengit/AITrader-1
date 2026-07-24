@@ -347,7 +347,7 @@ class StrategyEngine:
         avg_loss = float(np.mean([t["pnl_dollars"] for t in losers])) if losers else 0
         gross_profit = sum(t["pnl_dollars"] for t in winners)
         gross_loss = abs(sum(t["pnl_dollars"] for t in losers))
-        profit_factor = gross_profit / (gross_loss + 1e-9) if gross_loss > 0 else float("inf")
+        profit_factor = gross_profit / (gross_loss + 1e-9) if gross_loss > 0 else 0.0
 
         reasons = {}
         for t in sell_trades:
@@ -365,19 +365,25 @@ class StrategyEngine:
         years = (datetime.strptime(cfg.end, "%Y-%m-%d") - datetime.strptime(cfg.as_of, "%Y-%m-%d")).days / 365.25
         cagr = ((portfolio_value / cfg.capital) ** (1 / max(years, 0.01)) - 1) * 100
 
+        def _json_safe(val: float) -> float:
+            """Replace Infinity/NaN with 0.0 for JSON serialization."""
+            if np.isinf(val) or np.isnan(val):
+                return 0.0
+            return float(val)
+
         summary = {
             "initial_capital": cfg.capital,
             "final_portfolio": portfolio_value,
-            "total_return_pct": round(total_ret, 2),
-            "cagr_pct": round(cagr, 2),
+            "total_return_pct": _json_safe(round(total_ret, 2)),
+            "cagr_pct": _json_safe(round(cagr, 2)),
             "total_trades": len(sell_trades),
-            "win_rate": round(win_rate, 1),
-            "profit_factor": round(profit_factor, 2),
-            "avg_winner": round(avg_win, 2),
-            "avg_loser": round(avg_loss, 2),
+            "win_rate": _json_safe(round(win_rate, 1)),
+            "profit_factor": _json_safe(round(profit_factor, 2)),
+            "avg_winner": _json_safe(round(avg_win, 2)),
+            "avg_loser": _json_safe(round(avg_loss, 2)),
             "exit_reasons": reasons,
-            "spy_return_pct": round(spy_ret, 2),
-            "alpha_pct": round(total_ret - spy_ret, 2),
+            "spy_return_pct": _json_safe(round(spy_ret, 2)),
+            "alpha_pct": _json_safe(round(total_ret - spy_ret, 2)),
         }
 
         return {"trades": trades, "daily_equity": daily_equity, "summary": summary}

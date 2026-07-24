@@ -166,6 +166,9 @@ class GenerateCodeRequest(BaseModel):
 
 class GenerateCodeResponse(BaseModel):
     code: str
+    validation_status: str = "unknown"  # "passed" | "failed" | "unknown"
+    validation_attempts: int = 1
+    validation_log: List[str] = Field(default_factory=list)
 
 
 class RefineCodeRequest(BaseModel):
@@ -204,19 +207,82 @@ def post_generate_code(
     body: GenerateCodeRequest,
     db: Session = Depends(get_db),
 ):
-    """Generate strategy code (4 filter functions + CONFIG) from the plan. Persists to code_text."""
+    """Generate strategy code (4 filter functions + CONFIG) from the plan.
+    Persists to code_text. Automatically validates by running a single
+    backtest — if validation fails, retries up to 3 times with the error
+    message fed back to the LLM so it can fix the issue.
+    """
     from app.services.strategy_lab_llm import generate_code
+    from app.services.strategy_lab_orchestrator import _run_one
     sess = svc_get_session(db, session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found")
     plan = body.plan_text or sess.plan_text
     if not plan:
         raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
-    code, err = generate_code(plan, model=body.model)
-    if err or code is None:
-        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
-    svc_update_session(db, session_id, code_text=code)
-    return GenerateCodeResponse(code=code)
+
+    max_attempts = 3
+    last_error = None
+    validation_log = []
+
+    for attempt in range(1, max_attempts + 1):
+        code, err = generate_code(plan, model=body.model)
+        if err or code is None:
+            last_error = err
+            validation_log.append(f"Attempt {attempt}: LLM failed — {err}")
+            continue
+
+        # Validate: run a single backtest
+        try:
+            result = _run_one(
+                code_text=code,
+                session_id=str(session_id),
+                as_of="2022-01-01",
+                end_date="2024-01-01",
+                run_index=0,
+            )
+            if result["status"] == "completed":
+                k = result.get("kpis", {})
+                logger.info(
+                    "Code validation passed on attempt %d: ret=%.2f%% trades=%d",
+                    attempt, k.get("total_return_pct", 0), k.get("total_trades", 0),
+                )
+                svc_update_session(db, session_id, code_text=code)
+                return GenerateCodeResponse(
+                    code=code,
+                    validation_status="passed",
+                    validation_attempts=attempt,
+                    validation_log=validation_log,
+                )
+            else:
+                last_error = result.get("error_message", "unknown error")
+                validation_log.append(
+                    f"Attempt {attempt}: backtest failed — {last_error}"
+                )
+                # Feed the error back into the plan so the LLM can fix it
+                plan = (
+                    f"{sess.plan_text}\n\n"
+                    f"PREVIOUS ATTEMPT FAILED with error: {last_error}\n"
+                    f"Fix this error and regenerate the complete code."
+                )
+        except Exception as validate_err:
+            last_error = f"{type(validate_err).__name__}: {validate_err}"
+            validation_log.append(f"Attempt {attempt}: validation crashed — {last_error}")
+            plan = (
+                f"{sess.plan_text}\n\n"
+                f"PREVIOUS ATTEMPT FAILED with error: {last_error}\n"
+                f"Fix this error and regenerate the complete code."
+            )
+
+    # All attempts exhausted
+    raise HTTPException(
+        status_code=502,
+        detail={
+            "error": "code_validation_failed",
+            "details": f"All {max_attempts} attempts failed. Last error: {last_error}",
+            "validation_log": validation_log,
+        },
+    )
 
 
 @router.post("/sessions/{session_id}/refine-code", response_model=RefineCodeResponse)
@@ -615,3 +681,64 @@ def rollback_deployment(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return result
+
+
+# ── Chat endpoints ──────────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    model: str = Field(..., min_length=1)
+    critique_of: Optional[str] = None
+
+
+class ChatMessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    model_id: str
+    critique_of: Optional[str] = None
+    created_at: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    history: List[ChatMessageResponse]
+
+
+@router.post("/sessions/{session_id}/chat", response_model=ChatResponse)
+def post_chat(
+    session_id: uuid.UUID,
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+):
+    """Send a message to the performance chatbot. Returns response + full history."""
+    from app.services.strategy_lab_chat import chat_with_llm
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    try:
+        critique_uuid = uuid.UUID(body.critique_of) if body.critique_of else None
+        response_text, history = chat_with_llm(
+            db, session_id, body.message,
+            model=body.model, critique_of=critique_uuid,
+        )
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=502, detail={"error": "chat_failed", "details": str(e)})
+    return ChatResponse(
+        response=response_text,
+        history=[ChatMessageResponse(**h) for h in history],
+    )
+
+
+@router.get("/sessions/{session_id}/chat", response_model=List[ChatMessageResponse])
+def get_chat(
+    session_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Retrieve full chat history for a session."""
+    from app.services.strategy_lab_chat import get_chat_history
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    history = get_chat_history(db, session_id, limit=100)
+    return [ChatMessageResponse(**h) for h in history]

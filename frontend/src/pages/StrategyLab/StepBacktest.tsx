@@ -11,6 +11,7 @@ import {
   type RefineStrategyResponse,
 } from "../../lib/strategyLab";
 import { DiffReview } from "../../components/strategy-lab/DiffReview";
+import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
 
 interface StepBacktestProps {
   session: StrategySession;
@@ -163,18 +164,24 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
             )}
 
             {isDone && stats && stats.n_completed > 0 && (
-              <PostBatchActions
-                onSummarize={() => summarize.mutate()}
-                isSummarizing={summarize.isPending}
-                onRefine={() => refineMut.mutate()}
-                isRefining={refineMut.isPending}
-                onAnotherBatch={() => setBatchId(null)}
-                summary={summary}
-                refine={refine}
-                onAcceptRefine={(d) => apply.mutate(d)}
-                onRejectRefine={() => setRefine(null)}
-                isApplying={apply.isPending}
-              />
+              <>
+                <PostBatchActions
+                  onSummarize={() => summarize.mutate()}
+                  isSummarizing={summarize.isPending}
+                  onRefine={() => refineMut.mutate()}
+                  isRefining={refineMut.isPending}
+                  onAnotherBatch={() => setBatchId(null)}
+                  summary={summary}
+                  refine={refine}
+                  onAcceptRefine={(d) => apply.mutate(d)}
+                  onRejectRefine={() => setRefine(null)}
+                  isApplying={apply.isPending}
+                />
+                <ChatPanel
+                  sessionId={session.id}
+                  defaultModelId={session.model_id}
+                />
+              </>
             )}
           </>
         )}

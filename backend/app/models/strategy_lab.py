@@ -41,6 +41,10 @@ class StrategySession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text_default_now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text_default_now())
 
+    chat_messages: Mapped[List[StrategyChatMessage]] = relationship(
+        "StrategyChatMessage", back_populates="session", cascade="all, delete-orphan"
+    )
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": str(self.id),
@@ -52,6 +56,31 @@ class StrategySession(Base):
             "tags": self.tags or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class StrategyChatMessage(Base):
+    __tablename__ = "strategy_chat_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text_default_uuid())
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("strategy_sessions.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)  # "user" | "assistant" | "system"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    model_id: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    critique_of: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("strategy_chat_messages.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text_default_now())
+
+    session: Mapped[StrategySession] = relationship("StrategySession", back_populates="chat_messages")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "session_id": str(self.session_id),
+            "role": self.role,
+            "content": self.content,
+            "model_id": self.model_id,
+            "critique_of": str(self.critique_of) if self.critique_of else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 

@@ -166,7 +166,7 @@ function autoName(prompt: string): string {
 }
 
 // ── Model picker — grid of cards with cloud/local markers ────────────
-function ModelPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+export function ModelPicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
