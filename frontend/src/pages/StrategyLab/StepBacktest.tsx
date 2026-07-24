@@ -32,6 +32,31 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // On mount, load existing experiments so navigating back shows previous results
+  useEffect(() => {
+    let cancelled = false;
+    strategyLabApi.listExperiments(session.id).then((rows) => {
+      if (cancelled || rows.length === 0) return;
+      // Find the most recent batch_id
+      const batchIds = [...new Set(rows.map((r) => r.batch_id))];
+      const latestBatchId = batchIds[0];
+      const batchRows = rows.filter((r) => r.batch_id === latestBatchId);
+      setBatchId(latestBatchId);
+      setExperiments(batchRows);
+      setNRuns(batchRows.length);
+      setProgress({
+        completed: batchRows.filter((r) => r.status === "completed").length,
+        total: batchRows.length,
+        failed: batchRows.filter((r) => r.status === "failed").length,
+      });
+      // Load stats for the latest batch
+      strategyLabApi.getBatchStats(session.id, latestBatchId).then((s) => {
+        if (!cancelled) setStats(s);
+      }).catch(() => {});
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [session.id]);
+
   const start = useMutation({
     mutationFn: () =>
       strategyLabApi.startExperiments(session.id, {

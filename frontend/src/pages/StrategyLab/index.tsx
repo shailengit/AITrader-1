@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -30,12 +30,6 @@ export default function StrategyLabPage() {
     queryFn: () => strategyLabApi.getSession(sessionId!),
     enabled: !!sessionId,
   });
-
-  useEffect(() => {
-    if (session.data && activeStep === 1) {
-      setActiveStep(2);
-    }
-  }, [session.data, activeStep]);
 
   const handlePlanApproved = () => setActiveStep(3);
   const handleCodeReady = () => setActiveStep(4);
