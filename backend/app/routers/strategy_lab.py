@@ -221,7 +221,7 @@ def post_generate_code(
     if not plan:
         raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
 
-    max_attempts = 3
+    max_attempts = 2
     last_error = None
     validation_log = []
 
@@ -274,12 +274,26 @@ def post_generate_code(
                 f"Fix this error and regenerate the complete code."
             )
 
-    # All attempts exhausted
+    # All attempts exhausted — save the last code anyway so the user can
+    # see and fix it, rather than blocking with a 502.
+    if code:
+        svc_update_session(db, session_id, code_text=code)
+        logger.warning(
+            "Code validation failed after %d attempts, but saving last code. "
+            "Last error: %s", max_attempts, last_error,
+        )
+        return GenerateCodeResponse(
+            code=code,
+            validation_status="failed",
+            validation_attempts=max_attempts,
+            validation_log=validation_log,
+        )
+
     raise HTTPException(
         status_code=502,
         detail={
-            "error": "code_validation_failed",
-            "details": f"All {max_attempts} attempts failed. Last error: {last_error}",
+            "error": "code_generation_failed",
+            "details": f"All {max_attempts} LLM calls failed. Last error: {last_error}",
             "validation_log": validation_log,
         },
     )
