@@ -116,6 +116,32 @@ query = text(
 
 ---
 
+## Coding Agent Architecture
+
+The code generation is now a 3-stage process, not a single LLM call:
+
+### Stage 1: Generate
+- LLM receives: plan + reference template (`strategies/_template.py`) + accumulated learnings + rules
+- LLM fills in the 4 function bodies in the template
+- All boilerplate (imports, engine wiring, CONFIG) is pre-verified in the template
+
+### Stage 2: Validate
+1. Syntax check (`ast.parse`)
+2. Import check (try importing the module)
+3. Backtest check (`_run_one` with a single date window)
+
+### Stage 3: Debug (if validation fails)
+- Separate LLM call with error message + failing code
+- Produces a surgical unified diff (not a full rewrite)
+- Diff is applied and code is re-validated
+- Up to 3 debug cycles before falling back to save-anyway
+
+### Key Files
+- `strategies/_template.py` — known-working reference template
+- `backend/app/services/strategy_lab_prompts.py:make_debug_prompt()` — debug prompt
+- `backend/app/services/strategy_lab_llm.py:debug_code()` — debug LLM call
+- `backend/app/routers/strategy_lab.py:post_generate_code()` — 3-stage loop
+
 ## Validation Checklist (run after every code generation)
 
 - [ ] `from app.db.database import engine` present (not `create_engine`)

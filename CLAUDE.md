@@ -368,3 +368,23 @@ pf = vbt.Portfolio.from_signals(
 - `volume_ma_50` = 50-day rolling average volume
 
 **Lesson:** When adding new indicators or filters to the technical screener, use the `ta` library's output column names. Custom computed fields should be added in `_worker_ta_analysis` and included in the `ta_to_friendly` mapping in `run_quant_strategy_screener`.
+
+## Model Preference
+
+When dispatching subagents (via the Agent tool or Workflow tool), always use `model: "sonnet"` to map to the project's configured model (`deepseek-v4-flash:cloud`). This ensures all subagents use the same model as the main session for consistency and cost efficiency.
+
+## Strategy Lab Code Generation Learnings
+
+When generating strategy code for the Strategy Lab, refer to `backend/app/services/strategy_lab_learnings.md` for the accumulated knowledge of what works and what doesn't.
+
+The code generation uses a **3-stage coding agent**:
+1. **Generate** — LLM fills in 4 functions in a known-working template (`strategies/_template.py`)
+2. **Validate** — syntax check → import check → single backtest run
+3. **Debug** — if validation fails, a separate LLM call produces a surgical fix diff, applied and re-validated (up to 3 cycles)
+
+Key rules:
+- Use the **shared engine** from `app.db.database` — never `create_engine()`
+- Import `get_safe_table_name` from `app.utils.security`
+- Guard `market_cap` against NULL
+- Use `max_tokens=32768` for code generation calls
+- Always validate generated code with a single backtest run before presenting to the user
