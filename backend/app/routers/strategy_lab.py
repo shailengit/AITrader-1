@@ -345,9 +345,11 @@ def post_apply_diff(
 ):
     """Apply a refine diff to the session's code and persist the result.
 
-    Useful when the user accepts a refinement in the UI.
+    If the diff doesn't apply cleanly (e.g. the code has drifted), the LLM
+    is called automatically to produce a complete fixed file instead.
     """
     from app.services.strategy_lab_diff import apply_diff as apply_diff_fn
+    from app.services.strategy_lab_llm import debug_code
     sess = svc_get_session(db, session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -357,7 +359,23 @@ def post_apply_diff(
     try:
         new_code = apply_diff_fn(current, body.instruction)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail={"error": "diff_apply_failed", "details": str(e)})
+        # Diff failed to apply — call the LLM to produce a complete fixed file
+        logger.info("Diff apply failed (%s), calling LLM to produce fixed code", str(e)[:80])
+        try:
+            fixed, debug_err = debug_code(current, f"Diff apply failed: {e}", model=body.model)
+            if debug_err or fixed is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "diff_apply_failed", "details": f"Diff failed: {e}. Auto-fix also failed: {debug_err}"},
+                )
+            new_code = fixed
+        except HTTPException:
+            raise
+        except Exception as auto_fix_err:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "diff_apply_failed", "details": f"Diff failed: {e}. Auto-fix crashed: {auto_fix_err}"},
+            )
     svc_update_session(db, session_id, code_text=new_code)
     return {"code": new_code}
 
