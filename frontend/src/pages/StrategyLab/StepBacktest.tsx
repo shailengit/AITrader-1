@@ -373,11 +373,11 @@ function ExperimentTable({ rows, selectedWinner, onPick }: {
               <th>#</th>
               <th>Start</th>
               <th className="slab-table__num">Return</th>
-              <th className="slab-table__num">α</th>
-              <th className="slab-table__num">WR</th>
-              <th className="slab-table__num">PF</th>
+              <th className="slab-table__num">Alpha</th>
+              <th className="slab-table__num">Win%</th>
+              <th className="slab-table__num">P/Fact</th>
               <th className="slab-table__num">Trades</th>
-              <th className="slab-table__num">Sharpe*</th>
+              <th className="slab-table__num">R/Draw</th>
               <th>Status</th>
               <th></th>
             </tr>

@@ -222,7 +222,15 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
           borderTop: "1px solid var(--slab-rule)",
         }}
       >
-        <ModelPicker value={selectedModel} onChange={setSelectedModel} />
+        <select
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value)}
+          className="slab-input"
+          style={{ width: 160, fontSize: 11, padding: "6px 8px", flexShrink: 0 }}
+          disabled={send.isPending}
+        >
+          <option value={selectedModel}>{selectedModel}</option>
+        </select>
         <input
           type="text"
           value={input}
