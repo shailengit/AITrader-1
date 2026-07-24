@@ -176,7 +176,10 @@ def make_code_prompt(plan: str) -> List[Dict[str, str]]:
                 "7. Use `float()`, `int()`, or `round()` to convert numpy types before storing in dicts\n"
                 "8. Never compare `None` with `>` or `<` — guard all nullable values\n"
                 "9. All KPI values must be JSON-safe — no Infinity or NaN\n"
-                "10. Wrap `get_safe_table_name(ticker)` in try/except ValueError and `continue`\n\n"
+                "10. Wrap `get_safe_table_name(ticker)` in try/except ValueError and `continue`\n"
+                "11. Always call `.mean()` on `.ewm()` before accessing `.values`: "
+                "`close.ewm(span=20, adjust=False).mean().values` — "
+                "`ExponentialMovingWindow` has no `.values` attribute\n\n"
                 "ENGINE CONTRACT (do not reproduce this code, just match the signatures):\n"
                 f"{ENGINE_CONTRACT}"
             ),
@@ -302,7 +305,9 @@ def make_debug_prompt(code: str, error: str) -> List[Dict[str, str]]:
                 "  3. Wrong function signature: match the expected parameters\n"
                 "  4. JSON safety: use float()/int() on numpy types, avoid Infinity/NaN\n"
                 "  5. Database: use shared engine, not create_engine()\n"
-                "  6. Date lookup: use np.searchsorted(dates, np.datetime64(date_str))"
+                "  6. Date lookup: use np.searchsorted(dates, np.datetime64(date_str))\n"
+                "  7. EWM: call `.mean()` on `.ewm()` before `.values` — "
+                "ExponentialMovingWindow has no `.values` attribute"
             ),
         },
         {

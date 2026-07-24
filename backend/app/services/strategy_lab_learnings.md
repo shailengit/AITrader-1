@@ -85,7 +85,19 @@ def _json_safe(val: float) -> float:
 
 **Prompt rule:** Always use generous `max_tokens` — 16384 for analysis/chat, 32768 for code generation.
 
-### 9. Avoid Triple-Quoted f-strings for SQL
+### 9. Call `.mean()` on `.ewm()` Before Accessing `.values`
+
+**Problem:** The LLM writes `close.ewm(span=20, adjust=False).values` which raises `AttributeError: 'ExponentialMovingWindow' object has no attribute 'values'`. The `.ewm()` method returns an `ExponentialMovingWindow` object, not a Series.
+
+**Fix:** Always chain `.mean()` before `.values`:
+```python
+ema20 = close.ewm(span=20, adjust=False).mean().values  # CORRECT
+ema20 = close.ewm(span=20, adjust=False).values          # WRONG
+```
+
+**Prompt rule:** Always call `.mean()` on `.ewm()` before accessing `.values`.
+
+### 10. Avoid Triple-Quoted f-strings for SQL
 
 **Problem:** The LLM uses `f"""..."""` or `f'''...'''` for SQL queries containing double-quoted column names like `"Date"`. While valid Python, this confuses syntax highlighters (Monaco, VS Code) which show everything after the string as a comment (brown).
 
