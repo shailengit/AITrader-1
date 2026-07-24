@@ -128,6 +128,14 @@ query = text(
 
 ---
 
+## Never Throw 502 on LLM Failure
+
+**Rule:** The code generation endpoint must NEVER return a 502. If all LLM calls fail, return a 200 with `validation_status="failed"` and the error details in `validation_log`. The frontend shows a clear error message with a Retry button.
+
+**Why:** A 502 is a cryptic server error that confuses users. A graceful failure with a clear message and retry button is much better UX.
+
+**Implementation:** `post_generate_code()` in `strategy_lab.py` catches all LLM failures and returns `GenerateCodeResponse(code="", validation_status="failed", validation_log=[...])` instead of raising `HTTPException(502)`.
+
 ## Coding Agent Architecture
 
 The code generation is now a 3-stage process, not a single LLM call:
