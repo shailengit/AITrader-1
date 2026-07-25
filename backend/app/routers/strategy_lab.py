@@ -921,3 +921,139 @@ def get_chat(
         raise HTTPException(status_code=404, detail="session not found")
     history = get_chat_history(db, session_id, limit=100)
     return [ChatMessageResponse(**h) for h in history]
+
+
+# ── Library endpoints ───────────────────────────────────────────────────────
+
+class LibrarySaveRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    change_description: str = Field(default="")
+    model: Optional[str] = None
+
+
+class LibraryEntryResponse(BaseModel):
+    version: int
+    strategy_name: str
+    created_at: str
+    change_description: str
+    backtest_kpis: Dict[str, Any] = Field(default_factory=dict)
+    code: Optional[str] = None
+    folder: Optional[str] = None
+
+
+class LibraryListResponse(BaseModel):
+    name: str
+    display_name: str
+    version_count: int
+    latest_version: LibraryEntryResponse
+    versions: List[LibraryEntryResponse]
+
+
+@router.post("/sessions/{session_id}/library/save", response_model=LibraryEntryResponse)
+def save_to_library(
+    session_id: uuid.UUID,
+    body: LibrarySaveRequest,
+    db: Session = Depends(get_db),
+):
+    """Save the current session's code to the strategy library."""
+    from app.services.strategy_lab_library import save_strategy
+    from app.services.strategy_lab_experiments import list_experiments
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    if not sess.code_text:
+        raise HTTPException(status_code=400, detail="no code_text to save")
+
+    # Get latest KPIs from most recent completed experiment
+    exps = list_experiments(db, session_id=session_id, limit=50)
+    best_kpis = {}
+    for e in exps:
+        if e.status == "completed" and e.kpis:
+            best_kpis = e.kpis
+            break
+
+    meta = save_strategy(
+        name=body.name,
+        code=sess.code_text,
+        prompt=sess.prompt or "",
+        plan=sess.plan_text or "",
+        kpis=best_kpis,
+        change_description=body.change_description,
+        model_id=sess.model_id,
+        session_id=str(session_id),
+    )
+    return LibraryEntryResponse(**meta)
+
+
+@router.get("/library", response_model=List[LibraryListResponse])
+def list_library():
+    """List all saved strategies with their version history."""
+    from app.services.strategy_lab_library import list_strategies
+    strategies = list_strategies()
+    result = []
+    for s in strategies:
+        result.append(LibraryListResponse(
+            name=s["name"],
+            display_name=s["display_name"],
+            version_count=s["version_count"],
+            latest_version=LibraryEntryResponse(**s["latest_version"]),
+            versions=[LibraryEntryResponse(**v) for v in s["versions"]],
+        ))
+    return result
+
+
+@router.get("/library/{name}", response_model=LibraryListResponse)
+def get_library_entry(name: str):
+    """Get full details for a specific strategy."""
+    from app.services.strategy_lab_library import get_strategy
+    s = get_strategy(name)
+    if s is None:
+        raise HTTPException(status_code=404, detail="strategy not found")
+    return LibraryListResponse(
+        name=s["name"],
+        display_name=s["display_name"],
+        version_count=len(s["versions"]),
+        latest_version=LibraryEntryResponse(**s["versions"][-1]),
+        versions=[LibraryEntryResponse(**v) for v in s["versions"]],
+    )
+
+
+class LibraryLoadRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    version: Optional[int] = None  # None = latest
+
+
+@router.post("/library/load", response_model=SessionResponse)
+def load_from_library(
+    body: LibraryLoadRequest,
+    db: Session = Depends(get_db),
+):
+    """Create a new session from a saved library strategy (skips steps 1-2)."""
+    from app.services.strategy_lab_library import get_strategy
+    from app.services.strategy_lab_session import create_session
+    s = get_strategy(body.name)
+    if s is None:
+        raise HTTPException(status_code=404, detail="strategy not found")
+
+    # Pick the requested version or latest
+    versions = s["versions"]
+    if body.version:
+        versions = [v for v in versions if v.get("version") == body.version]
+    if not versions:
+        raise HTTPException(status_code=404, detail="version not found")
+
+    entry = versions[-1]
+    code = entry.get("code", "")
+    if not code:
+        raise HTTPException(status_code=400, detail="no code found for this version")
+
+    new_sess = create_session(
+        db,
+        name=f"{entry.get('strategy_name', body.name)} (library)",
+        prompt=entry.get("prompt", "Loaded from library"),
+        model_id=entry.get("model_id", "kimi-k2.6:cloud"),
+    )
+    # Set plan and code
+    from app.services.strategy_lab_session import update_session
+    update_session(db, new_sess.id, plan_text=entry.get("plan", ""), code_text=code)
+    return SessionResponse(**new_sess.to_dict())

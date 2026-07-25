@@ -112,6 +112,24 @@ export interface RefineStrategyResponse {
   error?: string;
 }
 
+export interface LibraryEntryResponse {
+  version: number;
+  strategy_name: string;
+  created_at: string;
+  change_description: string;
+  backtest_kpis: Record<string, any>;
+  code?: string;
+  folder?: string;
+}
+
+export interface LibraryListResponse {
+  name: string;
+  display_name: string;
+  version_count: number;
+  latest_version: LibraryEntryResponse;
+  versions: LibraryEntryResponse[];
+}
+
 export interface ChatMessage {
   id: string;
   role: string;
@@ -258,6 +276,16 @@ export const strategyLabApi = {
 
   refineDirect: (id: string, body: { instruction: string; model?: string }) =>
     postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body),
+
+  saveToLibrary: (id: string, body: { name: string; change_description?: string; model?: string }) =>
+    postJson<LibraryEntryResponse>(`${base}/sessions/${id}/library/save`, body),
+
+  listLibrary: () => getJson<LibraryListResponse[]>(`${base}/library`),
+
+  getLibraryEntry: (name: string) => getJson<LibraryListResponse>(`${base}/library/${name}`),
+
+  loadFromLibrary: (body: { name: string; version?: number }) =>
+    postJson<StrategySession>(`${base}/library/load`, body),
 
   getEquityCurve: (experimentId: string) =>
     getJson<{ equity_curve: Array<{ date: string; value: number }> }>(

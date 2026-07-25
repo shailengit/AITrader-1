@@ -19,6 +19,9 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
   const [refineSummary, setRefineSummary] = useState<string | null>(null);
   const [refineLog, setRefineLog] = useState<string[]>([]);
   const [showRefine, setShowRefine] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveName, setSaveName] = useState(session.name || "strategy");
+  const [saveDescription, setSaveDescription] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -58,6 +61,17 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
 
   const save = useMutation({
     mutationFn: () => strategyLabApi.updateSession(session.id, { code_text: code }),
+  });
+
+  const saveToLibrary = useMutation({
+    mutationFn: () => strategyLabApi.saveToLibrary(session.id, {
+      name: saveName,
+      change_description: saveDescription,
+    }),
+    onSuccess: () => {
+      setShowSaveDialog(false);
+      setSaveDescription("");
+    },
   });
 
   const refine = useMutation({
@@ -215,6 +229,17 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
             >
               <Wand2 size={11} />
               Refine with AI
+            </button>
+          )}
+
+          {!isInitialState && (
+            <button
+              type="button"
+              onClick={() => setShowSaveDialog(true)}
+              className="slab-btn slab-btn--ghost"
+            >
+              <Save size={11} />
+              Save to library
             </button>
           )}
 
@@ -390,6 +415,69 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Save to library dialog */}
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="slab-panel"
+            style={{ maxWidth: 560, marginTop: 16 }}
+          >
+            <div className="slab-panel__head">
+              <span className="slab-eyebrow slab-eyebrow--gold">// Save to library</span>
+            </div>
+            <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="slab-field">
+                <label className="slab-field__label">Strategy name</label>
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="slab-input"
+                />
+              </div>
+              <div className="slab-field">
+                <label className="slab-field__label">
+                  What changed?
+                  <span className="slab-mono slab-mono--xs slab-mono--faint">· optional</span>
+                </label>
+                <textarea
+                  value={saveDescription}
+                  onChange={(e) => setSaveDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Added SPY > 20d MA filter, widened trailing stop to 25%"
+                  className="slab-textarea"
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => saveToLibrary.mutate()}
+                  disabled={!saveName.trim() || saveToLibrary.isPending}
+                  className="slab-btn slab-btn--primary"
+                >
+                  {saveToLibrary.isPending ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSaveDialog(false)}
+                  className="slab-btn slab-btn--ghost"
+                >
+                  Cancel
+                </button>
+                {saveToLibrary.isSuccess && (
+                  <span className="slab-mono slab-mono--sm slab-mono--terminal">✓ Saved!</span>
+                )}
+                {saveToLibrary.isError && (
+                  <span className="slab-mono slab-mono--sm slab-mono--rose">
+                    × {String((saveToLibrary.error as Error)?.message ?? "Save failed")}
+                  </span>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
     </>
   );

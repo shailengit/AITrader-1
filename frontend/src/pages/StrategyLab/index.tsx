@@ -8,10 +8,12 @@ import { StepPlan } from "./StepPlan";
 import { StepCode } from "./StepCode";
 import { StepBacktest } from "./StepBacktest";
 import { StepDeploy } from "./StepDeploy";
+import { StepLibrary } from "./StepLibrary";
 import { strategyLabApi } from "../../lib/strategyLab";
 import "../../components/strategy-lab/lab.css";
 
 const STEPS = [
+  { id: 0, label: "Library", meta: "Saved" },
   { id: 1, label: "Idea", meta: "Prompt" },
   { id: 2, label: "Plan", meta: "Review" },
   { id: 3, label: "Code", meta: "Edit" },
@@ -43,7 +45,13 @@ export default function StrategyLabPage() {
     setActiveStep(2);
   };
 
+  const handleLoadSession = (newSessionId: string) => {
+    setSearchParams({ session: newSessionId });
+    setActiveStep(3);  // Skip to Code step
+  };
+
   const handleSelectStep = (stepId: number) => {
+    if (stepId === 0) { setActiveStep(0); return; }  // Library always accessible
     if (!sessionId && stepId !== 1) return;
     if (stepId >= 3 && !session.data?.code_text) return;
     setActiveStep(stepId);
@@ -87,7 +95,9 @@ export default function StrategyLabPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          {activeStep === 1 || !sessionId ? (
+          {activeStep === 0 ? (
+            <StepLibrary key="step-0" onLoadSession={handleLoadSession} />
+          ) : activeStep === 1 || !sessionId ? (
             <StepIdea key="step-1" onCreated={handleCreated} />
           ) : activeStep === 2 && session.data ? (
             <StepPlan
