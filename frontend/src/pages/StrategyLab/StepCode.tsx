@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle } from "lucide-react";
-import { DiffReview } from "../../components/strategy-lab/DiffReview";
+import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
 
 interface StepCodeProps {
@@ -17,7 +16,8 @@ const DEFAULT_CODE = `# (LLM has not generated code yet — click "Generate Code
 export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
   const [code, setCode] = useState(session.code_text ?? DEFAULT_CODE);
   const [refineInstruction, setRefineInstruction] = useState("");
-  const [pendingDiff, setPendingDiff] = useState<{ diff: string; summary: string } | null>(null);
+  const [refineSummary, setRefineSummary] = useState<string | null>(null);
+  const [refineLog, setRefineLog] = useState<string[]>([]);
   const [showRefine, setShowRefine] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,22 +62,15 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
 
   const refine = useMutation({
     mutationFn: () =>
-      strategyLabApi.refineCode(session.id, {
+      strategyLabApi.refineDirect(session.id, {
         model,
-        current_code: code,
         instruction: refineInstruction,
       }),
-    onSuccess: (r) => setPendingDiff({ diff: r.diff, summary: r.summary }),
-  });
-
-  const apply = useMutation({
-    mutationFn: (diff: string) =>
-      strategyLabApi.applyDiff(session.id, { instruction: diff, current_code: code }),
     onSuccess: (r) => {
-      setCode(r.code);
-      setPendingDiff(null);
+      if (r.code) setCode(r.code);
+      setRefineSummary(r.summary || "Code updated");
+      setRefineLog(r.validation_log || []);
       setRefineInstruction("");
-      setShowRefine(false);
     },
   });
 
@@ -324,7 +317,7 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
                 <div className="slab-panel__head">
                   <span className="slab-eyebrow slab-eyebrow--gold">// Refine</span>
                   <span className="slab-mono slab-mono--xs slab-mono--dim">
-                    LLM returns a diff for review
+                    LLM modifies code directly, validates with backtest
                   </span>
                 </div>
                 <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -342,7 +335,7 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
                       disabled={!refineInstruction.trim() || refine.isPending}
                       className="slab-btn slab-btn--primary"
                     >
-                      {refine.isPending ? "Drafting diff…" : "Generate diff"}
+                      {refine.isPending ? "Refining + validating…" : "Apply change"}
                     </button>
                     {refine.isError && (
                       <span className="slab-mono slab-mono--sm slab-mono--rose" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -352,24 +345,45 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
                     )}
                   </div>
 
-                  {pendingDiff && (
+                  {/* Refine summary */}
+                  {refineSummary && (
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        padding: "10px 14px",
+                        background: "var(--slab-terminal-glow)",
+                        borderRadius: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
                     >
-                      <DiffReview
-                        diff={pendingDiff.diff}
-                        summary={pendingDiff.summary}
-                        onAccept={() => apply.mutate(pendingDiff.diff)}
-                        onReject={() => setPendingDiff(null)}
-                        isApplying={apply.isPending}
-                      />
-                      {apply.isError && (
-                        <div className="slab-mono slab-mono--sm slab-mono--rose" style={{ marginTop: 8 }}>
-                          × {String((apply.error as Error)?.message ?? "Apply failed")}
-                        </div>
-                      )}
+                      <CheckCircle size={14} style={{ color: "var(--slab-terminal)", flexShrink: 0 }} />
+                      <span className="slab-mono slab-mono--sm" style={{ color: "var(--slab-terminal)" }}>
+                        {refineSummary}
+                      </span>
                     </motion.div>
+                  )}
+
+                  {/* Refine validation log */}
+                  {refineLog.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      {refineLog.map((entry, i) => (
+                        <div
+                          key={i}
+                          className="slab-mono slab-mono--xs"
+                          style={{
+                            color: entry.includes("failed") || entry.includes("FAILED") || entry.includes("crashed")
+                              ? "var(--slab-rose)"
+                              : "var(--slab-paper-faint)",
+                            padding: "2px 0",
+                          }}
+                        >
+                          {entry}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

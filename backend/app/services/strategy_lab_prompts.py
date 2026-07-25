@@ -318,3 +318,34 @@ def make_debug_prompt(code: str, error: str) -> List[Dict[str, str]]:
             ),
         },
     ]
+
+
+def make_refine_direct_prompt(code: str, instruction: str) -> List[Dict[str, str]]:
+    """Prompt the LLM to modify strategy code per a natural language instruction.
+
+    The LLM outputs the COMPLETE modified file (not a diff).
+    """
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are a quant strategy coder. The user has an existing strategy file "
+                "and wants a specific change. Output the COMPLETE modified Python file "
+                "in a single ```python block. Do NOT include any prose.\n\n"
+                "Rules:\n"
+                "- Keep ALL imports, engine wiring, and CONFIG exactly as they are\n"
+                "- Make ONLY the changes the user asked for — do not rewrite unrelated code\n"
+                "- The output must be a complete, valid Python file\n"
+                "- If the instruction is ambiguous, make a reasonable default choice\n"
+                "- Common changes: add/remove filters, adjust parameters, change exit logic"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Current code:\n\n```python\n{code}\n```\n\n"
+                f"Requested change:\n{instruction}\n\n"
+                "Output the COMPLETE modified Python file."
+            ),
+        },
+    ]

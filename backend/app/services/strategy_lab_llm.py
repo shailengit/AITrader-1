@@ -323,3 +323,30 @@ def debug_code(code: str, error: str, model: Optional[str] = None) -> Tuple[Opti
     except SyntaxError as e:
         return None, f"Debugger produced invalid syntax: {e}"
     return fixed, None
+
+
+def refine_code_direct(code: str, instruction: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """Modify strategy code per a natural language instruction.
+
+    The LLM produces the COMPLETE modified file (not a diff). Returns
+    (modified_code, error).
+    """
+    from app.services.strategy_lab_prompts import make_refine_direct_prompt
+    messages = make_refine_direct_prompt(code, instruction)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.0)
+    if err:
+        return None, err
+    modified = _extract_code_block(content or "")
+    if modified is None:
+        if finish_reason == "length":
+            detail = "response was truncated (finish_reason=length) before closing the ```python fence"
+        else:
+            detail = "response contained no ```python code block"
+        return None, f"LLM {detail} (content length={len(content or '')})"
+    # Validate syntax
+    import ast
+    try:
+        ast.parse(modified)
+    except SyntaxError as e:
+        return None, f"Refine produced invalid syntax: {e}"
+    return modified, None

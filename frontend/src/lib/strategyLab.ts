@@ -62,6 +62,13 @@ export interface RefineCodeResponse {
   error?: string;
 }
 
+export interface RefineDirectResponse {
+  code: string;
+  summary: string;
+  validation_status: string;
+  validation_log: string[];
+}
+
 export interface ApplyDiffResponse {
   code: string;
 }
@@ -248,6 +255,9 @@ export const strategyLabApi = {
     const qs = q.toString();
     return getJson<DeploymentListItem[]>(`${base}/deployments${qs ? `?${qs}` : ""}`);
   },
+
+  refineDirect: (id: string, body: { instruction: string; model?: string }) =>
+    postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body),
 
   rollbackDeployment: (deploymentId: string) =>
     postJson<{ rolled_back_deployment_id: string; new_active_class_name: string }>(

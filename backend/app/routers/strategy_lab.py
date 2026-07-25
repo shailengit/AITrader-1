@@ -393,6 +393,105 @@ def post_apply_diff(
     return {"code": new_code}
 
 
+class RefineDirectRequest(BaseModel):
+    instruction: str = Field(..., min_length=1)
+    model: Optional[str] = None
+
+
+class RefineDirectResponse(BaseModel):
+    code: str = ""
+    summary: str = ""
+    validation_status: str = "unknown"
+    validation_log: List[str] = Field(default_factory=list)
+
+
+@router.post("/sessions/{session_id}/refine-direct", response_model=RefineDirectResponse)
+def post_refine_direct(
+    session_id: uuid.UUID,
+    body: RefineDirectRequest,
+    db: Session = Depends(get_db),
+):
+    """Modify strategy code per a natural language instruction.
+
+    The LLM produces the complete modified file directly (no diff).
+    Validates with a backtest — if it fails, debug loop up to 3 cycles.
+    """
+    from app.services.strategy_lab_llm import refine_code_direct, debug_code
+    from app.services.strategy_lab_orchestrator import _run_one
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    current = sess.code_text
+    if not current:
+        raise HTTPException(status_code=400, detail="no code_text available — generate code first")
+
+    max_debug_cycles = 3
+    validation_log = []
+    code = current
+
+    # Step 1: LLM modifies the code
+    modified, err = refine_code_direct(code, body.instruction, model=body.model)
+    if err or modified is None:
+        logger.error("Refine direct failed: %s", err)
+        return RefineDirectResponse(
+            code=code, summary="", validation_status="failed",
+            validation_log=[f"LLM refine failed: {err}"],
+        )
+    code = modified
+    validation_log.append(f"Code modified ({len(code)} chars)")
+
+    # Step 2: Validate + debug loop
+    for cycle in range(max_debug_cycles + 1):
+        try:
+            result = _run_one(
+                code_text=code,
+                session_id=str(session_id),
+                as_of="2022-01-01",
+                end_date="2024-01-01",
+                run_index=0,
+            )
+        except Exception as validate_err:
+            result = {"status": "failed", "error_message": f"{type(validate_err).__name__}: {validate_err}"}
+
+        if result["status"] == "completed":
+            k = result.get("kpis", {})
+            logger.info("Refine validation passed on cycle %d: ret=%.2f%%", cycle, k.get("total_return_pct", 0))
+            svc_update_session(db, session_id, code_text=code)
+            return RefineDirectResponse(
+                code=code,
+                summary=f"Applied: {body.instruction[:120]}",
+                validation_status="passed",
+                validation_log=validation_log,
+            )
+
+        last_error = result.get("error_message", "unknown error")
+        validation_log.append(f"Debug cycle {cycle}: backtest failed — {last_error}")
+
+        if cycle >= max_debug_cycles:
+            break
+
+        # Debug: call LLM to fix
+        try:
+            fixed, debug_err = debug_code(code, last_error, model=body.model)
+            if debug_err or fixed is None:
+                validation_log.append(f"Debug cycle {cycle}: debugger failed — {debug_err}")
+                continue
+            code = fixed
+            validation_log.append(f"Debug cycle {cycle}: debugger produced fix ({len(fixed)} chars)")
+        except Exception as debug_exc:
+            validation_log.append(f"Debug cycle {cycle}: debugger crashed — {debug_exc}")
+            continue
+
+    # Save code anyway
+    svc_update_session(db, session_id, code_text=code)
+    return RefineDirectResponse(
+        code=code,
+        summary=f"Applied (with fixes): {body.instruction[:120]}",
+        validation_status="failed",
+        validation_log=validation_log,
+    )
+
+
 # ── Experiment endpoints (Phase 3) ────────────────────────────────────────
 
 class ExperimentRequest(BaseModel):
