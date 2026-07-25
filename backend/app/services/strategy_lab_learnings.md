@@ -184,6 +184,14 @@ The code generation is now a 3-stage process, not a single LLM call:
 - `backend/app/services/strategy_lab_llm.py:debug_code()` — debug LLM call
 - `backend/app/routers/strategy_lab.py:post_generate_code()` — 3-stage loop
 
+## Equity Curve Storage
+
+The `strategy_experiments` table has an `equity_curve` JSONB column that stores the daily portfolio value for each backtest run. The data is downsampled to a maximum of 500 points to keep the payload reasonable.
+
+**Endpoint:** `GET /experiments/{id}/equity-curve` returns `{ equity_curve: [{date, value, cash, holdings, n_holdings}] }`
+
+**Engine:** `strategies/engine.py` computes `sharpe_ratio` in the summary KPIs using the standard annualized formula: `mean(daily_returns) / std(daily_returns) * sqrt(252)`.
+
 ## Validation Checklist (run after every code generation)
 
 - [ ] `from app.db.database import engine` present (not `create_engine`)
