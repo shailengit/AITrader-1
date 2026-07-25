@@ -365,6 +365,14 @@ class StrategyEngine:
         years = (datetime.strptime(cfg.end, "%Y-%m-%d") - datetime.strptime(cfg.as_of, "%Y-%m-%d")).days / 365.25
         cagr = ((portfolio_value / cfg.capital) ** (1 / max(years, 0.01)) - 1) * 100
 
+        # Annualized Sharpe ratio from daily equity
+        sharpe = 0.0
+        if len(daily_equity) > 1:
+            eq_vals = np.array([d["value"] for d in daily_equity], dtype=float)
+            daily_rets = np.diff(eq_vals) / eq_vals[:-1]
+            if np.std(daily_rets) > 0 and len(daily_rets) > 0:
+                sharpe = float(np.mean(daily_rets) / np.std(daily_rets) * np.sqrt(252))
+
         def _json_safe(val: float) -> float:
             """Replace Infinity/NaN with 0.0 for JSON serialization."""
             if np.isinf(val) or np.isnan(val):
@@ -376,6 +384,7 @@ class StrategyEngine:
             "final_portfolio": portfolio_value,
             "total_return_pct": _json_safe(round(total_ret, 2)),
             "cagr_pct": _json_safe(round(cagr, 2)),
+            "sharpe_ratio": _json_safe(round(sharpe, 2)),
             "total_trades": len(sell_trades),
             "win_rate": _json_safe(round(win_rate, 1)),
             "profit_factor": _json_safe(round(profit_factor, 2)),

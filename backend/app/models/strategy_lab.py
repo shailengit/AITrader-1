@@ -96,6 +96,7 @@ class StrategyExperiment(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     kpis: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    equity_curve: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
     trades_summary: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     report_html_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text_default_now())

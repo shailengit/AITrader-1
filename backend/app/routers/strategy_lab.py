@@ -589,6 +589,19 @@ def batch_stats(
     return BatchStats(**get_batch_stats(db, batch_id))
 
 
+@router.get("/experiments/{experiment_id}/equity-curve")
+def get_equity_curve(
+    experiment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Return the equity curve for a single experiment."""
+    from app.models.strategy_lab import StrategyExperiment
+    exp = db.get(StrategyExperiment, experiment_id)
+    if exp is None:
+        raise HTTPException(status_code=404, detail="experiment not found")
+    return {"equity_curve": exp.equity_curve or []}
+
+
 @router.get("/sessions/{session_id}/batches/{batch_id}/events")
 async def batch_events(
     session_id: uuid.UUID,

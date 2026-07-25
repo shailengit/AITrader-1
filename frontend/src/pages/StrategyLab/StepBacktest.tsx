@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Sparkles, RotateCcw, AlertCircle, FileText } from "lucide-react";
+import { Play, Sparkles, RotateCcw, AlertCircle, FileText, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp } from "lucide-react";
 import {
   strategyLabApi,
   type StrategySession,
@@ -31,6 +31,13 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const [refine, setRefine] = useState<RefineStrategyResponse | null>(null);
   const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [equityExperimentId, setEquityExperimentId] = useState<string | null>(null);
+
+  const equityCurve = useQuery({
+    queryKey: ["equity-curve", equityExperimentId],
+    queryFn: () => strategyLabApi.getEquityCurve(equityExperimentId!),
+    enabled: !!equityExperimentId,
+  });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // On mount, load existing experiments so navigating back shows previous results
@@ -199,7 +206,50 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
                   setSelectedWinner(id);
                   onWinnerPicked(id);
                 }}
+                onShowEquity={(id) => setEquityExperimentId(id)}
               />
+            )}
+
+            {/* Equity curve chart */}
+            {equityCurve.data && equityCurve.data.equity_curve.length > 0 && (
+              <div className="slab-panel" style={{ maxWidth: 1280, marginTop: 16 }}>
+                <div className="slab-panel__head">
+                  <span className="slab-eyebrow slab-eyebrow--gold">
+                    <TrendingUp size={11} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                    Equity Curve
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEquityExperimentId(null)}
+                    className="slab-btn slab-btn--xs slab-btn--ghost"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div style={{ padding: 16 }}>
+                  <svg viewBox="0 0 800 240" style={{ width: "100%", height: 240 }}>
+                    {(() => {
+                      const pts = equityCurve.data.equity_curve;
+                      const values = pts.map((p) => p.value);
+                      const min = Math.min(...values);
+                      const max = Math.max(...values);
+                      const range = max - min || 1;
+                      const w = 800;
+                      const h = 220;
+                      const pad = 10;
+                      const path = pts
+                        .map((p, i) => {
+                          const x = pad + (i / (pts.length - 1)) * (w - 2 * pad);
+                          const y = pad + h - ((p.value - min) / range) * (h - 2 * pad);
+                          return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+                        })
+                        .join(" ");
+                      const color = values[values.length - 1] >= values[0] ? "var(--slab-terminal)" : "var(--slab-rose)";
+                      return <path d={path} fill="none" stroke={color} strokeWidth={2} />;
+                    })()}
+                  </svg>
+                </div>
+              </div>
             )}
 
             {isDone && stats && stats.n_completed > 0 && (
@@ -366,34 +416,82 @@ function LiveTicker({ completed, total, failed, isRunning, batchId }: {
   );
 }
 
-// ── Experiments table ─────────────────────────────────────────────────
-function ExperimentTable({ rows, selectedWinner, onPick }: {
+// ── Experiments table with sorting ────────────────────────────────────
+type SortKey = "run_index" | "start_date" | "total_return_pct" | "alpha_pct" | "win_rate" | "cagr_pct" | "sharpe_ratio" | "total_trades";
+type SortDir = "asc" | "desc";
+
+function ExperimentTable({ rows, selectedWinner, onPick, onShowEquity }: {
   rows: ExperimentRow[]; selectedWinner: string | null;
   onPick: (id: string) => void;
+  onShowEquity: (id: string) => void;
 }) {
-  const sorted = useMemoSortByIndex(rows);
+  const [sortKey, setSortKey] = useState<SortKey>("run_index");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    const k = sortKey;
+    const d = sortDir;
+    copy.sort((a, b) => {
+      let va: any, vb: any;
+      if (k === "run_index") { va = a.run_index; vb = b.run_index; }
+      else if (k === "start_date") { va = a.start_date || ""; vb = b.start_date || ""; }
+      else { va = a.kpis?.[k]; vb = b.kpis?.[k]; }
+      if (va == null) va = k === "run_index" ? 9999 : -999999;
+      if (vb == null) vb = k === "run_index" ? 9999 : -999999;
+      return d === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+    });
+    return copy;
+  }, [rows, sortKey, sortDir]);
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown size={10} style={{ opacity: 0.3, verticalAlign: "middle", marginLeft: 4 }} />;
+    return sortDir === "asc"
+      ? <ArrowUp size={10} style={{ verticalAlign: "middle", marginLeft: 4 }} />
+      : <ArrowDown size={10} style={{ verticalAlign: "middle", marginLeft: 4 }} />;
+  };
+
+  const Th = ({ columnKey, children }: { columnKey: SortKey; children: React.ReactNode }) => (
+    <th className="slab-table__num" onClick={() => handleSort(columnKey)} style={{ cursor: "pointer", userSelect: "none" }}>
+      {children}<SortIcon columnKey={columnKey} />
+    </th>
+  );
 
   return (
     <div className="slab-panel" style={{ maxWidth: 1280, marginTop: 24 }}>
       <div className="slab-panel__head">
         <span className="slab-eyebrow slab-eyebrow--gold">// Runs</span>
         <span className="slab-mono slab-mono--xs slab-mono--dim">
-          click <span style={{ color: "var(--slab-gold)" }}>pick</span> to mark the winner
+          click <span style={{ color: "var(--slab-gold)" }}>pick</span> to mark the winner · click <span style={{ color: "var(--slab-cyan)" }}>chart</span> for equity curve
         </span>
       </div>
       <div style={{ maxHeight: 480, overflow: "auto" }}>
         <table className="slab-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Start</th>
-              <th className="slab-table__num">Return</th>
-              <th className="slab-table__num">Alpha</th>
-              <th className="slab-table__num">Win%</th>
-              <th className="slab-table__num">P/Fact</th>
-              <th className="slab-table__num">Trades</th>
-              <th className="slab-table__num">R/Draw</th>
+              <th onClick={() => handleSort("run_index")} style={{ cursor: "pointer" }}>
+                #<SortIcon columnKey="run_index" />
+              </th>
+              <th onClick={() => handleSort("start_date")} style={{ cursor: "pointer" }}>
+                Start<SortIcon columnKey="start_date" />
+              </th>
+              <Th columnKey="total_return_pct">Return</Th>
+              <Th columnKey="alpha_pct">Alpha</Th>
+              <Th columnKey="win_rate">Win%</Th>
+              <Th columnKey="cagr_pct">CAGR%</Th>
+              <Th columnKey="total_trades">Trades</Th>
+              <Th columnKey="sharpe_ratio">Sharpe</Th>
               <th>Status</th>
+              <th></th>
               <th></th>
             </tr>
           </thead>
@@ -404,6 +502,7 @@ function ExperimentTable({ rows, selectedWinner, onPick }: {
                 row={row}
                 isSelected={selectedWinner === row.id}
                 onPick={() => onPick(row.id)}
+                onShowEquity={() => onShowEquity(row.id)}
               />
             ))}
           </tbody>
@@ -413,12 +512,11 @@ function ExperimentTable({ rows, selectedWinner, onPick }: {
   );
 }
 
-function ExperimentRowView({ row, isSelected, onPick }: {
-  row: ExperimentRow; isSelected: boolean; onPick: () => void;
+function ExperimentRowView({ row, isSelected, onPick, onShowEquity }: {
+  row: ExperimentRow; isSelected: boolean; onPick: () => void; onShowEquity: () => void;
 }) {
   const k = row.kpis;
   const ret = k?.total_return_pct;
-  const sharpe = ret != null && k?.max_drawdown_pct ? ret / Math.abs(k.max_drawdown_pct) : null;
   return (
     <tr className={isSelected ? "slab-table__row--selected" : ""}>
       <td>{String(row.run_index).padStart(3, "0")}</td>
@@ -428,14 +526,26 @@ function ExperimentRowView({ row, isSelected, onPick }: {
       </td>
       <td className="slab-table__num">{k?.alpha_pct != null ? `${k.alpha_pct >= 0 ? "+" : ""}${k.alpha_pct.toFixed(1)}%` : "—"}</td>
       <td className="slab-table__num">{k?.win_rate != null ? `${k.win_rate.toFixed(1)}%` : "—"}</td>
-      <td className="slab-table__num">{k?.profit_factor != null ? k.profit_factor.toFixed(2) : "—"}</td>
+      <td className="slab-table__num">{k?.cagr_pct != null ? `${k.cagr_pct.toFixed(1)}%` : "—"}</td>
       <td className="slab-table__num">{k?.total_trades ?? "—"}</td>
-      <td className="slab-table__num">{sharpe != null ? sharpe.toFixed(2) : "—"}</td>
+      <td className="slab-table__num">{k?.sharpe_ratio != null ? k.sharpe_ratio.toFixed(2) : "—"}</td>
       <td>
         {row.status === "completed" ? (
           <span className="slab-tag slab-tag--terminal">OK</span>
         ) : (
           <span className="slab-tag slab-tag--rose" title={row.error_message ?? ""}>FAIL</span>
+        )}
+      </td>
+      <td>
+        {row.status === "completed" && (
+          <button
+            type="button"
+            onClick={onShowEquity}
+            className="slab-btn slab-btn--xs slab-btn--ghost"
+            title="Show equity curve"
+          >
+            <TrendingUp size={11} />
+          </button>
         )}
       </td>
       <td>
@@ -451,10 +561,6 @@ function ExperimentRowView({ row, isSelected, onPick }: {
       </td>
     </tr>
   );
-}
-
-function useMemoSortByIndex(rows: ExperimentRow[]) {
-  return useMemo(() => rows.slice().sort((a, b) => a.run_index - b.run_index), [rows]);
 }
 
 // ── Post-batch actions ────────────────────────────────────────────────

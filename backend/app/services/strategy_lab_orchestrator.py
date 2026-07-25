@@ -73,10 +73,23 @@ def get_batch(batch_id: str) -> Optional[ExperimentBatch]:
 
 
 def _write_strategy_file(session_id: str, code_text: str) -> Path:
-    """Write the LLM-generated strategy code to a deterministic path."""
-    session_dir = GENERATED_ROOT / session_id
+    """Write the LLM-generated strategy code to a temp directory.
+
+    Uses /tmp/strategy_lab_generated/ to avoid triggering uvicorn --reload
+    (which watches the project root for file changes). The engine path in
+    the generated code is rewritten to an absolute path so the import works
+    regardless of where the temp file is written.
+    """
+    import tempfile
+    session_dir = Path(tempfile.gettempdir()) / "strategy_lab_generated" / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     strategy_path = session_dir / "strategy.py"
+    # Rewrite the relative engine path to an absolute path
+    engine_abs = str(ENGINE_PATH)
+    code_text = code_text.replace(
+        'os.path.join(os.path.dirname(__file__), "..", "..", "engine.py")',
+        repr(engine_abs),
+    )
     strategy_path.write_text(code_text)
     return strategy_path
 
@@ -179,11 +192,19 @@ def _run_one(
 
         result_data = engine_mod.StrategyEngine(cfg).run()
         summary = result_data["summary"]
+        # Include equity curve (last 500 points max to keep payload reasonable)
+        equity_curve = result_data.get("daily_equity", [])
+        if len(equity_curve) > 500:
+            # Downsample: keep first, last, and evenly spaced points in between
+            step = len(equity_curve) / 498
+            indices = [0] + [int(i * step) for i in range(1, 498)] + [len(equity_curve) - 1]
+            equity_curve = [equity_curve[i] for i in sorted(set(indices))]
 
         return {
             "run_index": run_index,
             "status": "completed",
             "kpis": summary,
+            "equity_curve": equity_curve,
             "started_at": started_at,
             "completed_at": datetime.now().isoformat(),
             "start_date": as_of,
@@ -241,6 +262,7 @@ def run_batch(
                     end_date=event.get("end_date"),
                     status=event["status"],
                     kpis=event.get("kpis"),
+                    equity_curve=event.get("equity_curve"),
                     error_message=event.get("error_message"),
                 )
                 db.add(exp)
@@ -249,7 +271,11 @@ def run_batch(
             logger.exception("Failed to persist experiment: %s", e)
 
     def _worker():
+        import traceback as _tb
         try:
+            # Log that worker started
+            with open("/tmp/strategy_lab_worker.log", "a") as _f:
+                _f.write(f"Worker started for batch {batch_id}\n")
             with ThreadPoolExecutor(max_workers=min(4, n_runs)) as ex:
                 futures = []
                 for i in range(n_runs):
@@ -258,13 +284,19 @@ def run_batch(
                     futures.append(fut)
 
                 for fut in as_completed(futures):
-                    result = fut.result()
+                    try:
+                        result = fut.result()
+                    except Exception as run_err:
+                        logger.exception("Run failed: %s", run_err)
+                        continue
                     # Persist to DB (durable, survives SSE disconnects)
                     _persist_event(result)
                     # Push to in-memory queue (SSE stream)
                     batch.queue.put(result)
         except Exception as e:
             logger.exception("Batch %s failed: %s", batch_id, e)
+            with open("/tmp/strategy_lab_worker.log", "a") as _f:
+                _f.write(f"Batch {batch_id} failed: {e}\n{_tb.format_exc()}\n")
         finally:
             # Mark done and push sentinel
             with batch.lock:

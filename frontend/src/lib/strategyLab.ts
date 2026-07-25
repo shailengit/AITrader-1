@@ -259,6 +259,11 @@ export const strategyLabApi = {
   refineDirect: (id: string, body: { instruction: string; model?: string }) =>
     postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body),
 
+  getEquityCurve: (experimentId: string) =>
+    getJson<{ equity_curve: Array<{ date: string; value: number }> }>(
+      `${base}/experiments/${experimentId}/equity-curve`,
+    ),
+
   rollbackDeployment: (deploymentId: string) =>
     postJson<{ rolled_back_deployment_id: string; new_active_class_name: string }>(
       `${base}/deployments/${deploymentId}/rollback`,
