@@ -35,14 +35,13 @@ def _get_client_and_model(model: Optional[str] = None) -> Tuple[Optional[OpenAI]
     """Build a per-request OpenAI client and resolve the model name.
 
     If `model` is None, falls back to the OLLAMA_MODEL env var.
+    The client is created with a generous timeout (300s) and 2 retries
+    to handle transient failures and long-running code generation.
     """
     api_base = os.environ.get("LOCAL_LLM_API_BASE", "http://localhost:11434/v1")
     api_key = os.environ.get("LOCAL_LLM_API_KEY", "not-needed")
-    # Timeout: long enough to absorb cloud-model latency (typical 15–30s
-    # for plan, 30–60s for code) plus a retry, but short enough that the
-    # user doesn't wait indefinitely on a hung model.
     try:
-        client = OpenAI(base_url=api_base, api_key=api_key, timeout=90, max_retries=0)
+        client = OpenAI(base_url=api_base, api_key=api_key, timeout=300, max_retries=2)
     except Exception as e:
         logger.error("Failed to create OpenAI client: %s", e)
         return None, ""
@@ -62,14 +61,29 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
     client, model_name = _get_client_and_model(model)
     if client is None:
         return None, None, "LLM client not initialized"
-    try:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=timeout,
-        )
+
+    # Resolve fallback model: explicit model arg → env var → hardcoded default
+    fallback_model = os.environ.get("OLLAMA_MODEL_FALLBACK", "minimax-m3:cloud")
+
+    for attempt, current_model in enumerate([model_name, fallback_model]):
+        if attempt > 0:
+            logger.info("Falling back to model %s after %s failed", current_model, model_name)
+        try:
+            response = client.chat.completions.create(
+                model=current_model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
+        except Exception as e:
+            err_str = f"{type(e).__name__}: {e}"
+            is_model_error = "not found" in err_str.lower() or "404" in err_str or "model" in err_str.lower()
+            if is_model_error and attempt == 0:
+                logger.warning("Model %s failed (%s), trying fallback %s", current_model, err_str, fallback_model)
+                continue
+            return None, None, f"LLM call failed: {err_str}"
+
         choice = response.choices[0]
         content = choice.message.content
         finish_reason = getattr(choice, "finish_reason", None)
@@ -83,14 +97,14 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
                 logger.info(
                     "LLM returned empty content but has reasoning field — "
                     "using reasoning as content (model=%s, finish_reason=%s)",
-                    model_name, finish_reason,
+                    current_model, finish_reason,
                 )
                 content = reasoning
 
         if content is None:
             logger.warning(
                 "LLM returned None content: model=%s, finish_reason=%s, usage=%s",
-                model_name, finish_reason, getattr(response, "usage", None),
+                current_model, finish_reason, getattr(response, "usage", None),
             )
             return None, finish_reason, f"LLM returned no content (finish_reason={finish_reason})"
         content = content.strip()
@@ -103,15 +117,16 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
             logger.warning(
                 "LLM returned empty content: model=%s, finish_reason=%s, "
                 "prompt_tokens=%s, completion_tokens=%s, total_tokens=%s",
-                model_name, finish_reason,
+                current_model, finish_reason,
                 getattr(usage, "prompt_tokens", None) if usage else None,
                 getattr(usage, "completion_tokens", None) if usage else None,
                 getattr(usage, "total_tokens", None) if usage else None,
             )
             return None, finish_reason, f"LLM returned empty content (finish_reason={finish_reason})"
         return content, finish_reason, None
-    except Exception as e:
-        return None, None, f"LLM call failed: {type(e).__name__}: {e}"
+
+    # Both models failed
+    return None, None, f"All models failed (primary={model_name}, fallback={fallback_model})"
 
 
 def _extract_code_block(text: str) -> Optional[str]:
