@@ -138,6 +138,18 @@ query = text(
 
 **Affected endpoints:** `/plan`, `/generate-code`, `/refine-code`, `/batches/{id}/summarize`, `/batches/{id}/refine`, `/chat`.
 
+## LLM Call Reliability — Three Layers of Defense
+
+LLM calls fail for three reasons. Each has a fix:
+
+| Failure | Root Cause | Fix |
+|---------|------------|-----|
+| Timeout | Client timeout (90s) < per-request timeout (180s) | Client timeout → 300s |
+| Transient failure | `max_retries=0` | `max_retries=2` |
+| Model unavailable | Single model, no fallback | Auto-fallback to `OLLAMA_MODEL_FALLBACK` (minimax-m3:cloud) |
+
+**Implementation:** `_get_client_and_model()` in `strategy_lab_llm.py` creates the client with `timeout=300, max_retries=2`. The `_chat()` function tries the primary model first; if it returns a 404/model-not-found error, it retries with the fallback model.
+
 ## Coding Agent Architecture
 
 The code generation is now a 3-stage process, not a single LLM call:
