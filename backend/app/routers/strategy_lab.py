@@ -278,6 +278,21 @@ def post_generate_code(
                 cycle, k.get("total_return_pct", 0), k.get("total_trades", 0),
             )
             svc_update_session(db, session_id, code_text=code)
+            # Auto-save to library
+            try:
+                from app.services.strategy_lab_library import save_strategy
+                save_strategy(
+                    name=sess.name or "unnamed",
+                    code=code,
+                    prompt=sess.prompt or "",
+                    plan=sess.plan_text or "",
+                    kpis=k,
+                    change_description="Auto-saved after code generation",
+                    model_id=sess.model_id,
+                    session_id=str(session_id),
+                )
+            except Exception as lib_err:
+                logger.warning("Auto-save to library failed: %s", lib_err)
             return GenerateCodeResponse(
                 code=code,
                 validation_status="passed",
