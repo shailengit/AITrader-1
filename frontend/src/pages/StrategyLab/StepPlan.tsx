@@ -26,6 +26,11 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generatePlan(session.id, { model }),
     onSuccess: (r) => {
+      if (r.error) {
+        setStatus("error");
+        setErrorMsg(r.error);
+        return;
+      }
       setPlanText(r.plan_text);
       setStatus("ready");
       setErrorMsg("");

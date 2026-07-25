@@ -46,6 +46,7 @@ export interface ListSessionsParams {
 
 export interface PlanResponse {
   plan_text: string;
+  error?: string;
 }
 
 export interface GenerateCodeResponse {
@@ -58,6 +59,7 @@ export interface GenerateCodeResponse {
 export interface RefineCodeResponse {
   diff: string;
   summary: string;
+  error?: string;
 }
 
 export interface ApplyDiffResponse {
@@ -93,12 +95,14 @@ export interface SummarizeResponse {
   summary_id: string;
   summary_text: string;
   winner_run_id: string | null;
+  error?: string;
 }
 
 export interface RefineStrategyResponse {
   diff: string;
   summary: string;
   rationale: string;
+  error?: string;
 }
 
 export interface ChatMessage {

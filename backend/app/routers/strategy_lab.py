@@ -156,7 +156,8 @@ class PlanRequest(BaseModel):
 
 
 class PlanResponse(BaseModel):
-    plan_text: str
+    plan_text: str = ""
+    error: Optional[str] = None
 
 
 class GenerateCodeRequest(BaseModel):
@@ -178,8 +179,9 @@ class RefineCodeRequest(BaseModel):
 
 
 class RefineCodeResponse(BaseModel):
-    diff: str
-    summary: str  # e.g. "+3 -1 in 1 hunk(s)"
+    diff: str = ""
+    summary: str = ""
+    error: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/plan", response_model=PlanResponse)
@@ -195,7 +197,8 @@ def post_plan(
         raise HTTPException(status_code=404, detail="session not found")
     plan, err = generate_plan(sess.prompt, model=body.model)
     if err or plan is None:
-        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+        logger.error("Plan generation failed: %s", err)
+        return PlanResponse(error=err or "LLM returned no content")
     # Persist
     svc_update_session(db, session_id, plan_text=plan)
     return PlanResponse(plan_text=plan)
@@ -314,13 +317,14 @@ def post_generate_code(
             validation_log=validation_log,
         )
 
-    raise HTTPException(
-        status_code=502,
-        detail={
-            "error": "code_generation_failed",
-            "details": f"All attempts failed. Last error: {last_error}",
-            "validation_log": validation_log,
-        },
+    # Unreachable: if code is None after generate, we return early above.
+    # If code is set, the debug loop either passes or saves code anyway.
+    # This is a safety net in case the logic changes.
+    return GenerateCodeResponse(
+        code=code or "",
+        validation_status="failed",
+        validation_attempts=max_generate_attempts,
+        validation_log=validation_log + ["Unexpected state — no code and no error"],
     )
 
 
@@ -341,7 +345,8 @@ def post_refine_code(
         raise HTTPException(status_code=400, detail="no code_text available — generate code first")
     diff, err = generate_refine_diff(current, body.instruction, model=body.model)
     if err or diff is None:
-        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+        logger.error("Refine diff generation failed: %s", err)
+        return RefineCodeResponse(diff="", summary="", error=err or "LLM returned no diff")
     return RefineCodeResponse(diff=diff, summary=diff_summary(diff))
 
 
@@ -546,9 +551,10 @@ class SummarizeRequest(BaseModel):
 
 
 class SummarizeResponse(BaseModel):
-    summary_id: str
-    summary_text: str
+    summary_id: str = ""
+    summary_text: str = ""
     winner_run_id: Optional[str] = None
+    error: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/batches/{batch_id}/summarize", response_model=SummarizeResponse)
@@ -582,7 +588,8 @@ def summarize_batch(
     kpis_table = json.dumps(rows, indent=2)
     summary, err = summarize_batch(kpis_table, len(exps), model=body.model)
     if err or summary is None:
-        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+        logger.error("Batch summarize failed: %s", err)
+        return SummarizeResponse(summary_id="", summary_text="", error=err or "LLM returned no summary")
     stats = get_batch_stats(db, batch_id)
     winner_id = uuid.UUID(stats["best_experiment_id"]) if stats.get("best_experiment_id") else None
     saved = create_batch_summary(
@@ -605,9 +612,10 @@ class RefineStrategyRequest(BaseModel):
 
 
 class RefineStrategyResponse(BaseModel):
-    diff: str
-    summary: str
-    rationale: str  # the LLM's reasoning
+    diff: str = ""
+    summary: str = ""
+    rationale: str = ""
+    error: Optional[str] = None  # the LLM's reasoning
 
 
 @router.post("/sessions/{session_id}/batches/{batch_id}/refine", response_model=RefineStrategyResponse)
@@ -632,7 +640,8 @@ def refine_strategy_after_batch(
     worst_table = json.dumps(stats["worst_3"], indent=2, default=str)
     diff, err = refine_strategy(sess.code_text, summary_text, worst_table, model=body.model)
     if err or diff is None:
-        raise HTTPException(status_code=502, detail={"error": "llm_failed", "details": err})
+        logger.error("Refine strategy failed: %s", err)
+        return RefineStrategyResponse(diff="", summary="", rationale="", error=err or "LLM returned no diff")
     return RefineStrategyResponse(
         diff=diff,
         summary=diff_summary(diff),
@@ -780,7 +789,8 @@ def post_chat(
             model=body.model, critique_of=critique_uuid,
         )
     except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=502, detail={"error": "chat_failed", "details": str(e)})
+        logger.error("Chat failed: %s", e)
+        return ChatResponse(response=f"Sorry, I encountered an error: {e}", history=[])
     return ChatResponse(
         response=response_text,
         history=[ChatMessageResponse(**h) for h in history],
