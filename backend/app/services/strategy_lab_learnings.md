@@ -150,6 +150,14 @@ LLM calls fail for three reasons. Each has a fix:
 
 **Implementation:** `_get_client_and_model()` in `strategy_lab_llm.py` creates the client with `timeout=300, max_retries=2`. The `_chat()` function tries the primary model first; if it returns a 404/model-not-found error, it retries with the fallback model.
 
+## Never Use Diffs for Code Refinement
+
+**Rule:** The "Refine with AI" feature must NEVER use diffs. Diffs are fragile — context lines drift, hunks don't match, and the user sees vague errors.
+
+**Instead:** The LLM produces the COMPLETE modified file directly. The same validation + debug loop used for code generation ensures the modified code runs.
+
+**Implementation:** `refine_code_direct()` in `strategy_lab_llm.py` calls the LLM with the current code + instruction and returns the complete modified file. The `POST /sessions/{id}/refine-direct` endpoint validates with a backtest and runs up to 3 debug cycles if it fails.
+
 ## Coding Agent Architecture
 
 The code generation is now a 3-stage process, not a single LLM call:
