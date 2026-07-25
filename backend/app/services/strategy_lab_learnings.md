@@ -184,6 +184,16 @@ The code generation is now a 3-stage process, not a single LLM call:
 - `backend/app/services/strategy_lab_llm.py:debug_code()` — debug LLM call
 - `backend/app/routers/strategy_lab.py:post_generate_code()` — 3-stage loop
 
+## Strategy Library
+
+Strategies are auto-saved to `strategies/library/<name>/v<N>/` with `strategy.py` + `meta.json`.
+
+**Auto-save triggers:** After code generation validation passes, after batch backtest completes, on deploy, and manual save.
+
+**Library step:** Step 0 in the sidebar — browse saved strategies, load into a new session skipping steps 1-2.
+
+**Version tracking:** Each refinement creates a new version folder (v1, v2, v3...). The `meta.json` tracks prompt, plan, KPIs, and change description.
+
 ## Equity Curve Storage
 
 The `strategy_experiments` table has an `equity_curve` JSONB column that stores the daily portfolio value for each backtest run. The data is downsampled to a maximum of 500 points to keep the payload reasonable.
