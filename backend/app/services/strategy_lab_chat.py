@@ -1,10 +1,13 @@
 """Chat service for the Strategy Lab performance chatbot.
 
 Provides session-scoped, stateful chat with multi-LLM support and
-cross-model critique functionality.
+cross-model critique functionality. Also detects code-change intent
+from the LLM and returns structured instructions for the frontend
+to trigger the refine-direct flow.
 """
 import json
 import logging
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
@@ -53,6 +56,20 @@ def add_chat_message(db: Session, session_id: UUID, role: str, content: str,
     db.commit()
     db.refresh(msg)
     return msg
+
+
+def _extract_code_change(text: str) -> Tuple[str, Optional[str]]:
+    """Parse [CODE_CHANGE: ...] marker from the end of the response.
+
+    Returns (cleaned_text, instruction_or_None). The marker must be on
+    its own line at the very end of the response.
+    """
+    m = re.search(r'\n?\[CODE_CHANGE:\s*(.+?)\]\s*$', text, re.DOTALL)
+    if m:
+        instruction = m.group(1).strip()
+        cleaned = text[:m.start()].strip()
+        return cleaned, instruction
+    return text, None
 
 
 def build_chat_context(db: Session, session: StrategySession) -> str:
@@ -105,8 +122,13 @@ def build_chat_context(db: Session, session: StrategySession) -> str:
 
 
 def chat_with_llm(db: Session, session_id: UUID, user_message: str,
-                  model: str, critique_of: Optional[UUID] = None) -> Tuple[str, List[Dict[str, Any]]]:
-    """Process a chat message and return (response_text, updated_history)."""
+                  model: str, critique_of: Optional[UUID] = None) -> Tuple[str, List[Dict[str, Any]], Optional[str]]:
+    """Process a chat message and return (response_text, updated_history, code_change_instruction).
+
+    If the LLM detects a code-change intent, it emits a [CODE_CHANGE: ...] marker
+    at the end of its response. This function parses that marker and returns the
+    instruction separately so the frontend can show an "Apply change" button.
+    """
     # Store user message
     add_chat_message(db, session_id, "user", user_message, model_id=model)
 
@@ -134,7 +156,23 @@ def chat_with_llm(db: Session, session_id: UUID, user_message: str,
             "You are a quantitative analyst assistant. You have access to the strategy plan, code, "
             "and backtest results. Answer questions about performance, compare runs, suggest improvements. "
             "Be specific — reference actual numbers and runs. Be concise.\n\n"
-            f"## Session Context\n\n{context}"
+            f"## Session Context\n\n{context}\n\n"
+            "---\n"
+            "CODE CHANGE INSTRUCTIONS:\n"
+            "If the user asks you to modify the strategy code (add/remove/change filters, "
+            "adjust parameters, change exit logic, etc.), include a code-change marker at "
+            "the END of your response in this exact format:\n\n"
+            "[CODE_CHANGE: <one-line instruction describing the change>]\n\n"
+            "The marker must be on its own line at the very end. "
+            "If the user is just asking a question or requesting analysis, do NOT include the marker.\n\n"
+            "If the user asks to modify the code but the request is ambiguous or "
+            "could be interpreted multiple ways, ask ONE clarifying question before "
+            "proceeding. For example:\n"
+            "  User: \"make it more aggressive\"\n"
+            "  Bot: \"Do you mean widen the trailing stop, increase max_holdings, "
+            "or reduce min_hold_days?\"\n\n"
+            "Only include the [CODE_CHANGE: ...] marker when the instruction is "
+            "clear and specific enough to act on."
         )
 
     # Load conversation history (last 20 messages)
@@ -151,9 +189,12 @@ def chat_with_llm(db: Session, session_id: UUID, user_message: str,
     if err or content is None:
         raise RuntimeError(err or "LLM returned empty response")
 
-    # Store assistant response
-    add_chat_message(db, session_id, "assistant", content, model_id=model, critique_of=critique_of)
+    # Parse code-change marker
+    cleaned_text, code_change_instruction = _extract_code_change(content)
+
+    # Store assistant response (with cleaned text, no marker)
+    add_chat_message(db, session_id, "assistant", cleaned_text, model_id=model, critique_of=critique_of)
 
     # Return updated history
     updated_history = get_chat_history(db, session_id, limit=20)
-    return content, updated_history
+    return cleaned_text, updated_history, code_change_instruction
