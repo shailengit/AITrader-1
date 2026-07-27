@@ -136,12 +136,14 @@ export interface ChatMessage {
   content: string;
   model_id: string;
   critique_of?: string;
+  code_change_instruction?: string;
   created_at: string;
 }
 
 export interface ChatResponse {
   response: string;
   history: ChatMessage[];
+  code_change_instruction?: string;
 }
 
 export interface DeploymentInfo {
@@ -274,7 +276,7 @@ export const strategyLabApi = {
     return getJson<DeploymentListItem[]>(`${base}/deployments${qs ? `?${qs}` : ""}`);
   },
 
-  refineDirect: (id: string, body: { instruction: string; model?: string }) =>
+  refineDirect: (id: string, body: { instruction: string; model?: string; validation_runs?: number }) =>
     postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body),
 
   saveToLibrary: (id: string, body: { name: string; change_description?: string; model?: string }) =>
