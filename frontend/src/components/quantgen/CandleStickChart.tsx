@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart,
   ColorType,
@@ -8,11 +8,13 @@ import {
   createSeriesMarkers,
   IChartApi,
   ISeriesApi,
+  IPriceLine,
   Time,
   CandlestickData,
   HistogramData,
   SeriesMarker,
   LineData,
+  LineStyle,
   SeriesMarkerShape,
   SeriesMarkerPosition,
 } from 'lightweight-charts';
@@ -46,11 +48,44 @@ interface Indicator {
   color?: string;
   lineWidth?: number;
   /**
+   * Series type. 'line' (default) draws a continuous line.
+   * 'bar' draws a histogram (per-bar color) — used for MACD
+   * histogram, OBV, and other volume-style series. */
+  seriesType?: 'line' | 'bar';
+  /**
+   * Per-data-point colors for 'bar' series. When provided, each
+   * bar uses the matching color; when omitted, the bar uses the
+   * series color. */
+  dataColors?: ('#10b981' | '#f43f5e' | string)[];
+  /**
+   * Line style for the series. 'solid' (default) draws a continuous
+   * line; 'dashed' / 'dotted' draw a stepped-dash pattern to
+   * visually distinguish companion series (e.g. Bollinger upper /
+   * lower bands) from the primary series (the middle band). */
+  lineStyle?: 'solid' | 'dashed' | 'dotted' | 'large_dashed' | 'sparse_dotted';
+  /**
    * When false, the line series is not registered on the chart at all
    * (no legend entry, no render). When true (default) or omitted, the
    * series is created and plotted normally.
    */
   visible?: boolean;
+  /**
+   * Where to render the series.
+   *  - 'overlay' (default): drawn on the candle pane sharing the price
+   *    scale — for price-scaled indicators (SMA, EMA, Bollinger, PSAR, …).
+   *  - 'oscillator': drawn in its OWN pane below the candles with an
+   *    independent price scale — for oscillators (RSI, MACD, ADX, ATR,
+   *    volume oscillators, …) so they never get squished against the
+   *    price axis or share a scale with another oscillator.
+   */
+  pane?: 'overlay' | 'oscillator';
+  /**
+   * Optional canonical midline (e.g. 50 for RSI, 0 for MACD/ROC, 25 for
+   * ADX). When provided, the chart draws a horizontal reference line at
+   * that value so the user can read the indicator's state at a glance.
+   * Line is bound to the series — toggling the indicator off removes it.
+   * Ignored when omitted or for overlay (price-scaled) indicators. */
+  midline?: number | null;
 }
 
 interface CandleStickChartProps {
@@ -63,6 +98,21 @@ interface CandleStickChartProps {
 }
 
 /** Parse mm/dd/yyyy or yyyy-mm-dd to UTC timestamp in seconds. */
+/** Map string line style to lightweight-charts LineStyle enum. Companion
+ *  series (e.g. Bollinger upper/lower bands) use a stepped-dash pattern
+ *  to visually distinguish them from the primary series (the middle
+ *  band). Used for any series that should look secondary on the chart. */
+function lineStyleMap(style: string | undefined) {
+  switch (style) {
+    case 'dashed': return LineStyle.Dashed;
+    case 'dotted': return LineStyle.Dotted;
+    case 'large_dashed': return LineStyle.LargeDashed;
+    case 'sparse_dotted': return LineStyle.SparseDotted;
+    case 'solid':
+    default: return LineStyle.Solid;
+  }
+}
+
 function parseDateToTimestamp(dateStr: string): number | null {
   // Try mm/dd/yyyy
   const slashParts = dateStr.split('/');
@@ -153,8 +203,41 @@ export function CandleStickChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'>>>({});
+  const indicatorSeriesRef = useRef<Record<string, ISeriesApi<'Line'> | ISeriesApi<'Histogram'>>>({});
+  // Price lines bound to each indicator series (RSI's midline=50, MACD's
+  // midline=0, …). Tracked separately so the destroy/recreate effect
+  // can remove them with their series without leaking ghost lines.
+  const indicatorPriceLinesRef = useRef<Record<string, IPriceLine[]>>({});
   const cutoffLineRef = useRef<VerticalLinePrimitive | null>(null);
+
+  // Total chart height the layout actually needs (sum of all pane
+  // heights + the time-scale row at the bottom). The wrapper's inline
+  // height is driven from this so the container grows to fit pinned
+  // oscillator panes and the outer chart panel's `overflowY: 'auto'`
+  // provides the scrollbar. Without this, panes 2..N would be clipped
+  // by the fixed wrapper height and become unreachable.
+  const [chartTotalHeight, setChartTotalHeight] = useState(height);
+
+  /**
+   * Total chart height for a given candle-pane target and oscillator
+   * count. Each pane is `candleTarget` px tall (stretch 1:1:…), plus
+   * a fixed budget for the time-scale row at the bottom.
+   *
+   * The candle pane must stay at `candleTarget` regardless of how
+   * many oscillator panes are added — that's why we *grow* the chart
+   * rather than squeezing the candle pane. */
+  const computeTotalHeight = (candleTarget: number, oscillatorCount: number): number => {
+    return candleTarget * (1 + Math.max(0, oscillatorCount)) + 30; // 30 = time-scale row
+  };
+
+  /** Number of oscillator (non-overlay) indicators in the current payload. */
+  const oscillatorCount = useMemo(
+    () => indicators.filter((i) => i.pane === 'oscillator' && i.visible !== false && i.data?.length).length,
+    [indicators],
+  );
+
+  /** Total chart height the lightweight-charts canvas should be sized to. */
+  const totalChartHeight = computeTotalHeight(height, oscillatorCount);
 
   const applyVisibleRange = () => {
     if (!chartRef.current) return;
@@ -189,7 +272,7 @@ export function CandleStickChart({
         horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
       },
       width: chartContainerRef.current.clientWidth,
-      height: height,
+      height: totalChartHeight,
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
@@ -236,13 +319,14 @@ export function CandleStickChart({
   }, []);
 
   // Adjust chart height without tearing down the chart. Runs whenever
-  // the height prop changes. Lightweight-charts accepts a height change
-  // via `applyOptions` and the series stay attached across height
-  // changes (expand/collapse, full-page vs drawer).
+  // the height prop changes (candle target) OR when the number of
+  // oscillator panes changes — the total height must grow to keep
+  // every pane at the candle's full size. Lightweight-charts accepts
+  // a height change via `applyOptions` and the series stay attached.
   useEffect(() => {
     if (!chartRef.current) return;
-    chartRef.current.applyOptions({ height });
-  }, [height]);
+    chartRef.current.applyOptions({ height: totalChartHeight });
+  }, [totalChartHeight]);
 
   // Update candlestick data
   useEffect(() => {
@@ -343,10 +427,18 @@ export function CandleStickChart({
   useEffect(() => {
     if (!chartRef.current || !indicators.length) return;
 
-    // Clear existing indicator series
-    Object.values(indicatorSeriesRef.current).forEach((series) => {
+    // Clear existing indicator series AND their bound price lines
+    // (midline references). Removing the series also drops the price
+    // lines in lightweight-charts, but we clear the tracking ref so
+    // the next render starts from a known-empty state.
+    Object.entries(indicatorSeriesRef.current).forEach(([name, series]) => {
       if (series && chartRef.current) {
         try {
+          const lines = indicatorPriceLinesRef.current[name] ?? [];
+          for (const line of lines) {
+            try { series.removePriceLine(line); } catch { /* ignore */ }
+          }
+          indicatorPriceLinesRef.current[name] = [];
           chartRef.current.removeSeries(series);
         } catch {
           // Series may already be removed during unmount; ignore
@@ -354,6 +446,27 @@ export function CandleStickChart({
       }
     });
     indicatorSeriesRef.current = {};
+    indicatorPriceLinesRef.current = {};
+
+    // Remove any oscillator panes left over from a previous render so
+    // the pane count matches the current indicator set. Pane 0 holds
+    // candles + volume + overlays and is never removed. Clear from the
+    // highest index down so removal doesn't shift the indices we still
+    // need to touch.
+    const panesBefore = chartRef.current.panes();
+    for (let i = panesBefore.length - 1; i >= 1; i--) {
+      try {
+        chartRef.current.removePane(i);
+      } catch {
+        // Pane may already be gone; ignore
+      }
+    }
+
+    // Pane assignment. Overlays share pane 0 with the candles (price
+    // scale). Each oscillator gets its OWN pane (1, 2, …) with an
+    // independent price scale, so RSI (0-100), MACD (~0), ADX (0-100),
+    // ATR, OBV, … never share an axis with price or with each other.
+    let oscillatorPane = 1;
 
     indicators.forEach((indicator, index) => {
       // Skip indicators the caller marked invisible. The caller is
@@ -367,28 +480,132 @@ export function CandleStickChart({
         const hue = (index * 137.508) % 360;
         const color = indicator.color || `hsl(${hue}, 70%, 50%)`;
 
-        const lineSeries = chartRef.current!.addSeries(LineSeries, {
-          color: color,
-          lineWidth: (indicator.lineWidth || 2) as 1 | 2 | 3 | 4,
-          priceLineVisible: false,
-          crosshairMarkerVisible: true,
-          lastValueVisible: true,
-          priceScaleId: 'right',
-        });
+        const isOscillator = indicator.pane === 'oscillator';
+        const paneIndex = isOscillator ? oscillatorPane : 0;
+        const isBar = indicator.seriesType === 'bar';
 
-        const indicatorData: LineData[] = indicator.data
-          .filter((d) => d && d.time && d.value !== undefined)
-          .map((d) => ({
-            time: (typeof d.time === 'number' ? Math.floor(d.time) : d.time) as Time,
-            value: d.value,
-          }))
-          .sort((a, b) => (a.time as number) - (b.time as number));
+        // For bar series (MACD histogram, OBV, etc.) the chart uses
+        // HistogramSeries with per-point color. The line series
+        // path is taken for everything else.
+        const lineSeries = chartRef.current!.addSeries(
+          isBar ? HistogramSeries : LineSeries,
+          {
+            color: color,
+            lineWidth: (isBar ? 2 : (indicator.lineWidth || 2)) as 1 | 2 | 3 | 4,
+            lineStyle: lineStyleMap(indicator.lineStyle),
+            priceLineVisible: false,
+            crosshairMarkerVisible: !isBar,
+            lastValueVisible: !isBar,
+            priceScaleId: 'right',
+          },
+          paneIndex,
+        ) as ISeriesApi<'Line'> | ISeriesApi<'Histogram'>;
 
-        lineSeries.setData(indicatorData);
+        if (isOscillator) oscillatorPane += 1;
+
+        if (isBar) {
+          // Bar series: build {time, value, color} per point. The
+          // caller can supply `dataColors` to override the color
+          // per bar (e.g. green for positive MACD histogram, red
+          // for negative). Default to the series color for all
+          // bars.
+          const fallbackColor = color;
+          const histData: HistogramData[] = indicator.data
+            .filter((d) => d && d.time && d.value !== undefined)
+            .map((d, i) => ({
+              time: (typeof d.time === 'number' ? Math.floor(d.time) : d.time) as Time,
+              value: d.value,
+              color: indicator.dataColors?.[i] ?? fallbackColor,
+            }))
+            .sort((a, b) => (a.time as number) - (b.time as number));
+          lineSeries.setData(histData);
+        } else {
+          const indicatorData: LineData[] = indicator.data
+            .filter((d) => d && d.time && d.value !== undefined)
+            .map((d) => ({
+              time: (typeof d.time === 'number' ? Math.floor(d.time) : d.time) as Time,
+              value: d.value,
+            }))
+            .sort((a, b) => (a.time as number) - (b.time as number));
+          lineSeries.setData(indicatorData);
+        }
         indicatorSeriesRef.current[indicator.name] = lineSeries;
+
+        // Draw a midline reference when the caller supplied one. Bound
+        // to the series so toggling the indicator off (visible=false)
+        // — or removing it entirely — drops the line with it. Dashed
+        // + muted color so it doesn't compete visually with the data.
+        if (indicator.midline != null) {
+          const line = lineSeries.createPriceLine({
+            price: indicator.midline,
+            color: 'rgba(148, 163, 184, 0.7)', // slate-400, theme-agnostic
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: 'mid',
+          });
+          indicatorPriceLinesRef.current[indicator.name] = [line];
+        }
       } catch (error) {
         console.error('Failed to add indicator:', indicator.name, error);
       }
+    });
+
+    // Give every pane an equal share of the vertical space so the
+    // oscillator panes (RSI/MACD/ADX/…) render at the same physical
+    // height as the candle pane.
+    //
+    // IMPORTANT: this must run on the next animation frame, not in
+    // this effect synchronously. The chart's pane layout (heights
+    // returned by `pane.getHeight()`) is computed by lightweight-
+    // charts on the next frame after the series / height changes; if
+    // we read the heights now, the new pane reports 0px and our
+    // setStretchFactor call has no effect. requestAnimationFrame
+    // defers the read until the layout has actually been computed.
+    requestAnimationFrame(() => {
+      if (!chartRef.current) return;
+      try {
+        const panes = chartRef.current.panes();
+        for (let i = 0; i < panes.length; i++) panes[i].setStretchFactor(1);
+      } catch {
+        // setStretchFactor is best-effort; ignore if unavailable
+      }
+    });
+
+    // Pin every oscillator pane to the candle pane's actual rendered
+    // height. Deferred to the next animation frame so the chart's
+    // layout has time to compute the post-stretch heights — reading
+    // pane heights synchronously here would see the pre-stretch
+    // values (with the new oscillator pane at 0px) and pin it to 0.
+    //
+    // Two frames are needed in practice:
+    //   frame 1: apply stretch factors (1:1:…)
+    //   frame 2: measure heights, pin oscillator panes, resize wrapper
+    requestAnimationFrame(() => {
+      if (!chartRef.current) return;
+      requestAnimationFrame(() => {
+        if (!chartRef.current) return;
+        try {
+          const panes = chartRef.current.panes();
+          if (panes.length === 0) return;
+          const candleHeight = panes[0]?.getHeight() ?? height;
+          for (let i = 1; i < panes.length; i++) {
+            try {
+              panes[i].setHeight(candleHeight);
+            } catch {
+              // Per-pane failure shouldn't break the layout.
+            }
+          }
+          // Drive the wrapper's outer height from the actual pane
+          // geometry. Pinned total may exceed the chart's internal
+          // `height` — that's fine, the outer panel scrolls.
+          const totalFromPanes = panes.reduce((sum, p) => sum + p.getHeight(), 0);
+          setChartTotalHeight(Math.max(height, totalFromPanes + 30));
+        } catch {
+          // pane() / getHeight() may not be available; fall back to
+          // the pre-pinned stretch layout, which is still equal-height.
+        }
+      });
     });
 
     applyVisibleRange();
@@ -442,7 +659,15 @@ export function CandleStickChart({
     <div
       ref={chartContainerRef}
       className="w-full relative"
-      style={{ height: `${height}px` }}
+      // Wrapper height is driven by `chartTotalHeight` (the measured
+      // total of all pinned panes + the time-scale row) and falls back
+      // to the pre-pinned `totalChartHeight` for the first frame
+      // before the indicator effect has had a chance to measure.
+      // When the total exceeds the parent chart panel's height, the
+      // panel's `overflowY: 'auto'` provides the scrollbar so every
+      // pane — including the candle pane — stays at its full target
+      // size instead of being squished.
+      style={{ height: `${Math.max(chartTotalHeight, totalChartHeight)}px` }}
     />
   );
 }

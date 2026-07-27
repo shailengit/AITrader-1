@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeCraft Golden Cross Rotation Strategy</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d28;
+    --surface2: #242738;
+    --border: #2d3148;
+    --text: #e2e4eb;
+    --text-muted: #8b8fa3;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--green), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+  h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 36px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h2 .emoji { margin-right: 10px; }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 24px 0 10px;
+    color: var(--cyan);
+  }
+  p, li { color: var(--text); margin-bottom: 12px; }
+  ul, ol { padding-left: 24px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h3 { margin-top: 0; }
+
+  .signal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  @media (max-width: 640px) { .signal-grid { grid-template-columns: 1fr; } }
+
+  .signal-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .signal-card .label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .signal-card h4 { font-size: 1.1rem; margin-bottom: 8px; }
+  .signal-card p { font-size: 0.92rem; color: var(--text-muted); margin-bottom: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-entry { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-exit { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-risk { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-info { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 10px;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .flow-arrow { color: var(--text-muted); font-size: 1.2rem; }
+
+  .formula {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.9rem;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+
+  .table-wrap { overflow-x: auto; margin: 16px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--surface2);
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+
+  .highlight-green { color: var(--green); }
+  .highlight-red { color: var(--red); }
+  .highlight-blue { color: var(--blue); }
+  .highlight-amber { color: var(--amber); }
+
+  .note {
+    background: rgba(6,182,212,0.08);
+    border-left: 3px solid var(--cyan);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .note strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📈 Golden Cross Rotation Strategy</h1>
+<p class="subtitle">How the TradeCraft Alpaca runner picks stocks, enters, exits, and rotates positions — explained end to end.</p>
+
+<!-- ============ OVERVIEW ============ -->
+<h2><span class="emoji">🎯</span> Strategy Philosophy</h2>
+<p>
+  This is a <strong>trend-following, momentum-based rotation strategy</strong> designed for the S&amp;P 1500 universe.
+  The core idea: <em>buy stocks that are just beginning a strong upward trend, hold them while the trend persists,
+  and replace them when better opportunities emerge or the trend reverses.</em>
+</p>
+<p>
+  It's called a <strong>"rotation"</strong> strategy because the portfolio constantly turns over — old positions
+  get sold (rotated out) and new ones get bought (rotated in) as the market's strongest signals shift from
+  one stock to another. The portfolio always holds the <strong>top 5 ranked stocks</strong> from the daily scan.
+</p>
+
+<div class="note">
+  <strong>Key insight:</strong> The strategy doesn't try to predict the market. It reacts to what the price action
+  is already telling us — EMAs crossing signal a trend change, RSI confirms momentum, and volume confirms
+  conviction. It's systematic, rules-based, and removes emotional decision-making.
+</div>
+
+<!-- ============ ENTRY SIGNALS ============ -->
+<h2><span class="emoji">🚦</span> Entry Signals</h2>
+<p>Every day, the strategy scans all ~1,500 S&amp;P 1500 stocks looking for two types of entry signals. A stock only needs <strong>one</strong> to be considered.</p>
+
+<div class="signal-grid">
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-entry">Entry A</span> — Primary</div>
+    <h4>Golden Cross <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">EMA20 × EMA200</span></h4>
+    <p>
+      The 20-day exponential moving average crosses <strong>above</strong> the 200-day moving average
+      within the last 5 trading days. This is a classic long-term bullish signal — the short-term trend
+      has decisively turned upward relative to the long-term trend.
+    </p>
+    <div class="formula">EMA20 crosses above EMA200 in last 5 days</div>
+    <p style="margin-top:8px;">
+      The <strong>crossover angle</strong> is measured: how fast are the two EMAs diverging?
+      A steeper angle = stronger trend = higher score.
+    </p>
+  </div>
+
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-entry">Entry B</span> — Secondary</div>
+    <h4>Momentum Continuation <span style="font-size:0.85rem;color:var(--text-muted);font-weight:400;">Stacked EMAs + RSI</span></h4>
+    <p>
+      For stocks that are already in an uptrend but haven't had a recent golden cross, this signal
+      catches <strong>strong momentum continuations</strong>. Three conditions must all be true:
+    </p>
+    <ul style="font-size:0.9rem;margin-bottom:0;">
+      <li><strong>Price &gt; EMA50 &gt; EMA200</strong> — bullish stack (uptrend confirmed at multiple timeframes)</li>
+      <li><strong>RSI(14) &gt; 60</strong> — momentum is present (not overbought, but strong)</li>
+      <li><strong>Volume &gt; 1.2× 50-day average</strong> — institutional conviction behind the move</li>
+    </ul>
+    <div class="formula" style="margin-top:8px;">P &gt; EMA50 &gt; EMA200 &amp;&amp; RSI &gt; 60 &amp;&amp; Vol &gt; 1.2× VolMA50</div>
+  </div>
+</div>
+
+<!-- ============ SCORING ============ -->
+<h2><span class="emoji">📊</span> Ranking &amp; Scoring</h2>
+<p>Every stock that triggers an entry signal gets a <strong>composite score</strong> from 0 to 1. The top 5 scorers become the day's candidates.</p>
+
+<div class="formula">
+  Score = 0.60 × Angle<sub>norm</sub> + 0.40 × Cap<sub>norm</sub>
+</div>
+
+<table>
+  <tr><th>Component</th><th>Weight</th><th>How It's Calculated</th><th>Why</th></tr>
+  <tr>
+    <td><strong>Crossover Angle</strong></td>
+    <td>60%</td>
+    <td>
+      For Entry A: how fast EMA20 diverges from EMA200 over a 6-bar window (±3 bars around crossover).<br>
+      For Entry B: the 5-day slope of EMA50.<br>
+      Both are sigmoid-normalized: <code>1 / (1 + e<sup>-angle×100</sup>)</code>
+    </td>
+    <td>A steeper angle means the trend is accelerating — stronger signal</td>
+  </tr>
+  <tr>
+    <td><strong>Market Cap</strong></td>
+    <td>40%</td>
+    <td><code>min(1.0, market_cap / $100B)</code></td>
+    <td>Prefer larger, more liquid stocks — they're safer and have lower slippage</td>
+  </tr>
+</table>
+
+<div class="note">
+  <strong>Why 60/40 split?</strong> The angle measures <em>technical</em> strength (is the trend real and accelerating?),
+  while market cap measures <em>fundamental</em> safety (is this a liquid, established company?).
+  The 60/40 weighting prioritizes technical signal while still favoring larger caps.
+</div>
+
+<!-- ============ EXIT SIGNALS ============ -->
+<h2><span class="emoji">🚪</span> Exit Signals</h2>
+<p>Once a stock is in the portfolio, it stays until <strong>any one</strong> of these conditions is met:</p>
+
+<div class="signal-grid">
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-exit">Exit</span></div>
+    <h4>Death Cross</h4>
+    <p>
+      The 20-day EMA crosses <strong>below</strong> the 200-day EMA. This is the inverse of the golden cross —
+      the short-term trend has turned bearish relative to the long-term trend. <strong>Immediate sell, no hold period.</strong>
+    </p>
+  </div>
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-exit">Exit</span></div>
+    <h4>Rotation Out</h4>
+    <p>
+      The stock falls out of the top 5 ranked candidates. A newer, stronger signal has replaced it.
+      But: the stock must have been held for <strong>at least 10 trading days</strong> before it can be
+      rotated out — this prevents churning good positions on daily noise.
+    </p>
+  </div>
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-risk">Risk</span></div>
+    <h4>Trailing Stop (20%)</h4>
+    <p>
+      A 20% trailing stop is attached to every position from day one (GTC order). If the stock drops
+      20% from its peak since entry, the stop triggers and the position is sold. This is your
+      <strong>catastrophic loss protection</strong> — no single position can lose more than ~20%.
+    </p>
+  </div>
+  <div class="signal-card">
+    <div class="label"><span class="badge badge-risk">Risk</span></div>
+    <h4>Take Profit (20%)</h4>
+    <p>
+      A 20% take-profit limit order is attached at entry. If the stock rises 20% above the entry price,
+      the position is sold for a profit. This locks in gains and frees up capital for the next opportunity.
+    </p>
+  </div>
+  <div class="signal-card" style="grid-column: 1 / -1;">
+    <div class="label"><span class="badge badge-risk">Risk</span> — Market-Level</div>
+    <h4>Crisis Override</h4>
+    <p>
+      If the SPY ETF drops <strong>more than 20% from its 200-day high</strong>, the strategy
+      assumes a market crash. <strong>All positions are closed to cash immediately.</strong>
+      The strategy stays in cash until SPY recovers. This is a circuit breaker, not a timing signal.
+    </p>
+  </div>
+</div>
+
+<!-- ============ DAILY PIPELINE ============ -->
+<h2><span class="emoji">🔄</span> The Daily Pipeline</h2>
+<p>Here's exactly what happens every time the strategy runs (scheduled weekdays at 8 PM ET):</p>
+
+<div class="flow">
+  <span class="flow-step">📡 Fetch latest date</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">🛡️ Check crisis override</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">🔍 Scan 1,500 stocks</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">🏆 Rank top 5</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">🔒 Re-attach stops</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">❌ Close stale positions</span>
+  <span class="flow-arrow">→</span>
+  <span class="flow-step">✅ Open new positions</span>
+</div>
+
+<div class="card">
+  <h3>Step-by-step breakdown</h3>
+  <ol>
+    <li>
+      <strong>Fetch the latest trading date</strong> from the PostgreSQL database
+      (<code>SELECT MAX("Date") FROM aapl</code>). This is the "as of" date for all analysis.
+    </li>
+    <li>
+      <strong>Check crisis override</strong> — query SPY's 200-day high. If drawdown &gt; 20%,
+      close everything and go to cash. Otherwise proceed.
+    </li>
+    <li>
+      <strong>Scan all 1,500 stocks</strong> — for each ticker, pull the last 300 days of OHLCV data
+      from the database. Compute EMAs (20, 50, 200), RSI(14), and volume MA(50). Check for Entry A
+      (golden cross in last 5 days) and Entry B (momentum continuation).
+    </li>
+    <li>
+      <strong>Rank candidates</strong> — every stock with a valid entry signal gets scored using the
+      60/40 angle + market cap formula. Sort descending, take the top 5.
+    </li>
+    <li>
+      <strong>Re-attach trailing stops</strong> — for every existing position, check if a trailing stop
+      order is active. If missing (e.g., from a previous "day" TIF order that expired), submit a new
+      GTC trailing stop at 20%.
+    </li>
+    <li>
+      <strong>Close stale positions</strong> — for each current position:
+      <ul>
+        <li>If it has a <strong>death cross</strong> → sell immediately</li>
+        <li>If it's <strong>not in the top 5</strong> and held ≥ 10 days → sell (rotated out)</li>
+        <li>If it's not in the top 5 but held &lt; 10 days → <strong>hold</strong> (give it time)</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Open new positions</strong> — count how many slots are available (MAX_HOLDINGS = 5 minus
+      remaining positions). For each available slot, take the next candidate from the ranked list and
+      submit a GTC bracket order (market entry + 20% take-profit + 20% trailing stop).
+    </li>
+  </ol>
+</div>
+
+<!-- ============ POSITION SIZING ============ -->
+<h2><span class="emoji">⚖️</span> Position Sizing</h2>
+<p>Capital is allocated based on <strong>rank</strong> — higher-ranked candidates get a larger share:</p>
+
+<table>
+  <tr><th>Rank</th><th>% of Portfolio</th><th>Example ($100k portfolio)</th></tr>
+  <tr><td>#1</td><td>30%</td><td>$30,000</td></tr>
+  <tr><td>#2</td><td>25%</td><td>$25,000</td></tr>
+  <tr><td>#3</td><td>20%</td><td>$20,000</td></tr>
+  <tr><td>#4</td><td>15%</td><td>$15,000</td></tr>
+  <tr><td>#5</td><td>10%</td><td>$10,000</td></tr>
+  <tr style="border-top:2px solid var(--border);"><td><strong>Total</strong></td><td><strong>100%</strong></td><td><strong>$100,000</strong></td></tr>
+</table>
+
+<p>
+  Shares are calculated as <code>max(1, int(target_value / current_price))</code> — so you always get
+  at least 1 share, and fractional shares are rounded down.
+</p>
+
+<!-- ============ ROTATION EXAMPLE ============ -->
+<h2><span class="emoji">🔄</span> How Rotation Works — Example</h2>
+
+<div class="card">
+  <p><strong>Day 1:</strong> The scan finds AXP, GS, JPM, SCHW, WFC as the top 5. The strategy buys all 5 with bracket orders.</p>
+  <p><strong>Day 2–10:</strong> The strategy runs daily. All 5 positions are still in the top 5, so nothing happens. Trailing stops are re-attached if needed.</p>
+  <p><strong>Day 11:</strong> A new stock (MSFT) has a golden cross and scores higher than WFC. The new top 5 is: AXP, GS, JPM, MSFT, SCHW.</p>
+  <ul>
+    <li>WFC is no longer in the top 5 → <strong>rotated out</strong> (held 11 days ≥ 10, so it's sold)</li>
+    <li>MSFT is new → <strong>rotated in</strong> with a fresh bracket order</li>
+    <li>AXP, GS, JPM, SCHW are still in the top 5 → <strong>held</strong></li>
+  </ul>
+  <p><strong>Day 15:</strong> JPM gets a death cross (EMA20 crosses below EMA200). Even though it's still in the top 5, the death cross overrides — <strong>sold immediately</strong>. The next candidate fills the slot.</p>
+  <p><strong>Day 20:</strong> AXP hits the 20% take-profit. The bracket's limit order fills automatically. The next candidate fills the slot.</p>
+</div>
+
+<!-- ============ RISK MANAGEMENT ============ -->
+<h2><span class="emoji">🛡️</span> Risk Management Layers</h2>
+
+<table>
+  <tr><th>Layer</th><th>Protection</th><th>Scope</th></tr>
+  <tr>
+    <td><strong>Trailing Stop</strong></td>
+    <td>Limits max loss on any position to ~20% from peak</td>
+    <td>Per position</td>
+  </tr>
+  <tr>
+    <td><strong>Take Profit</strong></td>
+    <td>Locks in gains at 20% — prevents giving back profits</td>
+    <td>Per position</td>
+  </tr>
+  <tr>
+    <td><strong>Death Cross Exit</strong></td>
+    <td>Gets out when the long-term trend turns bearish</td>
+    <td>Per position</td>
+  </tr>
+  <tr>
+    <td><strong>Min Hold Days (10)</strong></td>
+    <td>Prevents churning — gives each position time to work</td>
+    <td>Per position</td>
+  </tr>
+  <tr>
+    <td><strong>Max Holdings (5)</strong></td>
+    <td>Concentrated portfolio — only the best 5 ideas at any time</td>
+    <td>Portfolio</td>
+  </tr>
+  <tr>
+    <td><strong>Rank-Based Sizing</strong></td>
+    <td>Best ideas get the most capital (30/25/20/15/10%)</td>
+    <td>Portfolio</td>
+  </tr>
+  <tr>
+    <td><strong>Crisis Override</strong></td>
+    <td>If SPY drops 20%+ → all to cash. Market-level circuit breaker.</td>
+    <td>Market</td>
+  </tr>
+</table>
+
+<!-- ============ TECHNICAL DETAILS ============ -->
+<h2><span class="emoji">⚙️</span> Technical Implementation</h2>
+
+<div class="card">
+  <h3>Data Source</h3>
+  <p>All price data comes from a <strong>PostgreSQL database</strong> (<code>sp1500_1d</code>) containing daily OHLCV for all S&amp;P 1500 stocks. Each ticker has its own table (e.g., <code>aapl</code>, <code>msft</code>). The database is updated daily via a separate ETL process.</p>
+
+  <h3>Execution</h3>
+  <p>Orders are submitted to <strong>Alpaca Markets</strong> (paper trading) via their REST API. The strategy uses:</p>
+  <ul>
+    <li><strong>Bracket orders</strong> for entries — market order to buy, with attached OCO take-profit + trailing-stop</li>
+    <li><strong>Market orders</strong> for exits — sell at market when a close signal triggers</li>
+    <li><strong>Standalone trailing stops</strong> for re-attaching protection to existing positions</li>
+    <li>All protection orders use <strong>GTC</strong> (good-till-canceled) time-in-force so they persist beyond the entry day</li>
+  </ul>
+
+  <h3>Scheduling</h3>
+  <p>The strategy runs via <strong>cron</strong> at 8 PM ET on weekdays. A heartbeat file tracks the last run's success/failure status for monitoring.</p>
+
+  <h3>Key Files</h3>
+  <table>
+    <tr><th>File</th><th>Purpose</th></tr>
+    <tr><td><code>backend/app/services/alpaca_client.py</code></td><td>Alpaca API wrapper — account, positions, orders, trailing stops</td></tr>
+    <tr><td><code>backend/app/services/alpaca_runner.py</code></td><td>Long-only strategy — scan, rank, enter, exit, rotate</td></tr>
+    <tr><td><code>backend/app/services/alpaca_runner_long_short.py</code></td><td>Long/short variant (separate account, not yet active)</td></tr>
+    <tr><td><code>scripts/run_alpaca_strategy.sh</code></td><td>Cron shell script — loads env, runs runner, logs output</td></tr>
+  </table>
+</div>
+
+<!-- ============ SUMMARY ============ -->
+<h2><span class="emoji">💡</span> Summary</h2>
+<div class="card" style="border-color: var(--cyan);">
+  <p style="margin-bottom:8px;"><strong>In one sentence:</strong> Every day, scan 1,500 stocks for those just beginning a strong uptrend, buy the 5 best ones with built-in profit-taking and stop-losses, and replace them as better opportunities emerge or trends reverse.</p>
+  <p style="margin-bottom:0;color:var(--text-muted);">
+    <strong>Strengths:</strong> Systematic, rules-based, removes emotion, multiple layers of risk management, daily rebalancing keeps the portfolio fresh.<br>
+    <strong>Weaknesses:</strong> Trend-following strategies struggle in choppy/sideways markets, can whipsaw during quick reversals, relies on daily data (misses intraday moves).
+  </p>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,7642 @@
+[
+  {
+    "run_id": 1,
+    "start_date": "2002-02-23",
+    "end_date": "2026-07-08",
+    "duration_years": 24.4,
+    "annualized_return_pct": 10.72,
+    "total_return_pct": 1096.69,
+    "final_value": 1196691.81,
+    "n_trades": 18319,
+    "win_rate": 50.5,
+    "profit_factor": 1.06,
+    "avg_win": 1579.98,
+    "avg_loss": -1519.41,
+    "max_drawdown_pct": -55.51,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 170,
+        "wins": 75,
+        "total_pnl": 885101.3600000001
+      },
+      "Death Cross": {
+        "count": 18123,
+        "wins": 9171,
+        "total_pnl": 62867.6000000007
+      },
+      "Crisis Override": {
+        "count": 25,
+        "wins": 9,
+        "total_pnl": -94452.07
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 442.57
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 309666.83,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 131309.94,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 100556.54,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -28481.34,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -12408.58,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -25634.95,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 960.13,
+    "alpha_pct": 136.56
+  },
+  {
+    "run_id": 2,
+    "start_date": "2002-07-24",
+    "end_date": "2026-07-08",
+    "duration_years": 24.0,
+    "annualized_return_pct": 10.59,
+    "total_return_pct": 1014.85,
+    "final_value": 1114851.63,
+    "n_trades": 17326,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1536.91,
+    "avg_loss": -1481.7,
+    "max_drawdown_pct": -55.48,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 188,
+        "wins": 82,
+        "total_pnl": 820950.3900000001
+      },
+      "Rotated Out": {
+        "count": 2,
+        "wins": 2,
+        "total_pnl": 3023.74
+      },
+      "Death Cross": {
+        "count": 17116,
+        "wins": 8676,
+        "total_pnl": 55106.78000000107
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -89914.65999999997
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 288386.41,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "AMT",
+        "r": 225.14,
+        "pnl": 21012.99,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 122312.26,
+        "reason": "Trailing Stop (18.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -26541.63,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -11559.31,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -23784.3,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1263.27,
+    "alpha_pct": -248.42
+  },
+  {
+    "run_id": 3,
+    "start_date": "2002-08-06",
+    "end_date": "2026-07-08",
+    "duration_years": 23.9,
+    "annualized_return_pct": 10.71,
+    "total_return_pct": 1041.06,
+    "final_value": 1141057.5,
+    "n_trades": 17205,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1580.14,
+    "avg_loss": -1522.57,
+    "max_drawdown_pct": -55.47,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 185,
+        "wins": 83,
+        "total_pnl": 843326.0599999999
+      },
+      "Death Cross": {
+        "count": 16999,
+        "wins": 8614,
+        "total_pnl": 58427.81000000083
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -92008.14
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 421.89
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "AMT",
+        "r": 253.42,
+        "pnl": 25039.22,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 295235.28,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 125159.18,
+        "reason": "Trailing Stop (18.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -27155.87,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -11827.71,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -24401.19,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1233.83,
+    "alpha_pct": -192.77
+  },
+  {
+    "run_id": 4,
+    "start_date": "2002-09-02",
+    "end_date": "2026-07-08",
+    "duration_years": 23.8,
+    "annualized_return_pct": 10.5,
+    "total_return_pct": 980.78,
+    "final_value": 1080779.45,
+    "n_trades": 17207,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1496.42,
+    "avg_loss": -1442.17,
+    "max_drawdown_pct": -55.47,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 185,
+        "wins": 84,
+        "total_pnl": 795224.22
+      },
+      "Death Cross": {
+        "count": 17001,
+        "wins": 8613,
+        "total_pnl": 53628.43999999951
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -87151.98999999999
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 399.75
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 279580.72,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "AMT",
+        "r": 244.85,
+        "pnl": 22687.78,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 118586.66,
+        "reason": "Trailing Stop (18.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -25733.42,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -11206.38,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -23064.6,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1158.41,
+    "alpha_pct": -177.63
+  },
+  {
+    "run_id": 5,
+    "start_date": "2002-09-18",
+    "end_date": "2026-07-08",
+    "duration_years": 23.8,
+    "annualized_return_pct": 11.4,
+    "total_return_pct": 1206.04,
+    "final_value": 1306039.56,
+    "n_trades": 17195,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1811.58,
+    "avg_loss": -1741.5,
+    "max_drawdown_pct": -55.47,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 184,
+        "wins": 82,
+        "total_pnl": 985919.0500000004
+      },
+      "Death Cross": {
+        "count": 16990,
+        "wins": 8604,
+        "total_pnl": 60707.800000002826
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -105337.22000000002
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 483.09
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 338040.73,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "AMT",
+        "r": 225.14,
+        "pnl": 21470.35,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ALGN",
+        "r": 209.47,
+        "pnl": 19087.17,
+        "reason": "Trailing Stop (21.2%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -31099.94,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -13540.68,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -27965.4,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1228.31,
+    "alpha_pct": -22.27
+  },
+  {
+    "run_id": 6,
+    "start_date": "2002-12-22",
+    "end_date": "2026-07-08",
+    "duration_years": 23.5,
+    "annualized_return_pct": 11.15,
+    "total_return_pct": 1104.21,
+    "final_value": 1204214.27,
+    "n_trades": 17143,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1672.54,
+    "avg_loss": -1609.46,
+    "max_drawdown_pct": -55.46,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 171,
+        "wins": 77,
+        "total_pnl": 890989.55
+      },
+      "Death Cross": {
+        "count": 16951,
+        "wins": 8585,
+        "total_pnl": 66289.79999999999
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -97082.37999999998
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 445.28
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "AMT",
+        "r": 273.52,
+        "pnl": 27222.91,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 311623.65,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 132083.18,
+        "reason": "Trailing Stop (18.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -28642.98,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -12481.89,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -25634.95,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1171.46,
+    "alpha_pct": -67.25
+  },
+  {
+    "run_id": 7,
+    "start_date": "2003-01-11",
+    "end_date": "2026-07-08",
+    "duration_years": 23.5,
+    "annualized_return_pct": 10.82,
+    "total_return_pct": 1017.25,
+    "final_value": 1117254.55,
+    "n_trades": 17178,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1549.23,
+    "avg_loss": -1492.52,
+    "max_drawdown_pct": -55.47,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 177,
+        "wins": 79,
+        "total_pnl": 805418.64
+      },
+      "Death Cross": {
+        "count": 16980,
+        "wins": 8603,
+        "total_pnl": 75519.67000000027
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -90124.98
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 413.12
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "AMT",
+        "r": 273.52,
+        "pnl": 38694.31,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 289120.22,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 122558.29,
+        "reason": "Trailing Stop (18.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -26573.96,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -11582.95,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -23852.84,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1129.52,
+    "alpha_pct": -112.27
+  },
+  {
+    "run_id": 8,
+    "start_date": "2003-07-24",
+    "end_date": "2026-07-08",
+    "duration_years": 23.0,
+    "annualized_return_pct": 9.49,
+    "total_return_pct": 700.7,
+    "final_value": 800703.08,
+    "n_trades": 17055,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1114.26,
+    "avg_loss": -1076.12,
+    "max_drawdown_pct": -55.46,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 183,
+        "wins": 77,
+        "total_pnl": 576494.6500000001
+      },
+      "Death Cross": {
+        "count": 16851,
+        "wins": 8541,
+        "total_pnl": 26598.390000000425
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -64600.579999999994
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 296.16
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 207178.36,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 87868.0,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 67318.47,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -19073.77,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -8304.84,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -17169.94,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 1052.9,
+    "alpha_pct": -352.2
+  },
+  {
+    "run_id": 9,
+    "start_date": "2003-10-08",
+    "end_date": "2026-07-08",
+    "duration_years": 22.7,
+    "annualized_return_pct": 10.46,
+    "total_return_pct": 861.38,
+    "final_value": 961384.17,
+    "n_trades": 17022,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1339.27,
+    "avg_loss": -1293.06,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 178,
+        "wins": 79,
+        "total_pnl": 708535.1500000001
+      },
+      "Death Cross": {
+        "count": 16823,
+        "wins": 8529,
+        "total_pnl": 35631.16000000078
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -77513.04
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 355.48
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 248760.8,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 105476.75,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 80773.06,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -22888.52,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -9965.73,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -20562.8,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 987.64,
+    "alpha_pct": -126.26
+  },
+  {
+    "run_id": 10,
+    "start_date": "2003-10-16",
+    "end_date": "2026-07-08",
+    "duration_years": 22.7,
+    "annualized_return_pct": 9.14,
+    "total_return_pct": 630.03,
+    "final_value": 730026.73,
+    "n_trades": 17031,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1014.28,
+    "avg_loss": -981.65,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 172,
+        "wins": 77,
+        "total_pnl": 514310.8300000001
+      },
+      "Death Cross": {
+        "count": 16838,
+        "wins": 8534,
+        "total_pnl": 26705.97999999884
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -58862.249999999985
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 269.84
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 188833.17,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 80100.47,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 61331.06,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -17360.36,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7568.94,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -15627.73,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 973.1,
+    "alpha_pct": -343.07
+  },
+  {
+    "run_id": 11,
+    "start_date": "2003-12-14",
+    "end_date": "2026-07-08",
+    "duration_years": 22.6,
+    "annualized_return_pct": 9.4,
+    "total_return_pct": 658.9,
+    "final_value": 758896.18,
+    "n_trades": 17012,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 1055.53,
+    "avg_loss": -1021.5,
+    "max_drawdown_pct": -55.46,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 169,
+        "wins": 74,
+        "total_pnl": 539550.1100000001
+      },
+      "Death Cross": {
+        "count": 16822,
+        "wins": 8529,
+        "total_pnl": 26833.689999999522
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -61194.95
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 280.7
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 196415.85,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 83263.72,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 63767.0,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -18071.59,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7869.39,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -16244.61,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 946.01,
+    "alpha_pct": -287.11
+  },
+  {
+    "run_id": 12,
+    "start_date": "2004-01-30",
+    "end_date": "2026-07-08",
+    "duration_years": 22.4,
+    "annualized_return_pct": 8.64,
+    "total_return_pct": 542.0,
+    "final_value": 642001.87,
+    "n_trades": 17013,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 892.53,
+    "avg_loss": -864.42,
+    "max_drawdown_pct": -55.43,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 170,
+        "wins": 71,
+        "total_pnl": 441049.4899999999
+      },
+      "Death Cross": {
+        "count": 16822,
+        "wins": 8527,
+        "total_pnl": 22689.110000000455
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -51754.979999999996
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 237.26
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 166085.13,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 70434.99,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 53932.18,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6654.37,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ARWR",
+        "r": -29.69,
+        "pnl": -2911.36,
+        "reason": "Trailing Stop (35.7%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -13708.53,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 892.1,
+    "alpha_pct": -350.1
+  },
+  {
+    "run_id": 13,
+    "start_date": "2004-02-07",
+    "end_date": "2026-07-08",
+    "duration_years": 22.4,
+    "annualized_return_pct": 8.75,
+    "total_return_pct": 554.81,
+    "final_value": 654809.08,
+    "n_trades": 17006,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 910.37,
+    "avg_loss": -882.19,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 166,
+        "wins": 72,
+        "total_pnl": 450750.4200000001
+      },
+      "Death Cross": {
+        "count": 16819,
+        "wins": 8526,
+        "total_pnl": 24255.97000000017
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -52819.85
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 242.27
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 169509.57,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 71840.88,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 55024.94,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6793.77,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ARWR",
+        "r": -32.5,
+        "pnl": -3046.56,
+        "reason": "Trailing Stop (32.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14051.24,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 883.69,
+    "alpha_pct": -328.88
+  },
+  {
+    "run_id": 14,
+    "start_date": "2004-03-03",
+    "end_date": "2026-07-08",
+    "duration_years": 22.3,
+    "annualized_return_pct": 8.94,
+    "total_return_pct": 578.04,
+    "final_value": 678043.31,
+    "n_trades": 17001,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 943.8,
+    "avg_loss": -913.0,
+    "max_drawdown_pct": -55.46,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 168,
+        "wins": 67,
+        "total_pnl": 470051.45999999996
+      },
+      "Death Cross": {
+        "count": 16812,
+        "wins": 8523,
+        "total_pnl": 25342.83000000026
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -54681.11
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 250.63
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 175380.03,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 74406.62,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 56982.8,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -16131.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7030.13,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14531.04,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 873.14,
+    "alpha_pct": -295.1
+  },
+  {
+    "run_id": 15,
+    "start_date": "2004-04-07",
+    "end_date": "2026-07-08",
+    "duration_years": 22.3,
+    "annualized_return_pct": 8.63,
+    "total_return_pct": 531.27,
+    "final_value": 631265.44,
+    "n_trades": 16999,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 878.19,
+    "avg_loss": -850.53,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 162,
+        "wins": 64,
+        "total_pnl": 429571.79000000004
+      },
+      "Death Cross": {
+        "count": 16816,
+        "wins": 8526,
+        "total_pnl": 24721.60000000054
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -50888.64000000001
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 233.5
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 163394.51,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 69239.99,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 53044.31,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -15032.71,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6545.4,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -13537.17,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 878.71,
+    "alpha_pct": -347.44
+  },
+  {
+    "run_id": 16,
+    "start_date": "2004-04-17",
+    "end_date": "2026-07-08",
+    "duration_years": 22.2,
+    "annualized_return_pct": 9.09,
+    "total_return_pct": 590.93,
+    "final_value": 690931.61,
+    "n_trades": 17032,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 960.52,
+    "avg_loss": -929.06,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 164,
+        "wins": 67,
+        "total_pnl": 481522.39000000013
+      },
+      "Death Cross": {
+        "count": 16847,
+        "wins": 8539,
+        "total_pnl": 25179.539999999866
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -55722.68000000001
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 255.43
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 178804.47,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 75812.51,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 58052.79,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7165.53,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "AXON",
+        "r": -28.9,
+        "pnl": -4338.13,
+        "reason": "Trailing Stop (28.9%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14839.48,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 885.59,
+    "alpha_pct": -294.66
+  },
+  {
+    "run_id": 17,
+    "start_date": "2004-04-19",
+    "end_date": "2026-07-08",
+    "duration_years": 22.2,
+    "annualized_return_pct": 9.09,
+    "total_return_pct": 590.93,
+    "final_value": 690931.61,
+    "n_trades": 17032,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 960.52,
+    "avg_loss": -929.06,
+    "max_drawdown_pct": -55.45,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 164,
+        "wins": 67,
+        "total_pnl": 481522.39000000013
+      },
+      "Death Cross": {
+        "count": 16847,
+        "wins": 8539,
+        "total_pnl": 25179.539999999866
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -55722.68000000001
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 255.43
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 178804.47,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 75812.51,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 58052.79,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7165.53,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "AXON",
+        "r": -28.9,
+        "pnl": -4338.13,
+        "reason": "Trailing Stop (28.9%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14839.48,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 885.59,
+    "alpha_pct": -294.66
+  },
+  {
+    "run_id": 18,
+    "start_date": "2004-07-01",
+    "end_date": "2026-07-08",
+    "duration_years": 22.0,
+    "annualized_return_pct": 9.25,
+    "total_return_pct": 601.79,
+    "final_value": 701790.96,
+    "n_trades": 16973,
+    "win_rate": 50.6,
+    "profit_factor": 1.06,
+    "avg_win": 977.41,
+    "avg_loss": -946.91,
+    "max_drawdown_pct": -55.44,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 156,
+        "wins": 64,
+        "total_pnl": 486660.3700000001
+      },
+      "Death Cross": {
+        "count": 16796,
+        "wins": 8520,
+        "total_pnl": 29608.580000000376
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -56610.31
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 259.61
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 181495.09,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 77007.52,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 58986.19,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -16713.79,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7278.5,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -15010.84,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 889.74,
+    "alpha_pct": -287.95
+  },
+  {
+    "run_id": 19,
+    "start_date": "2004-10-19",
+    "end_date": "2026-07-08",
+    "duration_years": 21.7,
+    "annualized_return_pct": 10.74,
+    "total_return_pct": 816.88,
+    "final_value": 916875.3,
+    "n_trades": 16375,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 1299.62,
+    "avg_loss": -1264.54,
+    "max_drawdown_pct": -55.41,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 154,
+        "wins": 68,
+        "total_pnl": 651572.04
+      },
+      "Death Cross": {
+        "count": 16200,
+        "wins": 8247,
+        "total_pnl": 54115.84999999928
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -73975.90999999999
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 339.18
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 237264.48,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 100626.44,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 77062.23,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -9510.24,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BLFS",
+        "r": -33.33,
+        "pnl": -4440.17,
+        "reason": "Trailing Stop (40.0%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -19671.74,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 905.22,
+    "alpha_pct": -88.34
+  },
+  {
+    "run_id": 20,
+    "start_date": "2005-02-17",
+    "end_date": "2026-07-08",
+    "duration_years": 21.4,
+    "annualized_return_pct": 9.25,
+    "total_return_pct": 563.51,
+    "final_value": 663512.64,
+    "n_trades": 16264,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 943.04,
+    "avg_loss": -919.27,
+    "max_drawdown_pct": -55.39,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 152,
+        "wins": 63,
+        "total_pnl": 447017.57000000007
+      },
+      "Death Cross": {
+        "count": 16091,
+        "wins": 8189,
+        "total_pnl": 36027.53999999978
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -53490.689999999995
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 245.41
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 171710.99,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 72789.85,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 55753.44,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6881.51,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BLFS",
+        "r": -33.33,
+        "pnl": -3055.46,
+        "reason": "Trailing Stop (40.0%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14222.6,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 818.8,
+    "alpha_pct": -255.29
+  },
+  {
+    "run_id": 21,
+    "start_date": "2005-06-27",
+    "end_date": "2026-07-08",
+    "duration_years": 21.0,
+    "annualized_return_pct": 9.54,
+    "total_return_pct": 579.67,
+    "final_value": 679667.98,
+    "n_trades": 15860,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 982.12,
+    "avg_loss": -956.58,
+    "max_drawdown_pct": -55.38,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 149,
+        "wins": 60,
+        "total_pnl": 465102.56000000006
+      },
+      "Death Cross": {
+        "count": 15690,
+        "wins": 7987,
+        "total_pnl": 32425.980000000953
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -54830.570000000014
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 251.46
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 175869.24,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 74582.36,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 57142.16,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -16164.21,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7048.56,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14599.59,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 819.79,
+    "alpha_pct": -240.12
+  },
+  {
+    "run_id": 22,
+    "start_date": "2005-07-31",
+    "end_date": "2026-07-08",
+    "duration_years": 20.9,
+    "annualized_return_pct": 9.21,
+    "total_return_pct": 533.09,
+    "final_value": 633086.53,
+    "n_trades": 15673,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 914.06,
+    "avg_loss": -893.74,
+    "max_drawdown_pct": -55.34,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 153,
+        "wins": 65,
+        "total_pnl": 425224.98000000004
+      },
+      "Death Cross": {
+        "count": 15499,
+        "wins": 7901,
+        "total_pnl": 31567.860000000317
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -51074.6
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 234.34
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 163883.71,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 69486.02,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 53226.44,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6567.84,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BLFS",
+        "r": -33.33,
+        "pnl": -3216.14,
+        "reason": "Trailing Stop (40.0%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -13571.45,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 785.67,
+    "alpha_pct": -252.58
+  },
+  {
+    "run_id": 23,
+    "start_date": "2005-08-25",
+    "end_date": "2026-07-08",
+    "duration_years": 20.9,
+    "annualized_return_pct": 9.37,
+    "total_return_pct": 548.81,
+    "final_value": 648813.66,
+    "n_trades": 15662,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 937.52,
+    "avg_loss": -917.0,
+    "max_drawdown_pct": -55.36,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 151,
+        "wins": 63,
+        "total_pnl": 439591.19000000006
+      },
+      "Death Cross": {
+        "count": 15490,
+        "wins": 7900,
+        "total_pnl": 31057.95999999895
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 6,
+        "total_pnl": -52362.46
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 239.98
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 167797.35,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 71243.38,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 54546.85,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -15452.98,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -6730.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -13845.62,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 801.33,
+    "alpha_pct": -252.52
+  },
+  {
+    "run_id": 24,
+    "start_date": "2006-04-25",
+    "end_date": "2026-07-08",
+    "duration_years": 20.2,
+    "annualized_return_pct": 8.88,
+    "total_return_pct": 457.67,
+    "final_value": 557669.35,
+    "n_trades": 15317,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 814.69,
+    "avg_loss": -799.13,
+    "max_drawdown_pct": -55.32,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 145,
+        "wins": 55,
+        "total_pnl": 359733.50999999995
+      },
+      "Death Cross": {
+        "count": 15151,
+        "wins": 7736,
+        "total_pnl": 30068.589999999345
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -44128.0
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 206.14
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 144315.51,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 61191.28,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 46852.01,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -13254.65,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -5781.46,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -11926.42,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 729.36,
+    "alpha_pct": -271.69
+  },
+  {
+    "run_id": 25,
+    "start_date": "2006-06-17",
+    "end_date": "2026-07-08",
+    "duration_years": 20.1,
+    "annualized_return_pct": 10.56,
+    "total_return_pct": 648.73,
+    "final_value": 748726.59,
+    "n_trades": 15128,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 1102.53,
+    "avg_loss": -1077.82,
+    "max_drawdown_pct": -55.31,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 144,
+        "wins": 60,
+        "total_pnl": 525314.4699999999
+      },
+      "Death Cross": {
+        "count": 14963,
+        "wins": 7639,
+        "total_pnl": 32001.179999999833
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -58839.11
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 276.74
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 193725.22,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 82139.01,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 62901.9,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -17812.96,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -7762.43,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -16073.25,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 763.6,
+    "alpha_pct": -114.87
+  },
+  {
+    "run_id": 26,
+    "start_date": "2006-10-30",
+    "end_date": "2026-07-08",
+    "duration_years": 19.7,
+    "annualized_return_pct": 10.89,
+    "total_return_pct": 665.92,
+    "final_value": 765916.37,
+    "n_trades": 14869,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 1127.43,
+    "avg_loss": -1103.3,
+    "max_drawdown_pct": -55.26,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 145,
+        "wins": 60,
+        "total_pnl": 540170.2799999999
+      },
+      "Death Cross": {
+        "count": 14703,
+        "wins": 7516,
+        "total_pnl": 32670.839999999505
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -60192.76
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 283.21
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 198128.07,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 84001.81,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 64336.15,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -18233.23,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4959.03,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -16347.42,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 677.71,
+    "alpha_pct": -11.79
+  },
+  {
+    "run_id": 27,
+    "start_date": "2006-11-27",
+    "end_date": "2026-07-08",
+    "duration_years": 19.6,
+    "annualized_return_pct": 10.28,
+    "total_return_pct": 581.71,
+    "final_value": 681712.9,
+    "n_trades": 14867,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 1003.38,
+    "avg_loss": -983.13,
+    "max_drawdown_pct": -55.27,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 150,
+        "wins": 58,
+        "total_pnl": 463740.7600000001
+      },
+      "Death Cross": {
+        "count": 14696,
+        "wins": 7516,
+        "total_pnl": 35186.60999999902
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -53612.29999999999
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 252.09
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 176358.44,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 74793.24,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 57301.52,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -16228.87,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4416.21,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14599.59,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 674.28,
+    "alpha_pct": -92.57
+  },
+  {
+    "run_id": 28,
+    "start_date": "2006-12-11",
+    "end_date": "2026-07-08",
+    "duration_years": 19.6,
+    "annualized_return_pct": 10.75,
+    "total_return_pct": 637.28,
+    "final_value": 737282.2,
+    "n_trades": 14869,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 1085.7,
+    "avg_loss": -1062.12,
+    "max_drawdown_pct": -55.27,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 150,
+        "wins": 60,
+        "total_pnl": 511584.3
+      },
+      "Death Cross": {
+        "count": 14698,
+        "wins": 7513,
+        "total_pnl": 36107.5499999996
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -57968.23
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 272.56
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 190789.99,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 80873.71,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 61922.97,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -17522.0,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4774.35,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -15799.08,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 655.66,
+    "alpha_pct": -18.38
+  },
+  {
+    "run_id": 29,
+    "start_date": "2007-01-03",
+    "end_date": "2026-07-08",
+    "duration_years": 19.5,
+    "annualized_return_pct": 10.6,
+    "total_return_pct": 614.35,
+    "final_value": 714351.48,
+    "n_trades": 14857,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 1052.24,
+    "avg_loss": -1029.81,
+    "max_drawdown_pct": -55.27,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 143,
+        "wins": 55,
+        "total_pnl": 492229.35
+      },
+      "Death Cross": {
+        "count": 14693,
+        "wins": 7512,
+        "total_pnl": 35339.810000001125
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -56170.12999999999
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 264.2
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 184919.53,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 78378.26,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 60033.41,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -17004.75,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4627.33,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -15319.28,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 653.92,
+    "alpha_pct": -39.57
+  },
+  {
+    "run_id": 30,
+    "start_date": "2007-02-10",
+    "end_date": "2026-07-08",
+    "duration_years": 19.4,
+    "annualized_return_pct": 10.28,
+    "total_return_pct": 568.2,
+    "final_value": 668199.47,
+    "n_trades": 14865,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 983.54,
+    "avg_loss": -963.96,
+    "max_drawdown_pct": -55.28,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 150,
+        "wins": 59,
+        "total_pnl": 454629.94
+      },
+      "Death Cross": {
+        "count": 14694,
+        "wins": 7514,
+        "total_pnl": 32700.659999999225
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -52846.89
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 247.29
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 172934.01,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 73317.06,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 56163.23,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -15905.58,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4329.68,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -14393.96,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 640.46,
+    "alpha_pct": -72.26
+  },
+  {
+    "run_id": 31,
+    "start_date": "2007-03-21",
+    "end_date": "2026-07-08",
+    "duration_years": 19.3,
+    "annualized_return_pct": 10.15,
+    "total_return_pct": 545.69,
+    "final_value": 645691.04,
+    "n_trades": 14833,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 951.53,
+    "avg_loss": -931.52,
+    "max_drawdown_pct": -55.26,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 143,
+        "wins": 53,
+        "total_pnl": 437017.42
+      },
+      "Death Cross": {
+        "count": 14669,
+        "wins": 7498,
+        "total_pnl": 30548.59
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -51058.25000000001
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 238.72
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 167063.54,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 70856.76,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 54250.9,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -15356.0,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -4182.26,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -13811.34,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 640.88,
+    "alpha_pct": -95.19
+  },
+  {
+    "run_id": 32,
+    "start_date": "2007-03-23",
+    "end_date": "2026-07-08",
+    "duration_years": 19.3,
+    "annualized_return_pct": 9.65,
+    "total_return_pct": 491.88,
+    "final_value": 591879.92,
+    "n_trades": 14852,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 871.61,
+    "avg_loss": -855.24,
+    "max_drawdown_pct": -55.27,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 144,
+        "wins": 54,
+        "total_pnl": 391713.27
+      },
+      "Death Cross": {
+        "count": 14687,
+        "wins": 7510,
+        "total_pnl": 28576.180000000404
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -46859.79
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 218.88
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 153121.2,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 64987.17,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 49766.04,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -14095.19,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ASTH",
+        "r": -28.57,
+        "pnl": -3836.15,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -12646.12,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 640.37,
+    "alpha_pct": -148.49
+  },
+  {
+    "run_id": 33,
+    "start_date": "2007-06-30",
+    "end_date": "2026-07-08",
+    "duration_years": 19.0,
+    "annualized_return_pct": 9.37,
+    "total_return_pct": 449.34,
+    "final_value": 549340.95,
+    "n_trades": 14527,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 817.21,
+    "avg_loss": -801.28,
+    "max_drawdown_pct": -55.22,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 143,
+        "wins": 56,
+        "total_pnl": 372353.43000000005
+      },
+      "Death Cross": {
+        "count": 14363,
+        "wins": 7338,
+        "total_pnl": 10242.200000000377
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 7,
+        "total_pnl": -42947.44
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 203.01
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 142114.08,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 60277.45,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 46169.04,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "BLFS",
+        "r": -27.27,
+        "pnl": -4900.34,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -13060.68,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -11823.61,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 602.69,
+    "alpha_pct": -153.35
+  },
+  {
+    "run_id": 34,
+    "start_date": "2007-12-07",
+    "end_date": "2026-07-08",
+    "duration_years": 18.6,
+    "annualized_return_pct": 7.18,
+    "total_return_pct": 262.49,
+    "final_value": 362488.7,
+    "n_trades": 13798,
+    "win_rate": 50.9,
+    "profit_factor": 1.05,
+    "avg_win": 549.98,
+    "avg_loss": -543.12,
+    "max_drawdown_pct": -55.15,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 151,
+        "wins": 57,
+        "total_pnl": 213919.99999999997
+      },
+      "Death Cross": {
+        "count": 13626,
+        "wins": 6964,
+        "total_pnl": 1151.1299999994844
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 8,
+        "total_pnl": -24659.2
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 134.09
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 93682.78,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 39786.63,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 30460.64,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -4719.07,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7813.86,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -12109.88,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 597.15,
+    "alpha_pct": -334.66
+  },
+  {
+    "run_id": 35,
+    "start_date": "2008-03-03",
+    "end_date": "2026-07-08",
+    "duration_years": 18.3,
+    "annualized_return_pct": 6.26,
+    "total_return_pct": 204.7,
+    "final_value": 304695.56,
+    "n_trades": 13600,
+    "win_rate": 50.9,
+    "profit_factor": 1.05,
+    "avg_win": 465.99,
+    "avg_loss": -461.97,
+    "max_drawdown_pct": -55.12,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 153,
+        "wins": 60,
+        "total_pnl": 171564.58999999997
+      },
+      "Death Cross": {
+        "count": 13426,
+        "wins": 6861,
+        "total_pnl": 1527.91000000053
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 4,
+        "total_pnl": -28928.800000000003
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 112.57
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 78762.02,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 33424.99,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 25611.52,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -2732.09,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6511.55,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -11245.9,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 683.9,
+    "alpha_pct": -479.2
+  },
+  {
+    "run_id": 36,
+    "start_date": "2008-03-26",
+    "end_date": "2026-07-08",
+    "duration_years": 18.3,
+    "annualized_return_pct": 7.16,
+    "total_return_pct": 254.22,
+    "final_value": 354219.25,
+    "n_trades": 13526,
+    "win_rate": 50.8,
+    "profit_factor": 1.05,
+    "avg_win": 546.72,
+    "avg_loss": -537.8,
+    "max_drawdown_pct": -55.15,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 150,
+        "wins": 58,
+        "total_pnl": 220728.47
+      },
+      "Death Cross": {
+        "count": 13355,
+        "wins": 6814,
+        "total_pnl": -3785.4700000000253
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 4,
+        "total_pnl": -33093.0
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 130.95
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 91725.96,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 38872.8,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 29777.67,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -3179.16,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7676.78,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -13196.97,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 681.8,
+    "alpha_pct": -427.58
+  },
+  {
+    "run_id": 37,
+    "start_date": "2008-03-27",
+    "end_date": "2026-07-08",
+    "duration_years": 18.3,
+    "annualized_return_pct": 7.91,
+    "total_return_pct": 301.85,
+    "final_value": 401847.31,
+    "n_trades": 13528,
+    "win_rate": 50.9,
+    "profit_factor": 1.05,
+    "avg_win": 619.61,
+    "avg_loss": -607.81,
+    "max_drawdown_pct": -55.14,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 146,
+        "wins": 61,
+        "total_pnl": 265547.61
+      },
+      "Death Cross": {
+        "count": 13361,
+        "wins": 6813,
+        "total_pnl": -7942.620000000332
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 5,
+        "total_pnl": -35540.439999999995
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 148.71
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 103956.09,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 44109.74,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 33784.45,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -3607.6,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8602.1,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -14972.38,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 684.27,
+    "alpha_pct": -382.42
+  },
+  {
+    "run_id": 38,
+    "start_date": "2008-03-28",
+    "end_date": "2026-07-08",
+    "duration_years": 18.3,
+    "annualized_return_pct": 6.64,
+    "total_return_pct": 223.9,
+    "final_value": 323902.1,
+    "n_trades": 13531,
+    "win_rate": 50.8,
+    "profit_factor": 1.05,
+    "avg_win": 498.53,
+    "avg_loss": -491.69,
+    "max_drawdown_pct": -55.15,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 149,
+        "wins": 61,
+        "total_pnl": 195854.52999999997
+      },
+      "Death Cross": {
+        "count": 13361,
+        "wins": 6814,
+        "total_pnl": -6560.97000000009
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 4,
+        "total_pnl": -29726.38
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 119.88
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 83898.68,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 35604.11,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 27273.43,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -2912.16,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7025.62,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -12083.77,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 691.84,
+    "alpha_pct": -467.94
+  },
+  {
+    "run_id": 39,
+    "start_date": "2008-06-28",
+    "end_date": "2026-07-08",
+    "duration_years": 18.0,
+    "annualized_return_pct": 5.98,
+    "total_return_pct": 184.85,
+    "final_value": 284854.57,
+    "n_trades": 13334,
+    "win_rate": 50.8,
+    "profit_factor": 1.04,
+    "avg_win": 441.48,
+    "avg_loss": -436.7,
+    "max_drawdown_pct": -55.1,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 148,
+        "wins": 55,
+        "total_pnl": 168362.13999999998
+      },
+      "Death Cross": {
+        "count": 13165,
+        "wins": 6718,
+        "total_pnl": -10158.14999999987
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 3,
+        "total_pnl": -29854.23
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 105.47
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 73625.37,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 31281.01,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 23949.62,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -2440.25,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6134.57,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -10878.0,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 712.49,
+    "alpha_pct": -527.64
+  },
+  {
+    "run_id": 40,
+    "start_date": "2008-07-29",
+    "end_date": "2026-07-08",
+    "duration_years": 17.9,
+    "annualized_return_pct": 5.61,
+    "total_return_pct": 166.44,
+    "final_value": 266436.55,
+    "n_trades": 13235,
+    "win_rate": 50.9,
+    "profit_factor": 1.04,
+    "avg_win": 413.12,
+    "avg_loss": -410.31,
+    "max_drawdown_pct": -55.11,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 143,
+        "wins": 54,
+        "total_pnl": 158723.05
+      },
+      "Death Cross": {
+        "count": 13071,
+        "wins": 6675,
+        "total_pnl": -10698.629999999861
+      },
+      "Crisis Override": {
+        "count": 20,
+        "wins": 3,
+        "total_pnl": -34434.2
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 98.58
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 68977.92,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 29242.47,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 22401.55,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ARWR",
+        "r": -33.51,
+        "pnl": -2291.23,
+        "reason": "Trailing Stop (33.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5791.85,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -54.23,
+        "pnl": -10785.43,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 720.53,
+    "alpha_pct": -554.09
+  },
+  {
+    "run_id": 41,
+    "start_date": "2009-07-20",
+    "end_date": "2026-07-08",
+    "duration_years": 17.0,
+    "annualized_return_pct": 8.2,
+    "total_return_pct": 280.9,
+    "final_value": 380896.2,
+    "n_trades": 11930,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 630.73,
+    "avg_loss": -613.72,
+    "max_drawdown_pct": -54.98,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 143,
+        "wins": 58,
+        "total_pnl": 264955.61
+      },
+      "Death Cross": {
+        "count": 11772,
+        "wins": 5988,
+        "total_pnl": -28282.95999999975
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -30626.420000000002
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 98574.83,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 41790.02,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 32008.71,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9051.96,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8259.39,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ACAD",
+        "r": -65.1,
+        "pnl": -6787.58,
+        "reason": "Trailing Stop (67.9%)"
+      }
+    ],
+    "spy_return_pct": 960.6,
+    "alpha_pct": -679.7
+  },
+  {
+    "run_id": 42,
+    "start_date": "2009-08-19",
+    "end_date": "2026-07-08",
+    "duration_years": 16.9,
+    "annualized_return_pct": 8.64,
+    "total_return_pct": 304.96,
+    "final_value": 404962.11,
+    "n_trades": 11967,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 669.37,
+    "avg_loss": -650.34,
+    "max_drawdown_pct": -55.01,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 144,
+        "wins": 59,
+        "total_pnl": 288058.74999999994
+      },
+      "Death Cross": {
+        "count": 11808,
+        "wins": 6006,
+        "total_pnl": -30096.7999999994
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -32574.010000000006
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 104689.89,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 44461.21,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 34057.64,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -13227.76,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9633.87,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8670.65,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 909.35,
+    "alpha_pct": -604.39
+  },
+  {
+    "run_id": 43,
+    "start_date": "2009-09-18",
+    "end_date": "2026-07-08",
+    "duration_years": 16.8,
+    "annualized_return_pct": 8.74,
+    "total_return_pct": 308.46,
+    "final_value": 408457.11,
+    "n_trades": 11824,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 680.18,
+    "avg_loss": -660.85,
+    "max_drawdown_pct": -55.02,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 141,
+        "wins": 57,
+        "total_pnl": 292212.3599999999
+      },
+      "Death Cross": {
+        "count": 11668,
+        "wins": 5937,
+        "total_pnl": -31091.52000000019
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -32877.18
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 105668.3,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 44847.83,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 34353.59,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -13341.74,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9730.85,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8739.19,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 840.94,
+    "alpha_pct": -532.48
+  },
+  {
+    "run_id": 44,
+    "start_date": "2010-01-19",
+    "end_date": "2026-07-08",
+    "duration_years": 16.5,
+    "annualized_return_pct": 8.41,
+    "total_return_pct": 278.06,
+    "final_value": 378055.05,
+    "n_trades": 11831,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 626.81,
+    "avg_loss": -611.08,
+    "max_drawdown_pct": -54.97,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 134,
+        "wins": 57,
+        "total_pnl": 263250.2699999999
+      },
+      "Death Cross": {
+        "count": 11682,
+        "wins": 5945,
+        "total_pnl": -28986.93000000017
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -30401.0
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 97841.02,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 41473.7,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 31781.06,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -12339.91,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8987.3,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8088.03,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 768.06,
+    "alpha_pct": -490.0
+  },
+  {
+    "run_id": 45,
+    "start_date": "2010-02-10",
+    "end_date": "2026-07-08",
+    "duration_years": 16.4,
+    "annualized_return_pct": 9.19,
+    "total_return_pct": 323.34,
+    "final_value": 423340.38,
+    "n_trades": 11818,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 702.95,
+    "avg_loss": -684.12,
+    "max_drawdown_pct": -54.99,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 129,
+        "wins": 57,
+        "total_pnl": 305731.18000000005
+      },
+      "Death Cross": {
+        "count": 11674,
+        "wins": 5942,
+        "total_pnl": -31418.120000000305
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -34081.78
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 109581.94,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 46499.75,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 35605.71,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -13833.66,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -10086.47,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -9116.17,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 833.36,
+    "alpha_pct": -510.02
+  },
+  {
+    "run_id": 46,
+    "start_date": "2010-03-08",
+    "end_date": "2026-07-08",
+    "duration_years": 16.3,
+    "annualized_return_pct": 9.07,
+    "total_return_pct": 312.77,
+    "final_value": 412772.29,
+    "n_trades": 11815,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 686.94,
+    "avg_loss": -667.31,
+    "max_drawdown_pct": -55.0,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 135,
+        "wins": 55,
+        "total_pnl": 295890.83
+      },
+      "Death Cross": {
+        "count": 11665,
+        "wins": 5935,
+        "total_pnl": -30923.570000000127
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -33192.46000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 106646.71,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 45304.74,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 34695.08,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -13479.72,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9827.84,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8842.0,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 774.06,
+    "alpha_pct": -461.29
+  },
+  {
+    "run_id": 47,
+    "start_date": "2010-04-21",
+    "end_date": "2026-07-08",
+    "duration_years": 16.2,
+    "annualized_return_pct": 8.65,
+    "total_return_pct": 283.99,
+    "final_value": 383993.75,
+    "n_trades": 11787,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 638.73,
+    "avg_loss": -622.49,
+    "max_drawdown_pct": -54.98,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 131,
+        "wins": 54,
+        "total_pnl": 269257.44000000006
+      },
+      "Death Cross": {
+        "count": 11641,
+        "wins": 5926,
+        "total_pnl": -29762.669999999605
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -30873.160000000003
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 99308.64,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 42141.49,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 32281.9,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -12537.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9148.94,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8259.39,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 724.38,
+    "alpha_pct": -440.39
+  },
+  {
+    "run_id": 48,
+    "start_date": "2010-06-28",
+    "end_date": "2026-07-08",
+    "duration_years": 16.0,
+    "annualized_return_pct": 7.71,
+    "total_return_pct": 229.01,
+    "final_value": 329010.12,
+    "n_trades": 11302,
+    "win_rate": 50.9,
+    "profit_factor": 1.05,
+    "avg_win": 553.97,
+    "avg_loss": -544.85,
+    "max_drawdown_pct": -54.93,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 129,
+        "wins": 54,
+        "total_pnl": 214369.04000000007
+      },
+      "Death Cross": {
+        "count": 11158,
+        "wins": 5697,
+        "total_pnl": -23252.6599999999
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -26431.210000000003
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 85121.69,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 36096.18,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 27637.68,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -10738.18,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7823.48,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7094.16,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 820.66,
+    "alpha_pct": -591.65
+  },
+  {
+    "run_id": 49,
+    "start_date": "2010-07-10",
+    "end_date": "2026-07-08",
+    "duration_years": 16.0,
+    "annualized_return_pct": 8.15,
+    "total_return_pct": 249.94,
+    "final_value": 349935.7,
+    "n_trades": 11328,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 588.23,
+    "avg_loss": -577.8,
+    "max_drawdown_pct": -54.93,
+    "exit_reasons": {
+      "Rotated Out": {
+        "count": 2,
+        "wins": 1,
+        "total_pnl": 288.74
+      },
+      "Trailing Stop": {
+        "count": 127,
+        "wins": 51,
+        "total_pnl": 232438.53999999998
+      },
+      "Death Cross": {
+        "count": 11184,
+        "wins": 5714,
+        "total_pnl": -23111.60999999982
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -28105.44
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 90502.94,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 38380.74,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 29390.65,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -11422.07,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8308.4,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7505.42,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 816.99,
+    "alpha_pct": -567.05
+  },
+  {
+    "run_id": 50,
+    "start_date": "2010-07-11",
+    "end_date": "2026-07-08",
+    "duration_years": 16.0,
+    "annualized_return_pct": 8.15,
+    "total_return_pct": 249.94,
+    "final_value": 349935.7,
+    "n_trades": 11328,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 588.23,
+    "avg_loss": -577.8,
+    "max_drawdown_pct": -54.93,
+    "exit_reasons": {
+      "Rotated Out": {
+        "count": 2,
+        "wins": 1,
+        "total_pnl": 288.74
+      },
+      "Trailing Stop": {
+        "count": 127,
+        "wins": 51,
+        "total_pnl": 232438.53999999998
+      },
+      "Death Cross": {
+        "count": 11184,
+        "wins": 5714,
+        "total_pnl": -23111.60999999982
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -28105.44
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 90502.94,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 38380.74,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 29390.65,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -11422.07,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8308.4,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7505.42,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 816.99,
+    "alpha_pct": -567.05
+  },
+  {
+    "run_id": 51,
+    "start_date": "2011-05-30",
+    "end_date": "2026-07-08",
+    "duration_years": 15.1,
+    "annualized_return_pct": 7.56,
+    "total_return_pct": 200.54,
+    "final_value": 300538.11,
+    "n_trades": 10756,
+    "win_rate": 51.0,
+    "profit_factor": 1.05,
+    "avg_win": 519.69,
+    "avg_loss": -513.66,
+    "max_drawdown_pct": -54.88,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 123,
+        "wins": 49,
+        "total_pnl": 191374.70000000004
+      },
+      "Death Cross": {
+        "count": 10618,
+        "wins": 5432,
+        "total_pnl": -25217.649999999794
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -24192.190000000002
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 77783.61,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 33003.22,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 25270.04,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -9826.34,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7144.58,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6545.82,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 630.52,
+    "alpha_pct": -429.98
+  },
+  {
+    "run_id": 52,
+    "start_date": "2011-06-19",
+    "end_date": "2026-07-08",
+    "duration_years": 15.1,
+    "annualized_return_pct": 8.27,
+    "total_return_pct": 230.91,
+    "final_value": 330907.46,
+    "n_trades": 10663,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 575.63,
+    "avg_loss": -566.81,
+    "max_drawdown_pct": -54.88,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 126,
+        "wins": 52,
+        "total_pnl": 220997.73
+      },
+      "Death Cross": {
+        "count": 10521,
+        "wins": 5380,
+        "total_pnl": -28269.259999999987
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 324.71
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -26631.230000000003
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 85610.89,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 36342.21,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 27842.57,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -10816.17,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7888.13,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7196.98,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 663.88,
+    "alpha_pct": -432.97
+  },
+  {
+    "run_id": 53,
+    "start_date": "2011-06-25",
+    "end_date": "2026-07-08",
+    "duration_years": 15.0,
+    "annualized_return_pct": 8.47,
+    "total_return_pct": 239.35,
+    "final_value": 339345.38,
+    "n_trades": 10688,
+    "win_rate": 51.0,
+    "profit_factor": 1.06,
+    "avg_win": 588.84,
+    "avg_loss": -580.28,
+    "max_drawdown_pct": -54.9,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 125,
+        "wins": 52,
+        "total_pnl": 226962.38000000003
+      },
+      "Death Cross": {
+        "count": 10548,
+        "wins": 5398,
+        "total_pnl": -26399.93000000013
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -27332.52
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 87812.32,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 37291.18,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 28571.08,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -11086.12,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8082.1,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7299.79,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 665.33,
+    "alpha_pct": -425.98
+  },
+  {
+    "run_id": 54,
+    "start_date": "2012-01-28",
+    "end_date": "2026-07-08",
+    "duration_years": 14.4,
+    "annualized_return_pct": 9.99,
+    "total_return_pct": 295.35,
+    "final_value": 395353.05,
+    "n_trades": 9993,
+    "win_rate": 50.9,
+    "profit_factor": 1.06,
+    "avg_win": 711.69,
+    "avg_loss": -693.36,
+    "max_drawdown_pct": -54.83,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 119,
+        "wins": 62,
+        "total_pnl": 303538.37999999995
+      },
+      "Death Cross": {
+        "count": 9859,
+        "wins": 5022,
+        "total_pnl": -53046.12000000022
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -31793.99
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 102243.87,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 43406.79,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 33238.07,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -12915.81,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -9407.57,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -8533.56,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 627.84,
+    "alpha_pct": -332.49
+  },
+  {
+    "run_id": 55,
+    "start_date": "2012-03-03",
+    "end_date": "2026-07-08",
+    "duration_years": 14.3,
+    "annualized_return_pct": 9.39,
+    "total_return_pct": 262.33,
+    "final_value": 362330.27,
+    "n_trades": 9954,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 652.61,
+    "avg_loss": -635.49,
+    "max_drawdown_pct": -54.8,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 115,
+        "wins": 59,
+        "total_pnl": 274498.75999999995
+      },
+      "Death Cross": {
+        "count": 9824,
+        "wins": 4998,
+        "total_pnl": -53244.6500000003
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -29129.200000000004
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 93682.78,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 39751.48,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 30437.87,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -11824.0,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8631.69,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7745.32,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 598.73,
+    "alpha_pct": -336.4
+  },
+  {
+    "run_id": 56,
+    "start_date": "2012-04-21",
+    "end_date": "2026-07-08",
+    "duration_years": 14.2,
+    "annualized_return_pct": 9.08,
+    "total_return_pct": 244.12,
+    "final_value": 344121.97,
+    "n_trades": 9947,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 621.04,
+    "avg_loss": -603.71,
+    "max_drawdown_pct": -54.83,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 115,
+        "wins": 55,
+        "total_pnl": 258341.41
+      },
+      "Death Cross": {
+        "count": 9817,
+        "wins": 4990,
+        "total_pnl": -53227.01000000012
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -27675.889999999992
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 89035.33,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 37783.24,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 28935.33,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -11236.1,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -8179.09,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -7368.34,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 592.46,
+    "alpha_pct": -348.34
+  },
+  {
+    "run_id": 57,
+    "start_date": "2013-05-02",
+    "end_date": "2026-07-08",
+    "duration_years": 13.2,
+    "annualized_return_pct": 8.94,
+    "total_return_pct": 209.15,
+    "final_value": 309153.3,
+    "n_trades": 9308,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 576.01,
+    "avg_loss": -560.73,
+    "max_drawdown_pct": -54.72,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 108,
+        "wins": 51,
+        "total_pnl": 218484.56000000003
+      },
+      "Death Cross": {
+        "count": 9185,
+        "wins": 4669,
+        "total_pnl": -44022.659999999756
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -24917.79
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 79985.04,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 33987.34,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "ARWR",
+        "r": 140.25,
+        "pnl": 14265.83,
+        "reason": "Trailing Stop (34.6%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -10114.29,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7370.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6751.45,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 484.95,
+    "alpha_pct": -275.8
+  },
+  {
+    "run_id": 58,
+    "start_date": "2014-01-10",
+    "end_date": "2026-07-08",
+    "duration_years": 12.5,
+    "annualized_return_pct": 6.86,
+    "total_return_pct": 128.92,
+    "final_value": 228918.53,
+    "n_trades": 9247,
+    "win_rate": 50.6,
+    "profit_factor": 1.04,
+    "avg_win": 425.62,
+    "avg_loss": -417.58,
+    "max_drawdown_pct": -54.7,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 99,
+        "wins": 41,
+        "total_pnl": 140059.49
+      },
+      "Death Cross": {
+        "count": 9133,
+        "wins": 4636,
+        "total_pnl": -36861.699999999946
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -18406.190000000002
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 59193.82,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 25130.25,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 131.45,
+        "pnl": 14300.61,
+        "reason": "Trailing Stop (18.5%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7480.73,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5431.17,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5037.89,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 399.64,
+    "alpha_pct": -270.72
+  },
+  {
+    "run_id": 59,
+    "start_date": "2014-03-23",
+    "end_date": "2026-07-08",
+    "duration_years": 12.3,
+    "annualized_return_pct": 7.21,
+    "total_return_pct": 135.37,
+    "final_value": 235374.9,
+    "n_trades": 9119,
+    "win_rate": 50.7,
+    "profit_factor": 1.05,
+    "avg_win": 442.39,
+    "avg_loss": -434.28,
+    "max_drawdown_pct": -54.68,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 94,
+        "wins": 41,
+        "total_pnl": 148248.54000000004
+      },
+      "Death Cross": {
+        "count": 9010,
+        "wins": 4576,
+        "total_pnl": -39308.08000000014
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -18939.590000000004
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 60906.04,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 25868.34,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 131.45,
+        "pnl": 14921.33,
+        "reason": "Trailing Stop (18.5%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7696.7,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5592.82,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5140.7,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 391.94,
+    "alpha_pct": -256.57
+  },
+  {
+    "run_id": 60,
+    "start_date": "2014-03-26",
+    "end_date": "2026-07-08",
+    "duration_years": 12.3,
+    "annualized_return_pct": 8.47,
+    "total_return_pct": 171.43,
+    "final_value": 271433.42,
+    "n_trades": 9113,
+    "win_rate": 50.6,
+    "profit_factor": 1.05,
+    "avg_win": 514.47,
+    "avg_loss": -501.15,
+    "max_drawdown_pct": -54.74,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 95,
+        "wins": 41,
+        "total_pnl": 188429.06999999998
+      },
+      "Death Cross": {
+        "count": 9003,
+        "wins": 4570,
+        "total_pnl": -47474.519999999895
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -21840.769999999997
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 70200.93,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 29804.83,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 131.45,
+        "pnl": 17213.25,
+        "reason": "Trailing Stop (18.5%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -8872.5,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -6465.68,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5928.94,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 395.21,
+    "alpha_pct": -223.78
+  },
+  {
+    "run_id": 61,
+    "start_date": "2014-05-20",
+    "end_date": "2026-07-08",
+    "duration_years": 12.1,
+    "annualized_return_pct": 6.39,
+    "total_return_pct": 112.0,
+    "final_value": 212001.3,
+    "n_trades": 9091,
+    "win_rate": 50.6,
+    "profit_factor": 1.04,
+    "avg_win": 397.04,
+    "avg_loss": -391.35,
+    "max_drawdown_pct": -54.7,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 99,
+        "wins": 42,
+        "total_pnl": 124580.6
+      },
+      "Death Cross": {
+        "count": 8977,
+        "wins": 4558,
+        "total_pnl": -36345.91000000011
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17057.200000000004
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 54790.97,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 23302.59,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 131.45,
+        "pnl": 13441.14,
+        "reason": "Trailing Stop (18.5%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6928.83,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5043.23,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4558.09,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 388.4,
+    "alpha_pct": -276.4
+  },
+  {
+    "run_id": 62,
+    "start_date": "2014-08-03",
+    "end_date": "2026-07-08",
+    "duration_years": 11.9,
+    "annualized_return_pct": 6.95,
+    "total_return_pct": 122.98,
+    "final_value": 222981.69,
+    "n_trades": 8682,
+    "win_rate": 50.8,
+    "profit_factor": 1.04,
+    "avg_win": 422.19,
+    "avg_loss": -417.64,
+    "max_drawdown_pct": -54.65,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 98,
+        "wins": 41,
+        "total_pnl": 132157.19999999995
+      },
+      "Death Cross": {
+        "count": 8569,
+        "wins": 4369,
+        "total_pnl": -34015.609999999964
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17936.18
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 57726.2,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 17925.07,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 95.0,
+        "pnl": 14615.64,
+        "reason": "Trailing Stop (9.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7282.77,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5301.86,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4832.26,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 373.57,
+    "alpha_pct": -250.59
+  },
+  {
+    "run_id": 63,
+    "start_date": "2014-12-13",
+    "end_date": "2026-07-08",
+    "duration_years": 11.6,
+    "annualized_return_pct": 6.98,
+    "total_return_pct": 118.26,
+    "final_value": 218258.4,
+    "n_trades": 8336,
+    "win_rate": 50.7,
+    "profit_factor": 1.04,
+    "avg_win": 420.97,
+    "avg_loss": -414.84,
+    "max_drawdown_pct": -54.63,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 92,
+        "wins": 40,
+        "total_pnl": 134066.27999999997
+      },
+      "Death Cross": {
+        "count": 8229,
+        "wins": 4186,
+        "total_pnl": -39964.279999999795
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17573.45
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 56503.19,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 17573.6,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "APPF",
+        "r": 131.45,
+        "pnl": 13823.12,
+        "reason": "Trailing Stop (18.5%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7138.79,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5204.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4832.26,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 351.68,
+    "alpha_pct": -233.42
+  },
+  {
+    "run_id": 64,
+    "start_date": "2015-03-21",
+    "end_date": "2026-07-08",
+    "duration_years": 11.3,
+    "annualized_return_pct": 6.88,
+    "total_return_pct": 112.0,
+    "final_value": 212000.81,
+    "n_trades": 8040,
+    "win_rate": 50.7,
+    "profit_factor": 1.04,
+    "avg_win": 411.97,
+    "avg_loss": -405.75,
+    "max_drawdown_pct": -54.52,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 94,
+        "wins": 43,
+        "total_pnl": 128451.31
+      },
+      "Death Cross": {
+        "count": 7931,
+        "wins": 4031,
+        "total_pnl": -39778.509999999915
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17051.400000000005
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 54790.97,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 17433.01,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 16701.57,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6928.83,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5043.23,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4558.09,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 326.97,
+    "alpha_pct": -214.97
+  },
+  {
+    "run_id": 65,
+    "start_date": "2015-03-31",
+    "end_date": "2026-07-08",
+    "duration_years": 11.3,
+    "annualized_return_pct": 6.38,
+    "total_return_pct": 100.76,
+    "final_value": 200763.45,
+    "n_trades": 8060,
+    "win_rate": 50.7,
+    "profit_factor": 1.04,
+    "avg_win": 389.32,
+    "avg_loss": -384.37,
+    "max_drawdown_pct": -54.57,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 94,
+        "wins": 41,
+        "total_pnl": 116773.50000000001
+      },
+      "Death Cross": {
+        "count": 7950,
+        "wins": 4040,
+        "total_pnl": -38914.63999999991
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 813.07
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -16174.589999999998
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 51855.74,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 16519.18,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15857.11,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6562.89,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4784.61,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4318.19,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 335.21,
+    "alpha_pct": -234.45
+  },
+  {
+    "run_id": 66,
+    "start_date": "2015-07-03",
+    "end_date": "2026-07-08",
+    "duration_years": 11.0,
+    "annualized_return_pct": 6.56,
+    "total_return_pct": 101.34,
+    "final_value": 201343.24,
+    "n_trades": 7746,
+    "win_rate": 50.6,
+    "profit_factor": 1.04,
+    "avg_win": 402.18,
+    "avg_loss": -396.22,
+    "max_drawdown_pct": -54.54,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 96,
+        "wins": 43,
+        "total_pnl": 119379.02000000002
+      },
+      "Death Cross": {
+        "count": 7634,
+        "wins": 3876,
+        "total_pnl": -40993.429999999855
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 875.3
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -16229.78
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 52100.34,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 16589.48,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15857.11,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6586.89,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4784.61,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4386.73,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 331.26,
+    "alpha_pct": -229.92
+  },
+  {
+    "run_id": 67,
+    "start_date": "2015-07-17",
+    "end_date": "2026-07-08",
+    "duration_years": 11.0,
+    "annualized_return_pct": 5.51,
+    "total_return_pct": 80.12,
+    "final_value": 180121.66,
+    "n_trades": 7606,
+    "win_rate": 50.6,
+    "profit_factor": 1.03,
+    "avg_win": 361.63,
+    "avg_loss": -358.27,
+    "max_drawdown_pct": -54.48,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 95,
+        "wins": 44,
+        "total_pnl": 98386.37999999999
+      },
+      "Death Cross": {
+        "count": 7496,
+        "wins": 3802,
+        "total_pnl": -37978.10000000017
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -14517.38
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 46719.09,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 14796.97,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 14168.19,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5891.0,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4299.68,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -3975.47,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 320.77,
+    "alpha_pct": -240.65
+  },
+  {
+    "run_id": 68,
+    "start_date": "2015-11-15",
+    "end_date": "2026-07-08",
+    "duration_years": 10.6,
+    "annualized_return_pct": 6.32,
+    "total_return_pct": 91.97,
+    "final_value": 191969.42,
+    "n_trades": 6984,
+    "win_rate": 50.3,
+    "profit_factor": 1.04,
+    "avg_win": 390.37,
+    "avg_loss": -379.01,
+    "max_drawdown_pct": -54.32,
+    "exit_reasons": {
+      "Death Cross": {
+        "count": 6879,
+        "wins": 3468,
+        "total_pnl": -54092.21000000001
+      },
+      "Trailing Stop": {
+        "count": 90,
+        "wins": 42,
+        "total_pnl": 125347.95999999999
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -15427.19
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 49654.32,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 20525.97,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15106.48,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6262.94,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4558.31,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4112.56,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 339.14,
+    "alpha_pct": -247.17
+  },
+  {
+    "run_id": 69,
+    "start_date": "2016-02-06",
+    "end_date": "2026-07-08",
+    "duration_years": 10.4,
+    "annualized_return_pct": 8.85,
+    "total_return_pct": 141.87,
+    "final_value": 241870.12,
+    "n_trades": 6688,
+    "win_rate": 50.5,
+    "profit_factor": 1.06,
+    "avg_win": 497.28,
+    "avg_loss": -478.94,
+    "max_drawdown_pct": -54.33,
+    "exit_reasons": {
+      "Death Cross": {
+        "count": 6585,
+        "wins": 3334,
+        "total_pnl": -42873.71999999996
+      },
+      "Trailing Stop": {
+        "count": 88,
+        "wins": 43,
+        "total_pnl": 158784.19
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -19413.559999999998
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 62618.25,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CVNA",
+        "r": 158.06,
+        "pnl": 17186.98,
+        "reason": "Trailing Stop (18.9%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 19047.3,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7888.66,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5754.46,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5140.7,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 370.42,
+    "alpha_pct": -228.55
+  },
+  {
+    "run_id": 70,
+    "start_date": "2016-04-04",
+    "end_date": "2026-07-08",
+    "duration_years": 10.3,
+    "annualized_return_pct": 7.97,
+    "total_return_pct": 119.6,
+    "final_value": 219596.17,
+    "n_trades": 6429,
+    "win_rate": 50.8,
+    "profit_factor": 1.06,
+    "avg_win": 450.93,
+    "avg_loss": -439.93,
+    "max_drawdown_pct": -54.26,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 89,
+        "wins": 46,
+        "total_pnl": 130193.95999999999
+      },
+      "Death Cross": {
+        "count": 6325,
+        "wins": 3214,
+        "total_pnl": -33952.190000000155
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17657.2
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 56747.79,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 17264.55,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10510.37,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7174.79,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5204.88,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4797.99,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 326.49,
+    "alpha_pct": -206.89
+  },
+  {
+    "run_id": 71,
+    "start_date": "2016-05-05",
+    "end_date": "2026-07-08",
+    "duration_years": 10.2,
+    "annualized_return_pct": 8.04,
+    "total_return_pct": 119.61,
+    "final_value": 219611.16,
+    "n_trades": 6410,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 451.26,
+    "avg_loss": -438.96,
+    "max_drawdown_pct": -54.25,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 82,
+        "wins": 42,
+        "total_pnl": 132337.71
+      },
+      "Death Cross": {
+        "count": 6313,
+        "wins": 3204,
+        "total_pnl": -36064.99000000017
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17657.41
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 56747.79,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 17264.55,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10510.37,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7174.79,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5237.2,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4797.99,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 329.15,
+    "alpha_pct": -209.54
+  },
+  {
+    "run_id": 72,
+    "start_date": "2016-07-29",
+    "end_date": "2026-07-08",
+    "duration_years": 9.9,
+    "annualized_return_pct": 7.7,
+    "total_return_pct": 108.99,
+    "final_value": 208986.48,
+    "n_trades": 6363,
+    "win_rate": 50.8,
+    "profit_factor": 1.05,
+    "avg_win": 432.38,
+    "avg_loss": -423.45,
+    "max_drawdown_pct": -54.28,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 81,
+        "wins": 42,
+        "total_pnl": 121914.37000000004
+      },
+      "Death Cross": {
+        "count": 6267,
+        "wins": 3185,
+        "total_pnl": -35167.440000000104
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -16828.59
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 54057.16,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 16513.91,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10027.98,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6844.84,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4978.58,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4592.36,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 303.04,
+    "alpha_pct": -194.05
+  },
+  {
+    "run_id": 73,
+    "start_date": "2016-10-31",
+    "end_date": "2026-07-08",
+    "duration_years": 9.7,
+    "annualized_return_pct": 9.23,
+    "total_return_pct": 135.15,
+    "final_value": 235147.61,
+    "n_trades": 6169,
+    "win_rate": 50.7,
+    "profit_factor": 1.06,
+    "avg_win": 494.54,
+    "avg_loss": -477.7,
+    "max_drawdown_pct": -54.26,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 78,
+        "wins": 44,
+        "total_pnl": 156607.88999999996
+      },
+      "Death Cross": {
+        "count": 6076,
+        "wins": 3078,
+        "total_pnl": -46406.479999999865
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -18887.91
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 60906.04,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "BLFS",
+        "r": 138.44,
+        "pnl": 16444.99,
+        "reason": "Trailing Stop (19.3%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 18484.32,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7672.7,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5592.82,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5072.16,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 309.63,
+    "alpha_pct": -174.48
+  },
+  {
+    "run_id": 74,
+    "start_date": "2017-03-06",
+    "end_date": "2026-07-08",
+    "duration_years": 9.3,
+    "annualized_return_pct": 8.94,
+    "total_return_pct": 122.5,
+    "final_value": 222501.45,
+    "n_trades": 5982,
+    "win_rate": 50.5,
+    "profit_factor": 1.06,
+    "avg_win": 476.07,
+    "avg_loss": -458.96,
+    "max_drawdown_pct": -54.23,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 75,
+        "wins": 38,
+        "total_pnl": 139104.63
+      },
+      "Death Cross": {
+        "count": 5892,
+        "wins": 2982,
+        "total_pnl": -40113.48999999994
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -17907.94
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 57481.6,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "BLFS",
+        "r": 138.44,
+        "pnl": 16383.29,
+        "reason": "Trailing Stop (19.3%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 17546.03,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7270.77,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5301.86,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4763.71,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 264.13,
+    "alpha_pct": -141.63
+  },
+  {
+    "run_id": 75,
+    "start_date": "2017-08-29",
+    "end_date": "2026-07-08",
+    "duration_years": 8.9,
+    "annualized_return_pct": 7.92,
+    "total_return_pct": 96.49,
+    "final_value": 196491.51,
+    "n_trades": 5697,
+    "win_rate": 50.6,
+    "profit_factor": 1.05,
+    "avg_win": 426.15,
+    "avg_loss": -415.26,
+    "max_drawdown_pct": -54.18,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 73,
+        "wins": 34,
+        "total_pnl": 118242.65999999999
+      },
+      "Death Cross": {
+        "count": 5608,
+        "wins": 2845,
+        "total_pnl": -44477.76000000019
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 1004.55
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -14744.400000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 50877.33,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "BLFS",
+        "r": 138.44,
+        "pnl": 14809.75,
+        "reason": "Trailing Stop (19.3%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15481.79,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6412.91,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4655.29,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4283.92,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 250.27,
+    "alpha_pct": -153.78
+  },
+  {
+    "run_id": 76,
+    "start_date": "2017-09-24",
+    "end_date": "2026-07-08",
+    "duration_years": 8.8,
+    "annualized_return_pct": 8.47,
+    "total_return_pct": 104.36,
+    "final_value": 204358.47,
+    "n_trades": 5700,
+    "win_rate": 50.6,
+    "profit_factor": 1.05,
+    "avg_win": 443.18,
+    "avg_loss": -430.91,
+    "max_drawdown_pct": -54.17,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 68,
+        "wins": 34,
+        "total_pnl": 125458.43999999997
+      },
+      "Death Cross": {
+        "count": 5616,
+        "wins": 2848,
+        "total_pnl": -44730.59000000003
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 1052.28
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -15339.620000000006
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 52834.15,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "BLFS",
+        "r": 138.44,
+        "pnl": 15262.27,
+        "reason": "Trailing Stop (19.3%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 16044.77,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6664.87,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4849.26,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4352.46,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 242.13,
+    "alpha_pct": -137.77
+  },
+  {
+    "run_id": 77,
+    "start_date": "2017-10-20",
+    "end_date": "2026-07-08",
+    "duration_years": 8.7,
+    "annualized_return_pct": 5.95,
+    "total_return_pct": 65.5,
+    "final_value": 165502.29,
+    "n_trades": 5645,
+    "win_rate": 50.6,
+    "profit_factor": 1.04,
+    "avg_win": 354.83,
+    "avg_loss": -351.37,
+    "max_drawdown_pct": -54.11,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 76,
+        "wins": 34,
+        "total_pnl": 76324.93000000001
+      },
+      "Death Cross": {
+        "count": 5553,
+        "wins": 2820,
+        "total_pnl": -30649.65999999989
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 1608.13
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -12444.99
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 42805.45,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 13042.24,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 7937.6,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5417.08,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -3944.07,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -3632.76,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 231.92,
+    "alpha_pct": -166.42
+  },
+  {
+    "run_id": 78,
+    "start_date": "2018-01-22",
+    "end_date": "2026-07-08",
+    "duration_years": 8.5,
+    "annualized_return_pct": 6.93,
+    "total_return_pct": 76.27,
+    "final_value": 176269.44,
+    "n_trades": 5539,
+    "win_rate": 50.5,
+    "profit_factor": 1.04,
+    "avg_win": 385.01,
+    "avg_loss": -377.39,
+    "max_drawdown_pct": -54.12,
+    "exit_reasons": {
+      "Death Cross": {
+        "count": 5452,
+        "wins": 2764,
+        "total_pnl": -27079.980000000018
+      },
+      "Trailing Stop": {
+        "count": 71,
+        "wins": 31,
+        "total_pnl": 83084.05999999998
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 805.12
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -13197.95
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 45496.08,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "BLFS",
+        "r": 138.44,
+        "pnl": 11971.22,
+        "reason": "Trailing Stop (19.3%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 13886.7,
+        "reason": "Trailing Stop (20.4%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4170.37,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ALKS",
+        "r": -32.75,
+        "pnl": -3044.7,
+        "reason": "Trailing Stop (32.8%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -3804.12,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 200.35,
+    "alpha_pct": -124.08
+  },
+  {
+    "run_id": 79,
+    "start_date": "2018-05-14",
+    "end_date": "2026-07-08",
+    "duration_years": 8.2,
+    "annualized_return_pct": 8.86,
+    "total_return_pct": 99.82,
+    "final_value": 199816.77,
+    "n_trades": 5235,
+    "win_rate": 50.5,
+    "profit_factor": 1.06,
+    "avg_win": 434.05,
+    "avg_loss": -417.94,
+    "max_drawdown_pct": -54.34,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 64,
+        "wins": 32,
+        "total_pnl": 114087.45999999999
+      },
+      "Death Cross": {
+        "count": 5156,
+        "wins": 2607,
+        "total_pnl": -37844.53000000018
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -13191.829999999998
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 51611.14,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 14918.82,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9574.82,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6532.89,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4752.28,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4352.46,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 209.8,
+    "alpha_pct": -109.98
+  },
+  {
+    "run_id": 80,
+    "start_date": "2018-07-09",
+    "end_date": "2026-07-08",
+    "duration_years": 8.0,
+    "annualized_return_pct": 9.79,
+    "total_return_pct": 111.04,
+    "final_value": 211042.21,
+    "n_trades": 5040,
+    "win_rate": 50.5,
+    "profit_factor": 1.07,
+    "avg_win": 441.43,
+    "avg_loss": -420.53,
+    "max_drawdown_pct": -48.22,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 70,
+        "wins": 33,
+        "total_pnl": 119224.18000000001
+      },
+      "Death Cross": {
+        "count": 4954,
+        "wins": 2506,
+        "total_pnl": -35154.38000000019
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 778.61
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -12343.929999999998
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 54546.37,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 13605.21,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10101.07,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -6898.83,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5010.9,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4626.63,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 202.95,
+    "alpha_pct": -91.91
+  },
+  {
+    "run_id": 81,
+    "start_date": "2018-08-12",
+    "end_date": "2026-07-08",
+    "duration_years": 7.9,
+    "annualized_return_pct": 11.32,
+    "total_return_pct": 133.34,
+    "final_value": 233335.77,
+    "n_trades": 5029,
+    "win_rate": 50.5,
+    "profit_factor": 1.08,
+    "avg_win": 490.66,
+    "avg_loss": -464.27,
+    "max_drawdown_pct": -48.23,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 63,
+        "wins": 31,
+        "total_pnl": 141657.61000000002
+      },
+      "Death Cross": {
+        "count": 4950,
+        "wins": 2505,
+        "total_pnl": -37457.859999999986
+      },
+      "Rotated Out": {
+        "count": 1,
+        "wins": 1,
+        "total_pnl": 1262.85
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -14768.7
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 60416.83,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15012.65,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 11168.18,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7624.71,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5560.49,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -5072.16,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 197.32,
+    "alpha_pct": -63.98
+  },
+  {
+    "run_id": 82,
+    "start_date": "2018-08-19",
+    "end_date": "2026-07-08",
+    "duration_years": 7.9,
+    "annualized_return_pct": 10.0,
+    "total_return_pct": 112.0,
+    "final_value": 212000.77,
+    "n_trades": 4864,
+    "win_rate": 50.3,
+    "profit_factor": 1.07,
+    "avg_win": 440.72,
+    "avg_loss": -415.46,
+    "max_drawdown_pct": -44.97,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 68,
+        "wins": 31,
+        "total_pnl": 124185.95000000001
+      },
+      "Death Cross": {
+        "count": 4781,
+        "wins": 2412,
+        "total_pnl": -37511.710000000116
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -13245.29
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 54790.97,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 13323.73,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10144.92,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AR",
+        "r": -27.4,
+        "pnl": -2772.15,
+        "reason": "Trailing Stop (30.3%)"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5043.23,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4558.09,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 195.34,
+    "alpha_pct": -83.34
+  },
+  {
+    "run_id": 83,
+    "start_date": "2019-01-08",
+    "end_date": "2026-07-08",
+    "duration_years": 7.5,
+    "annualized_return_pct": 16.12,
+    "total_return_pct": 206.64,
+    "final_value": 306640.87,
+    "n_trades": 4643,
+    "win_rate": 50.6,
+    "profit_factor": 1.12,
+    "avg_win": 622.84,
+    "avg_loss": -572.39,
+    "max_drawdown_pct": -41.02,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 69,
+        "wins": 34,
+        "total_pnl": 187725.39999999997
+      },
+      "Death Cross": {
+        "count": 4559,
+        "wins": 2313,
+        "total_pnl": -27068.700000000073
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -9472.18
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 79251.23,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 15012.65,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 14676.51,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7306.22,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BMRN",
+        "r": -31.08,
+        "pnl": -3257.28,
+        "reason": "Trailing Stop (41.4%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6614.37,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 224.51,
+    "alpha_pct": -17.87
+  },
+  {
+    "run_id": 84,
+    "start_date": "2019-02-15",
+    "end_date": "2026-07-08",
+    "duration_years": 7.4,
+    "annualized_return_pct": 16.2,
+    "total_return_pct": 203.33,
+    "final_value": 303327.85,
+    "n_trades": 4631,
+    "win_rate": 50.6,
+    "profit_factor": 1.11,
+    "avg_win": 616.35,
+    "avg_loss": -565.24,
+    "max_drawdown_pct": -41.02,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 64,
+        "wins": 33,
+        "total_pnl": 188836.56999999998
+      },
+      "Death Cross": {
+        "count": 4552,
+        "wins": 2305,
+        "total_pnl": -30756.810000000092
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -9600.390000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 78517.42,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 14824.99,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 14515.72,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7209.24,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BMRN",
+        "r": -31.08,
+        "pnl": -3222.63,
+        "reason": "Trailing Stop (41.4%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6545.82,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 200.41,
+    "alpha_pct": 2.92
+  },
+  {
+    "run_id": 85,
+    "start_date": "2019-05-04",
+    "end_date": "2026-07-08",
+    "duration_years": 7.2,
+    "annualized_return_pct": 11.49,
+    "total_return_pct": 118.38,
+    "final_value": 218381.77,
+    "n_trades": 4650,
+    "win_rate": 50.5,
+    "profit_factor": 1.08,
+    "avg_win": 437.02,
+    "avg_loss": -411.12,
+    "max_drawdown_pct": -41.05,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 73,
+        "wins": 31,
+        "total_pnl": 106694.41999999998
+      },
+      "Death Cross": {
+        "count": 4562,
+        "wins": 2313,
+        "total_pnl": -20593.670000000006
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 3,
+        "total_pnl": -7224.190000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 56503.19,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "CRWD",
+        "r": 94.9,
+        "pnl": 7787.81,
+        "reason": "Trailing Stop (20.4%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10451.9,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "BMRN",
+        "r": -31.08,
+        "pnl": -2529.59,
+        "reason": "Trailing Stop (41.4%)"
+      },
+      {
+        "t": "CLSK",
+        "r": -31.54,
+        "pnl": -2516.93,
+        "reason": "Trailing Stop (31.5%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4729.44,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 182.14,
+    "alpha_pct": -63.76
+  },
+  {
+    "run_id": 86,
+    "start_date": "2020-01-28",
+    "end_date": "2026-07-08",
+    "duration_years": 6.4,
+    "annualized_return_pct": 11.86,
+    "total_return_pct": 105.83,
+    "final_value": 205827.43,
+    "n_trades": 3986,
+    "win_rate": 50.0,
+    "profit_factor": 1.09,
+    "avg_win": 437.77,
+    "avg_loss": -402.79,
+    "max_drawdown_pct": -39.01,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 69,
+        "wins": 29,
+        "total_pnl": 95673.89
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 2,
+        "total_pnl": -10116.619999999999
+      },
+      "Death Cross": {
+        "count": 3902,
+        "wins": 1961,
+        "total_pnl": -16676.400000000074
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 53323.36,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "AEO",
+        "r": 137.13,
+        "pnl": 12202.49,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9837.94,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "EPC",
+        "r": -30.2,
+        "pnl": -2766.8,
+        "reason": "Crisis Override"
+      },
+      {
+        "t": "CLSK",
+        "r": -30.9,
+        "pnl": -2707.47,
+        "reason": "Trailing Stop (30.9%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4489.54,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 150.16,
+    "alpha_pct": -44.33
+  },
+  {
+    "run_id": 87,
+    "start_date": "2020-02-07",
+    "end_date": "2026-07-08",
+    "duration_years": 6.4,
+    "annualized_return_pct": 11.11,
+    "total_return_pct": 96.53,
+    "final_value": 196529.38,
+    "n_trades": 3892,
+    "win_rate": 50.0,
+    "profit_factor": 1.08,
+    "avg_win": 415.86,
+    "avg_loss": -384.76,
+    "max_drawdown_pct": -38.36,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 73,
+        "wins": 30,
+        "total_pnl": 80698.54999999999
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 2,
+        "total_pnl": -9469.069999999998
+      },
+      "Death Cross": {
+        "count": 3804,
+        "wins": 1915,
+        "total_pnl": -9907.87999999996
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 50877.33,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9414.02,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "AAPL",
+        "r": 44.21,
+        "pnl": 3843.72,
+        "reason": "Trailing Stop (9.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "EPC",
+        "r": -30.2,
+        "pnl": -2786.49,
+        "reason": "Crisis Override"
+      },
+      {
+        "t": "CLSK",
+        "r": -30.9,
+        "pnl": -2761.38,
+        "reason": "Trailing Stop (30.9%)"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4318.19,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 146.16,
+    "alpha_pct": -49.63
+  },
+  {
+    "run_id": 88,
+    "start_date": "2020-02-26",
+    "end_date": "2026-07-08",
+    "duration_years": 6.4,
+    "annualized_return_pct": 12.66,
+    "total_return_pct": 113.53,
+    "final_value": 213534.69,
+    "n_trades": 3808,
+    "win_rate": 50.1,
+    "profit_factor": 1.1,
+    "avg_win": 451.44,
+    "avg_loss": -413.22,
+    "max_drawdown_pct": -37.51,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 73,
+        "wins": 33,
+        "total_pnl": 94929.1
+      },
+      "Crisis Override": {
+        "count": 15,
+        "wins": 2,
+        "total_pnl": -12888.979999999998
+      },
+      "Death Cross": {
+        "count": 3720,
+        "wins": 1872,
+        "total_pnl": -6676.470000000049
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 55280.18,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10203.39,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "AAPL",
+        "r": 44.21,
+        "pnl": 3484.49,
+        "reason": "Trailing Stop (9.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5495.07,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5075.56,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4592.36,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 162.52,
+    "alpha_pct": -48.99
+  },
+  {
+    "run_id": 89,
+    "start_date": "2020-08-08",
+    "end_date": "2026-07-08",
+    "duration_years": 5.9,
+    "annualized_return_pct": 15.07,
+    "total_return_pct": 129.31,
+    "final_value": 229314.62,
+    "n_trades": 3558,
+    "win_rate": 50.2,
+    "profit_factor": 1.11,
+    "avg_win": 493.62,
+    "avg_loss": -447.08,
+    "max_drawdown_pct": -34.36,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 65,
+        "wins": 31,
+        "total_pnl": 101283.64000000001
+      },
+      "Death Cross": {
+        "count": 3483,
+        "wins": 1753,
+        "total_pnl": -6566.970000000081
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -6276.009999999999
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 59438.42,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 10978.15,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ABR",
+        "r": 44.48,
+        "pnl": 3973.53,
+        "reason": "Trailing Stop (11.0%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5909.0,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -5463.5,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4969.34,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 141.93,
+    "alpha_pct": -12.62
+  },
+  {
+    "run_id": 90,
+    "start_date": "2020-09-16",
+    "end_date": "2026-07-08",
+    "duration_years": 5.8,
+    "annualized_return_pct": 20.69,
+    "total_return_pct": 198.05,
+    "final_value": 298046.46,
+    "n_trades": 3550,
+    "win_rate": 50.1,
+    "profit_factor": 1.14,
+    "avg_win": 657.05,
+    "avg_loss": -577.5,
+    "max_drawdown_pct": -34.3,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 60,
+        "wins": 31,
+        "total_pnl": 162926.76
+      },
+      "Death Cross": {
+        "count": 3480,
+        "wins": 1746,
+        "total_pnl": -9923.949999999957
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -8098.970000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 77049.8,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "AEO",
+        "r": 112.48,
+        "pnl": 28074.45,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 14267.21,
+        "reason": "Trailing Stop (17.9%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -7678.7,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -7079.92,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -6408.74,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 138.89,
+    "alpha_pct": 59.16
+  },
+  {
+    "run_id": 91,
+    "start_date": "2021-01-03",
+    "end_date": "2026-07-08",
+    "duration_years": 5.5,
+    "annualized_return_pct": 13.54,
+    "total_return_pct": 101.31,
+    "final_value": 201310.56,
+    "n_trades": 3548,
+    "win_rate": 49.9,
+    "profit_factor": 1.09,
+    "avg_win": 429.8,
+    "avg_loss": -391.06,
+    "max_drawdown_pct": -34.26,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 62,
+        "wins": 28,
+        "total_pnl": 78223.09000000001
+      },
+      "Death Cross": {
+        "count": 3476,
+        "wins": 1741,
+        "total_pnl": -7314.369999999925
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -5455.670000000001
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 52100.34,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9633.29,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 6985.93,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5183.12,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4784.61,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4352.46,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 114.71,
+    "alpha_pct": -13.4
+  },
+  {
+    "run_id": 92,
+    "start_date": "2021-03-08",
+    "end_date": "2026-07-08",
+    "duration_years": 5.3,
+    "annualized_return_pct": 13.41,
+    "total_return_pct": 95.64,
+    "final_value": 195638.06,
+    "n_trades": 3452,
+    "win_rate": 49.7,
+    "profit_factor": 1.09,
+    "avg_win": 419.79,
+    "avg_loss": -380.35,
+    "max_drawdown_pct": -35.48,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 49,
+        "wins": 20,
+        "total_pnl": 72431.75
+      },
+      "Death Cross": {
+        "count": 3393,
+        "wins": 1695,
+        "total_pnl": -8676.529999999959
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 2,
+        "total_pnl": -2889.92
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 50632.73,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9750.23,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 6781.77,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5243.11,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4849.26,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4249.64,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 110.3,
+    "alpha_pct": -14.66
+  },
+  {
+    "run_id": 93,
+    "start_date": "2021-04-30",
+    "end_date": "2026-07-08",
+    "duration_years": 5.2,
+    "annualized_return_pct": 13.61,
+    "total_return_pct": 93.9,
+    "final_value": 193899.24,
+    "n_trades": 3434,
+    "win_rate": 49.7,
+    "profit_factor": 1.09,
+    "avg_win": 415.2,
+    "avg_loss": -376.42,
+    "max_drawdown_pct": -34.54,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 50,
+        "wins": 23,
+        "total_pnl": 73061.01999999999
+      },
+      "Death Cross": {
+        "count": 3374,
+        "wins": 1684,
+        "total_pnl": -9855.10000000006
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -3751.26
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 50143.52,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9662.53,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 6728.51,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -27.25,
+        "pnl": -5195.12,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4784.61,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4215.37,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 91.74,
+    "alpha_pct": 2.16
+  },
+  {
+    "run_id": 94,
+    "start_date": "2021-06-08",
+    "end_date": "2026-07-08",
+    "duration_years": 5.1,
+    "annualized_return_pct": 14.22,
+    "total_return_pct": 96.49,
+    "final_value": 196491.54,
+    "n_trades": 3404,
+    "win_rate": 49.8,
+    "profit_factor": 1.09,
+    "avg_win": 420.82,
+    "avg_loss": -380.88,
+    "max_drawdown_pct": -33.19,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 53,
+        "wins": 22,
+        "total_pnl": 68644.28000000001
+      },
+      "Death Cross": {
+        "count": 3341,
+        "wins": 1670,
+        "total_pnl": -5197.419999999947
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 2,
+        "total_pnl": -1872.2400000000002
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 50877.33,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9779.47,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 6808.4,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -25.28,
+        "pnl": -3467.59,
+        "reason": "Trailing Stop (29.7%)"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4849.26,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4283.92,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 89.48,
+    "alpha_pct": 7.01
+  },
+  {
+    "run_id": 95,
+    "start_date": "2021-07-01",
+    "end_date": "2026-07-08",
+    "duration_years": 5.0,
+    "annualized_return_pct": 13.68,
+    "total_return_pct": 90.32,
+    "final_value": 190317.35,
+    "n_trades": 3397,
+    "win_rate": 49.7,
+    "profit_factor": 1.09,
+    "avg_win": 409.84,
+    "avg_loss": -372.2,
+    "max_drawdown_pct": -33.9,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 54,
+        "wins": 22,
+        "total_pnl": 63142.61
+      },
+      "Death Cross": {
+        "count": 3333,
+        "wins": 1666,
+        "total_pnl": -3882.9899999999498
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -2748.69
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 49165.11,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "APP",
+        "r": 68.06,
+        "pnl": 9487.11,
+        "reason": "Trailing Stop (17.9%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 6595.36,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -25.28,
+        "pnl": -3364.65,
+        "reason": "Trailing Stop (29.7%)"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -4719.95,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "BILL",
+        "r": -35.52,
+        "pnl": -4112.56,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 85.29,
+    "alpha_pct": 5.03
+  },
+  {
+    "run_id": 96,
+    "start_date": "2021-11-10",
+    "end_date": "2026-07-08",
+    "duration_years": 4.7,
+    "annualized_return_pct": 12.64,
+    "total_return_pct": 74.11,
+    "final_value": 174109.16,
+    "n_trades": 2994,
+    "win_rate": 49.8,
+    "profit_factor": 1.08,
+    "avg_win": 376.63,
+    "avg_loss": -345.24,
+    "max_drawdown_pct": -31.33,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 54,
+        "wins": 20,
+        "total_pnl": 38293.530000000006
+      },
+      "Death Cross": {
+        "count": 2930,
+        "wins": 1471,
+        "total_pnl": 8294.71000000004
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 1,
+        "total_pnl": -3210.2
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 35467.37,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "ACMR",
+        "r": 40.8,
+        "pnl": 4820.03,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "AA",
+        "r": 36.95,
+        "pnl": 3491.27,
+        "reason": "Trailing Stop (18.8%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "APP",
+        "r": -23.98,
+        "pnl": -2858.84,
+        "reason": "Trailing Stop (24.0%)"
+      },
+      {
+        "t": "AHCO",
+        "r": -25.28,
+        "pnl": -3451.34,
+        "reason": "Trailing Stop (29.7%)"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -3588.45,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 71.47,
+    "alpha_pct": 2.64
+  },
+  {
+    "run_id": 97,
+    "start_date": "2022-01-04",
+    "end_date": "2026-07-08",
+    "duration_years": 4.5,
+    "annualized_return_pct": 11.61,
+    "total_return_pct": 64.06,
+    "final_value": 164063.5,
+    "n_trades": 2730,
+    "win_rate": 50.2,
+    "profit_factor": 1.08,
+    "avg_win": 353.87,
+    "avg_loss": -330.56,
+    "max_drawdown_pct": -42.01,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 60,
+        "wins": 22,
+        "total_pnl": 28239.64000000001
+      },
+      "Death Cross": {
+        "count": 2660,
+        "wins": 1345,
+        "total_pnl": 6567.4500000000135
+      },
+      "Crisis Override": {
+        "count": 10,
+        "wins": 3,
+        "total_pnl": 434.41999999999973
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 251.07,
+        "pnl": 33265.95,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "ANF",
+        "r": 113.8,
+        "pnl": 11349.95,
+        "reason": "Trailing Stop (15.2%)"
+      },
+      {
+        "t": "APP",
+        "r": 34.22,
+        "pnl": 5230.24,
+        "reason": "Trailing Stop (18.3%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AHCO",
+        "r": -25.28,
+        "pnl": -2855.35,
+        "reason": "Trailing Stop (29.7%)"
+      },
+      {
+        "t": "ACMR",
+        "r": -26.33,
+        "pnl": -1712.67,
+        "reason": "Trailing Stop (31.7%)"
+      },
+      {
+        "t": "ADUS",
+        "r": -28.31,
+        "pnl": -2004.36,
+        "reason": "Death Cross"
+      }
+    ],
+    "spy_return_pct": 65.89,
+    "alpha_pct": -1.83
+  },
+  {
+    "run_id": 98,
+    "start_date": "2022-09-08",
+    "end_date": "2026-07-08",
+    "duration_years": 3.8,
+    "annualized_return_pct": 17.8,
+    "total_return_pct": 87.27,
+    "final_value": 187267.96,
+    "n_trades": 1615,
+    "win_rate": 50.0,
+    "profit_factor": 1.16,
+    "avg_win": 502.99,
+    "avg_loss": -435.68,
+    "max_drawdown_pct": -24.89,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 66,
+        "wins": 24,
+        "total_pnl": 25884.239999999998
+      },
+      "Death Cross": {
+        "count": 1549,
+        "wins": 784,
+        "total_pnl": 28939.310000000027
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "APP",
+        "r": 204.26,
+        "pnl": 23650.35,
+        "reason": "Trailing Stop (14.7%)"
+      },
+      {
+        "t": "ANF",
+        "r": 113.8,
+        "pnl": 9016.9,
+        "reason": "Trailing Stop (15.2%)"
+      },
+      {
+        "t": "AMRX",
+        "r": 83.46,
+        "pnl": 12951.76,
+        "reason": "Death Cross"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "AA",
+        "r": -18.96,
+        "pnl": -1606.68,
+        "reason": "Trailing Stop (19.0%)"
+      },
+      {
+        "t": "BRBR",
+        "r": -18.97,
+        "pnl": -2280.06,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "AHCO",
+        "r": -28.84,
+        "pnl": -2524.5,
+        "reason": "Trailing Stop (29.7%)"
+      }
+    ],
+    "spy_return_pct": 96.4,
+    "alpha_pct": -9.13
+  },
+  {
+    "run_id": 99,
+    "start_date": "2023-06-21",
+    "end_date": "2026-07-08",
+    "duration_years": 3.0,
+    "annualized_return_pct": 17.36,
+    "total_return_pct": 62.87,
+    "final_value": 162871.81,
+    "n_trades": 1033,
+    "win_rate": 50.4,
+    "profit_factor": 1.19,
+    "avg_win": 429.86,
+    "avg_loss": -366.49,
+    "max_drawdown_pct": -15.05,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 46,
+        "wins": 18,
+        "total_pnl": 23946.520000000004
+      },
+      "Death Cross": {
+        "count": 987,
+        "wins": 503,
+        "total_pnl": 12366.409999999987
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "CASY",
+        "r": 88.44,
+        "pnl": 17643.56,
+        "reason": "Trailing Stop (11.7%)"
+      },
+      {
+        "t": "AHR",
+        "r": 33.21,
+        "pnl": 5163.38,
+        "reason": "Trailing Stop (9.5%)"
+      },
+      {
+        "t": "AGO",
+        "r": 33.07,
+        "pnl": 3435.3,
+        "reason": "Trailing Stop (9.7%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ACLS",
+        "r": -16.74,
+        "pnl": -4161.71,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "ADEA",
+        "r": -17.26,
+        "pnl": -3714.96,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "AHCO",
+        "r": -19.69,
+        "pnl": -2275.91,
+        "reason": "Trailing Stop (20.1%)"
+      }
+    ],
+    "spy_return_pct": 77.89,
+    "alpha_pct": -15.02
+  },
+  {
+    "run_id": 100,
+    "start_date": "2023-10-29",
+    "end_date": "2026-07-08",
+    "duration_years": 2.7,
+    "annualized_return_pct": 8.25,
+    "total_return_pct": 23.78,
+    "final_value": 123781.8,
+    "n_trades": 715,
+    "win_rate": 48.5,
+    "profit_factor": 1.09,
+    "avg_win": 396.97,
+    "avg_loss": -344.35,
+    "max_drawdown_pct": -21.23,
+    "exit_reasons": {
+      "Trailing Stop": {
+        "count": 44,
+        "wins": 20,
+        "total_pnl": 16290.180000000004
+      },
+      "Death Cross": {
+        "count": 671,
+        "wins": 327,
+        "total_pnl": -5260.150000000008
+      }
+    },
+    "top3_winners": [
+      {
+        "t": "CASY",
+        "r": 88.44,
+        "pnl": 9189.35,
+        "reason": "Trailing Stop (11.7%)"
+      },
+      {
+        "t": "DECK",
+        "r": 38.59,
+        "pnl": 5743.41,
+        "reason": "Trailing Stop (15.0%)"
+      },
+      {
+        "t": "AGO",
+        "r": 33.07,
+        "pnl": 3414.48,
+        "reason": "Trailing Stop (9.7%)"
+      }
+    ],
+    "top3_losers": [
+      {
+        "t": "ADEA",
+        "r": -17.26,
+        "pnl": -1930.15,
+        "reason": "Death Cross"
+      },
+      {
+        "t": "GME",
+        "r": -18.25,
+        "pnl": -2164.42,
+        "reason": "Trailing Stop (19.2%)"
+      },
+      {
+        "t": "HTZ",
+        "r": -26.37,
+        "pnl": -2872.59,
+        "reason": "Trailing Stop (33.4%)"
+      }
+    ],
+    "spy_return_pct": 87.74,
+    "alpha_pct": -63.96
+  }
+]

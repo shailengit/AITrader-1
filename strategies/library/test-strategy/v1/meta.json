@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "strategy_name": "Test Strategy",
+  "prompt": "test",
+  "plan": "",
+  "created_at": "2026-07-25T15:56:10.308489",
+  "backtest_kpis": {},
+  "change_description": "Initial version",
+  "model_id": "",
+  "session_id": ""
+}

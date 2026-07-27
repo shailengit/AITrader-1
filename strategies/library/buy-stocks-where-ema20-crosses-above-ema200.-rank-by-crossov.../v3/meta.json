@@ -1,0 +1,25 @@
+{
+  "version": 3,
+  "strategy_name": "Buy stocks where EMA20 crosses above EMA200. Rank by crossov...",
+  "prompt": "Buy stocks where EMA20 crosses above EMA200. Rank by crossover angle + market cap. Hold top 5, exit on death cross or 20% trailing stop.",
+  "plan": "## Signal\n- **Entry trigger**: EMA20 crosses above EMA200 (golden cross) on the daily timeframe.\n\n## Entry scoring\n- **Score composition**: 50% crossover angle + 50% market cap, both normalized to 0\u20131.\n- **Crossover angle**: Compute the slope of EMA20 over the last 5 days, convert to degrees via arctan, then normalize by dividing by 90 (max possible angle).\n- **Market cap**: Normalize using min\u2011max scaling across the candidate pool on that day.\n- **Selection**: Rank all candidates by score descending; take the top 5.\n\n## Holding re-score\n- **No daily re\u2011score**: Once a position is entered, it is held until an exit condition is met. No re\u2011ranking or replacement occurs intra\u2011holding.\n\n## Exits\n1. **Death cross**: EMA20 crosses below EMA200.\n2. **Trailing stop**: 20% trailing stop from the highest close since entry (i.e., exit if current close \u2264 (1 \u2013 0.20) \u00d7 highest close since entry).\n\n## Parameters\n- `max_holdings`: 5\n- `min_hold_days`: 1 (no exit before one full trading day)\n- `trailing_stop%`: 20%\n- `take_profit%`: None\n- `time_stop_days`: None\n- `max_sector_count`: 2 (limit to avoid sector concentration)\n- `crossover_angle_lookback`: 5 days (for slope calculation)\n\n## Edge cases\n- **Sector caps**: If a sector already has 2 holdings, new signals from that sector are ignored until a position in that sector is exited.\n- **Volatility filter**: Exclude stocks with 20\u2011day average true range (ATR) less than 0.5% of current price (to avoid very low volatility stocks).\n- **Regime adaptation**: Only generate signals when the S&P 500 index is above its 200\u2011day simple moving average (bull market filter). If the market is below its 200\u2011day SMA, no new entries are allowed; existing positions are still held until their exit conditions are met.\n- **Duplicate signals**: If multiple signals occur on the same day for the same stock, only the first is considered.\n- **Insufficient candidates**: If fewer than 5 stocks meet the entry criteria, only those that do are entered (portfolio may be underweight).",
+  "created_at": "2026-07-27T12:06:29.896699",
+  "backtest_kpis": {
+    "initial_capital": 100000.0,
+    "final_portfolio": 100000.0,
+    "total_return_pct": 0.0,
+    "cagr_pct": 0.0,
+    "sharpe_ratio": 0.0,
+    "total_trades": 0,
+    "win_rate": 0.0,
+    "profit_factor": 0.0,
+    "avg_winner": 0.0,
+    "avg_loser": 0.0,
+    "exit_reasons": {},
+    "spy_return_pct": 2.65,
+    "alpha_pct": -2.65
+  },
+  "change_description": "Auto-saved after code generation",
+  "model_id": "deepseek-v4-flash:cloud",
+  "session_id": "8e134e37-c8ff-4a15-a604-ddaa9fd77946"
+}

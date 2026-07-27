@@ -8,6 +8,8 @@ import {
   catalogEntryToColumn,
   catalogParamsToBackendParams,
   chartPayloadKey,
+  isOverlayColumn,
+  midlineForColumn,
 } from '../../../data/indicatorMap';
 import type { IndicatorDescriptor } from '../../../types/indicators';
 import { CandleStickChart } from '../../../components/quantgen';
@@ -287,10 +289,23 @@ export default function ChartView({
         if (params) {
           params = catalogParamsToBackendParams(catalogName, params);
         }
+      } else {
+        // Strip trailing __<sig> to get the bare column name
+        // (e.g. "trend_ema_fast__window20" → "trend_ema_fast").
+        // The id may already be a sig-suffixed payload key from
+        // the Markov page's defaultIndicators or from a URL param.
+        const lastSep = ov.id.lastIndexOf('__');
+        if (lastSep > 0) {
+          column = ov.id.slice(0, lastSep);
+        }
       }
       if (!cols.includes(column)) cols.push(column);
       if (params && Object.keys(params).length > 0) {
-        overrides[column] = params;
+        // Use sig-suffixed override key so multiple param variants
+        // of the same column can coexist (e.g. EMA20 + EMA200).
+        // The backend's get_chart_data already supports this format.
+        const overrideKey = chartPayloadKey(column, params);
+        overrides[overrideKey] = params;
       }
     }
 
@@ -341,9 +356,71 @@ export default function ChartView({
     [setSearchParams],
   );
 
+/**
+ * Companion bands for multi-line indicators. When the user adds a primary
+ * band indicator (e.g. Bollinger Bands middle), the upper and lower bands
+ * are automatically added so the chart renders the full envelope.
+ * Keys are backend column names; values are companion descriptors.
+ * Companion bands use dashed line style to visually distinguish them
+ * from the primary band.
+ */
+const BAND_COMPANIONS: Record<string, Array<{ id: string; label: string; lineStyle?: string }>> = {
+  'volatility_bbm': [
+    { id: 'volatility_bbh', label: 'BB Upper', lineStyle: 'dashed' },
+    { id: 'volatility_bbl', label: 'BB Lower', lineStyle: 'dashed' },
+  ],
+  'volatility_kcc': [
+    { id: 'volatility_kch', label: 'KC Upper', lineStyle: 'dashed' },
+    { id: 'volatility_kcl', label: 'KC Lower', lineStyle: 'dashed' },
+  ],
+  'volatility_dcl': [
+    { id: 'volatility_dch', label: 'DC Upper', lineStyle: 'dashed' },
+    { id: 'volatility_dcm', label: 'DC Middle', lineStyle: 'dashed' },
+  ],
+};
+
   const handleAddOverlay = useCallback(
     (descriptor: IndicatorDescriptor) => {
       const nextOverlays = [...overlays, descriptor];
+
+      // Check if this indicator has companion bands (e.g. Bollinger Bands
+      // upper/lower, Keltner upper/lower, Donchian upper/middle).
+      // Resolve the catalog id to a backend column first.
+      let column = descriptor.id;
+      const m = /^ta__(.+)__/.exec(descriptor.id);
+      if (m) {
+        column = catalogEntryToColumn(m[1]);
+      }
+      const companions = BAND_COMPANIONS[column];
+      if (companions) {
+        // Override the primary band's label to avoid commas (which break
+        // the comma-separated labels URL param). Use a descriptive label
+        // that includes the window but not the std dev.
+        const windowVal = descriptor.params?.window ?? 20;
+        const primaryName = m ? m[1] : column;
+        nextOverlays[nextOverlays.length - 1].label = `${primaryName} SMA${windowVal}`;
+
+        for (const comp of companions) {
+          // Always update companion band params to match the primary band,
+          // even if the companion was already added (e.g. user changed the
+          // std dev and re-added Bollinger Bands — the companion bands must
+          // use the new params so the backend recomputes them correctly).
+          const existing = nextOverlays.find((o) => o.id === comp.id);
+          if (existing) {
+            existing.params = descriptor.params;
+          } else {
+            nextOverlays.push({
+              id: comp.id,
+              label: comp.label,
+              // Pass the same params as the primary band so the backend
+              // recomputes the companion bands with the correct window
+              // and std dev (e.g. Bollinger Bands with window_dev=3).
+              params: descriptor.params,
+            });
+          }
+        }
+      }
+
       const paramMap: Record<string, Record<string, number>> = {};
       for (const o of nextOverlays) {
         if (o.params && Object.keys(o.params).length > 0) {
@@ -423,6 +500,11 @@ export default function ChartView({
         series[key].push({ time: t, value: v });
       });
     });
+    // Build a set of companion band ids so we can set dashed line style
+    // for upper/lower bands (Bollinger, Keltner, Donchian).
+    const companionIds = new Set(
+      Object.values(BAND_COMPANIONS).flatMap((comps) => comps.map((c) => c.id)),
+    );
     return overlays.map((ov, i) => {
       // Resolve the chart-endpoint payload key for this overlay.
       // - For a catalog id (ta__<Name>__<sig>): translate the catalog
@@ -438,9 +520,13 @@ export default function ChartView({
         column = catalogEntryToColumn(catalogName);
         payloadKey = chartPayloadKey(column, ov.params);
       } else {
-        column = ov.id;
+        // Strip trailing __<sig> to get the bare column name
+        // (e.g. "trend_ema_fast__window20" → "trend_ema_fast").
+        const lastSep = ov.id.lastIndexOf('__');
+        column = lastSep > 0 ? ov.id.slice(0, lastSep) : ov.id;
         payloadKey = chartPayloadKey(column, ov.params);
       }
+      const isOverlay = isOverlayColumn(column);
       return {
         name: ov.label,
         type: 'line',
@@ -453,6 +539,15 @@ export default function ChartView({
         // Pass active state through so CandleStickChart can avoid
         // creating a series for hidden overlays.
         visible: activeIds.has(ov.id),
+        // Oscillators (RSI, MACD, ADX, etc.) get their own pane below
+        // the candles so they never get squished against the price axis.
+        // Price-scaled overlays (EMAs, SMAs, Bollinger, etc.) share the
+        // candle pane. Matches the pattern in TickerDetailDrawer.
+        pane: isOverlay ? 'overlay' : 'oscillator',
+        midline: isOverlay ? null : midlineForColumn(column),
+        // Companion bands (BB Upper/Lower, KC Upper/Lower, etc.) use
+        // dashed lines to visually distinguish them from the primary band.
+        lineStyle: companionIds.has(ov.id) ? 'dashed' as const : undefined,
       };
     });
   }, [chartBars, overlays, activeIds]);
@@ -558,7 +653,7 @@ export default function ChartView({
             />
           </div>
           <div style={{ height: 1, backgroundColor: colors.border }} />
-          <div>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <div
               style={{
                 fontSize: 10,

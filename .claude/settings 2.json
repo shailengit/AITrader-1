@@ -1,0 +1,9 @@
+{
+  "tools": {
+    "tradecraft": {
+      "command": "tradecraft",
+      "args": ["--json"],
+      "description": "TradeCraft CLI — strategy creation, backtesting, coach analytics, Markov learning. Use for: creating/backtesting trading strategies from natural language, checking trading performance KPIs, getting coach reports, checking Markov model status, running sector rotation scans, AI stock screening, and QuantGen strategy generation."
+    }
+  }
+}

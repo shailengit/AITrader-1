@@ -197,6 +197,14 @@ def get_chart_data(
     # default params is ALSO produced — this is what lets the chart render
     # both `EMA 20` (default) and `EMA 200` (override) side by side even
     # though they share the `ema_20` registry entry.
+    #
+    # The `overrides` map supports two key formats:
+    #  - Bare column name (legacy): {"momentum_rsi": {window:21}} —
+    #    applies to the most-recently-added variant of that column.
+    #  - Sig-suffixed (new): {"momentum_rsi__window21": {window:21}} —
+    #    supports MULTIPLE param variants of the same column (e.g. RSI
+    #    14, RSI 21, RSI 28 all on the same chart). The sig suffix is
+    #    the params signature (e.g. `window14`, `window21`).
     needs: List[Tuple[str, str, Optional[Dict[str, Any]]]] = []
     seen_keys: set[str] = set()
 
@@ -208,16 +216,33 @@ def get_chart_data(
         seen_keys.add(payload_key)
         needs.append((payload_key, col, params))
 
-    for col in indicators:
-        params = overrides.get(col)
-        # Always produce the default-param series for the column so the
-        # frontend can render the "natural" version even when an override
-        # is also requested for the same column. (Skip when no override is
-        # present — the default IS the only request in that case, and we'd
-        # produce a duplicate.)
-        if params:
-            add_need(col, None)
+    # Process each override entry. The override key may be a bare
+    # column name or `<col>__<sig>`. The params dict is always present
+    # (we only enter this branch when params is non-empty).
+    for ov_key, params in overrides.items():
+        if not params:
+            continue
+        # Extract the column from the override key.
+        if '__' in ov_key:
+            col = ov_key.split('__', 1)[0]
+        else:
+            col = ov_key
+        # Always also produce the default-param version for this column
+        # so the bare-key fallback works.
+        add_need(col, None)
         add_need(col, params)
+
+    # Also process bare-column indicators that have no override at all
+    # (columns requested with default params only).
+    override_cols = set()
+    for ov_key in overrides.keys():
+        if '__' in ov_key:
+            override_cols.add(ov_key.split('__', 1)[0])
+        else:
+            override_cols.add(ov_key)
+    for col in indicators:
+        if col not in override_cols:
+            add_need(col, None)
 
     for payload_key, col, params in needs:
         if params:
@@ -235,6 +260,16 @@ def get_chart_data(
                 df[payload_key] = df['Close'].rolling(window=params['window']).mean()
             elif col.startswith('ema_') and params.get('window') and 'Close' in df.columns and len(df) >= params['window']:
                 df[payload_key] = df['Close'].ewm(span=params['window'], adjust=False).mean()
+            elif col in df.columns:
+                # Column is auto-produced by add_all_ta_features but the
+                # caller asked for a param-suffixed payload key (e.g. the
+                # frontend always emits a sig for `ta__StochRSI__...` even
+                # when the params match the ta-bundle defaults). Mirror
+                # the ta-bundle column under the suffixed key so the
+                # frontend finds it. Recomputing with the same params
+                # would just produce the same series, so the mirror is
+                # sufficient.
+                df[payload_key] = df[col]
         else:
             # Default-param request — only recompute if the auto-bundle
             # didn't already produce the column.

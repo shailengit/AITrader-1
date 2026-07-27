@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { idFromCatalog, formatOverlayLabel } from '../../../../data/indicatorMap';
 
@@ -35,6 +35,18 @@ export default function IndicatorPickerPanel({ onAdd, alreadyAdded }: IndicatorP
   const [isLoaded, setIsLoaded] = useState(false);
   // Per-indicator param overrides, keyed by indicator name.
   const [paramValues, setParamValues] = useState<Record<string, Record<string, number>>>({});
+  // Ref to the "Add overlay" action row of the currently-expanded card.
+  // Used to scroll the button into view after expanding — without this,
+  // indicators with long descriptions + many params (e.g. Ichimoku
+  // Cloud) push the button below the nested scroll viewport and the
+  // user can't reach it.
+  const actionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (expandedIdx != null && actionRef.current) {
+      actionRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [expandedIdx]);
 
   useEffect(() => {
     fetch('/api/indicators/catalog')
@@ -69,7 +81,7 @@ export default function IndicatorPickerPanel({ onAdd, alreadyAdded }: IndicatorP
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div style={{ position: 'relative', marginBottom: 8 }}>
         <Search
           size={12}
@@ -116,7 +128,7 @@ export default function IndicatorPickerPanel({ onAdd, alreadyAdded }: IndicatorP
       <div style={{ fontSize: 10, color: 'var(--subtle)', marginBottom: 6 }}>
         {filtered.length} indicator{filtered.length !== 1 ? 's' : ''}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {filtered.map((ind, idx) => {
           const isExpanded = expandedIdx === idx;
           const values = paramValues[ind.name] ?? {};
@@ -168,7 +180,21 @@ export default function IndicatorPickerPanel({ onAdd, alreadyAdded }: IndicatorP
               </div>
               {isExpanded && (
                 <div style={{ padding: '6px 8px 8px', backgroundColor: 'var(--canvas)' }}>
-                  <p style={{ fontSize: 10, color: 'var(--muted)', margin: '0 0 6px', lineHeight: 1.4 }}>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--muted)',
+                      margin: '0 0 6px',
+                      lineHeight: 1.4,
+                      // Cap the description height so a very long
+                      // description (e.g. Ichimoku Cloud) scrolls inside
+                      // its own box instead of pushing the params +
+                      // "Add overlay" button below the picker's nested
+                      // scroll viewport. Keeps the action reachable.
+                      maxHeight: 72,
+                      overflowY: 'auto',
+                    }}
+                  >
                     {ind.description}
                   </p>
                   {ind.params.length > 0 && (
@@ -208,26 +234,28 @@ export default function IndicatorPickerPanel({ onAdd, alreadyAdded }: IndicatorP
                       ))}
                     </div>
                   )}
-                  <button
-                    onClick={() => onAdd({ id, label, params: effectiveValues })}
-                    disabled={alreadyAddedThis}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '3px 8px',
-                      borderRadius: 4,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: alreadyAddedThis ? 'default' : 'pointer',
-                      backgroundColor: alreadyAddedThis ? 'var(--border)' : 'var(--accent)',
-                      color: alreadyAddedThis ? 'var(--muted)' : '#000',
-                    }}
-                  >
-                    <Plus size={9} />
-                    {alreadyAddedThis ? 'Added' : 'Add overlay'}
-                  </button>
+                  <div ref={actionRef}>
+                    <button
+                      onClick={() => onAdd({ id, label, params: effectiveValues })}
+                      disabled={alreadyAddedThis}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        border: 'none',
+                        cursor: alreadyAddedThis ? 'default' : 'pointer',
+                        backgroundColor: alreadyAddedThis ? 'var(--border)' : 'var(--accent)',
+                        color: alreadyAddedThis ? 'var(--muted)' : '#000',
+                      }}
+                    >
+                      <Plus size={9} />
+                      {alreadyAddedThis ? 'Added' : 'Add overlay'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -238,10 +238,32 @@ export default function MarkovPage() {
     return `${m}m ${s}s`;
   };
 
+  const defaultIndicators: IndicatorDescriptor[] = useMemo(() => [
+    { id: 'trend_ema_fast__window20', label: 'EMA 20', params: { window: 20 } },
+    { id: 'trend_ema_slow__window200', label: 'EMA 200', params: { window: 200 } },
+  ], []);
+
   const handleOpenInChart = useCallback((ticker: string) => {
     recordAppReferrer('/markov', 'Markov Chain Trader');
-    navigate(`/markov/chart/${encodeURIComponent(ticker)}`);
-  }, [navigate]);
+    const params = new URLSearchParams();
+    if (lastAsOfDate) params.set('from', lastAsOfDate);
+    // Pass default indicators as overlay params so the full-page chart
+    // renders EMA20 and EMA200 by default.
+    const overlayIds = defaultIndicators.map((d) => d.id).join(',');
+    const overlayLabels = defaultIndicators.map((d) => d.label).join(',');
+    const paramMap: Record<string, Record<string, number>> = {};
+    for (const d of defaultIndicators) {
+      if (d.params && Object.keys(d.params).length > 0) {
+        paramMap[d.id] = d.params;
+      }
+    }
+    params.set('overlays', overlayIds);
+    params.set('labels', overlayLabels);
+    if (Object.keys(paramMap).length > 0) {
+      params.set('params', JSON.stringify(paramMap));
+    }
+    navigate(`/markov/chart/${encodeURIComponent(ticker)}?${params.toString()}`);
+  }, [navigate, lastAsOfDate, defaultIndicators]);
 
   const handleExportToLab = useCallback((ticker: string) => {
     recordAppReferrer('/markov', 'Markov Chain Trader');
@@ -259,11 +281,6 @@ export default function MarkovPage() {
     } catch { /* ignore */ }
     return {};
   }, []);
-
-  const defaultIndicators: IndicatorDescriptor[] = useMemo(() => [
-    { id: 'trend_ema_fast__window20', label: 'EMA 20', params: { window: 20 } },
-    { id: 'trend_ema_slow__window50', label: 'EMA 50', params: { window: 50 } },
-  ], []);
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto" }}>

@@ -1,0 +1,21 @@
+{
+  "initial_capital": 100000.0,
+  "final_portfolio": 467291.6603131294,
+  "total_return_pct": 367.29,
+  "cagr_pct": 26.69,
+  "total_trades": 1015,
+  "win_rate": 54.0,
+  "profit_factor": 1.43,
+  "avg_winner": 2171.99,
+  "avg_loser": -1776.29,
+  "exit_reasons": {
+    "Rotated Out": 873,
+    "Death Cross Warning": 43,
+    "Death Cross": 41,
+    "Time Stop": 40,
+    "Trailing Stop": 10,
+    "Take Profit": 8
+  },
+  "spy_return_pct": 151.72,
+  "alpha_pct": 215.57
+}

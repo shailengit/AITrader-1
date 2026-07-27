@@ -208,7 +208,7 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
           <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--slab-paper-faint)" }}>
             <MessageSquare size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
             <p className="slab-prose" style={{ fontSize: 14 }}>
-              Ask about performance — e.g. "why did run 3 underperform?" or "add a SPY > 20d MA filter"
+              Ask about performance — e.g. "why did run 3 underperform?" or "add a SPY {'>'} 20d MA filter"
             </p>
           </div>
         )}

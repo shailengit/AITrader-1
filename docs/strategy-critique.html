@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Cross Rotation Strategy — Expert Critique</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --green: #3fb950;
+            --red: #f85149;
+            --orange: #d29922;
+            --blue: #58a6ff;
+            --purple: #bc8cff;
+            --max-width: 800px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+            font-size: 16px;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 24px;
+        }
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-top: 28px;
+            margin-bottom: 8px;
+        }
+        p, li {
+            color: var(--text);
+            margin-bottom: 12px;
+        }
+        ul, ol {
+            padding-left: 24px;
+            margin-bottom: 16px;
+        }
+        li { margin-bottom: 6px; }
+        .badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+        .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+        .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
+        .badge-blue { background: rgba(88,166,255,0.15); color: var(--blue); }
+        .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+        .code-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            margin: 16px 0 24px 0;
+            white-space: pre;
+        }
+
+        .callout {
+            background: var(--surface);
+            border-left: 4px solid var(--blue);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+        }
+        .callout-red { border-left-color: var(--red); }
+        .callout-orange { border-left-color: var(--orange); }
+        .callout-green { border-left-color: var(--green); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0 28px 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: var(--surface);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        td:first-child {
+            font-weight: 600;
+            white-space: nowrap;
+            color: var(--blue);
+        }
+
+        .summary-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 32px 0;
+        }
+        .summary-box p { margin-bottom: 8px; }
+
+        .tag { font-size: 0.8rem; color: var(--text-muted); margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <h1>Golden Cross Rotation Strategy</h1>
+        <p class="subtitle">Expert Critique — reviewed as if by a veteran professional trader</p>
+
+        <!-- ============================================================ -->
+        <!-- EXECUTIVE SUMMARY -->
+        <!-- ============================================================ -->
+        <div class="summary-box">
+            <h2 style="margin-top:0; border-bottom:none; padding-bottom:0;">Executive Summary</h2>
+            <p>The strategy has a <strong>solid skeleton</strong> — the scoring system, two-entry design, rotation logic, and crisis override show real thinking. But it's not ready for live trading. The three killers are:</p>
+            <ol>
+                <li><strong>1500 sequential DB queries</strong> — this will fail under any real load</li>
+                <li><strong>No earnings filter</strong> — one earnings gap will wipe out a month of gains</li>
+                <li><strong>No backtest</strong> — you're flying blind with real money</li>
+            </ol>
+            <p>Fix those three things and you have something worth paper-trading. Leave them unfixed and you'll learn the same lessons the hard way.</p>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- WHAT'S ACTUALLY GOOD -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-green">✓</span> What's Actually Good</h2>
+
+        <ol>
+            <li><strong>The scoring system is thoughtful.</strong> The sigmoid normalization of crossover angle + market cap weighting is a legitimate way to rank candidates. Using angle steepness to differentiate between a barely-crossed EMA and a powerful divergence is smart.</li>
+            <li><strong>Entry B (momentum continuation) is a solid filter.</strong> Requiring price &gt; EMA50 &gt; EMA200 + RSI &gt; 60 + volume &gt; 1.2× avg catches stocks already in an established uptrend. This is a real pattern that works.</li>
+            <li><strong>MIN_HOLD_DAYS = 10 is correct.</strong> Forcing a minimum hold prevents whipsaw — you'd be surprised how many strategies skip this and get destroyed by transaction costs.</li>
+            <li><strong>Crisis override is a good safety net.</strong> 20% SPY drawdown → cash is simple and effective. Most retail strategies have zero market-level risk management.</li>
+            <li><strong>Re-attaching trailing stops daily</strong> is a pragmatic fix for the GTC issue. It shows you understand that production systems need defense-in-depth.</li>
+            <li><strong>The long/short variant's borrow cache</strong> is a smart optimization — 1500 API calls per run would be brutal.</li>
+        </ol>
+
+        <!-- ============================================================ -->
+        <!-- FATAL FLAWS -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-red">✗</span> Fatal Flaws</h2>
+
+        <h3>1. Scanning 1500 stocks with sequential DB queries</h3>
+        <div class="code-block">for ticker in tickers:  # 1500 iterations
+    with self.engine.connect() as conn:
+        df = pd.read_sql(...)  # 1500 separate DB connections</div>
+        <p>Each iteration opens a new connection, runs a query, and processes it. At ~100ms per query, that's <strong>2.5 minutes</strong> of pure DB time. When the market's moving or the DB is under load, this will timeout, crash, or take so long the data is stale by the time orders go in.</p>
+        <div class="callout callout-red">
+            <strong>Fix:</strong> Batch-fetch all 1500 tickers in one query. Create a materialized view or fetch in chunks of 50-100 with <code>UNION ALL</code>.
+        </div>
+
+        <h3>2. Entry A (golden cross) looks back only 5 days</h3>
+        <div class="code-block">for i in range(len(df) - 5, len(df)):</div>
+        <p>A golden cross that happened 5 days ago is already priced in. The market has already reacted. You're buying after the move, not during it. The angle computation helps, but you're still late to every party.</p>
+        <div class="callout callout-red">
+            <strong>Fix:</strong> Either catch the crossover on the day it happens (day 0-1), or drop Entry A entirely and rely on Entry B (momentum continuation) which is actually a better signal.
+        </div>
+
+        <h3>3. No slippage model, no fill simulation, no partial fill handling</h3>
+        <p>You submit market orders and assume they fill at <code>candidate["price"]</code> — which is yesterday's close. In reality:</p>
+        <ul>
+            <li>Market-on-open orders fill at the open, which can be <strong>2-5% away</strong> from yesterday's close</li>
+            <li>For low-volume stocks, the spread alone can be 0.5-1%</li>
+            <li>Partial fills are common for larger positions</li>
+            <li>You calculate share counts based on yesterday's price, but the actual fill could be very different</li>
+        </ul>
+        <p>Your position sizing is wrong from the moment you submit the order.</p>
+
+        <h3>4. The "angle" metric for Entry B is meaningless</h3>
+        <div class="code-block">slope = (ema50.iloc[-1] - ema50.iloc[-5]) / ema50.iloc[-5]
+entry_b = {"angle": float(slope * 100)}</div>
+        <p>This is the 5-bar slope of the EMA50, normalized by the EMA50 value. Then you feed it through the same sigmoid as the crossover angle. These are <strong>completely different quantities</strong> — one measures divergence speed at crossover, the other measures EMA50 steepness. They're not comparable, yet you rank them on the same score axis.</p>
+
+        <h3>5. No backtest. At all.</h3>
+        <p>There's no backtest, no walk-forward analysis, no simulation. You're running this on a $100K paper account with zero evidence that any of these signals have positive expectancy. The strategy explanation is all theory — where's the equity curve? The Sharpe ratio? The max drawdown? The win rate?</p>
+
+        <!-- ============================================================ -->
+        <!-- NAIVE ASSUMPTIONS -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-orange">!</span> Naive Assumptions</h2>
+
+        <h3>1. "Golden cross = bullish" is a retail myth</h3>
+        <p>The EMA20/200 golden cross is one of the most widely known signals in existence. Every retail trader, every algo, every newsletter mentions it. <strong>It doesn't work as a standalone signal</strong> — it's been backtested to death and shows no consistent edge after transaction costs. The fact that you're layering Entry B on top helps, but you're still starting with a weak foundation.</p>
+
+        <h3>2. Market cap weighting assumes large caps are safer</h3>
+        <div class="code-block">cap_norm = min(1.0, mc / 100e9)
+score = ANGLE_WEIGHT * angle_norm + CAP_WEIGHT * cap_norm</div>
+        <p>You're giving 40% weight to market cap. This means a $200B stock with a weak signal beats a $10B stock with a strong signal. Large caps have lower volatility and lower returns — you're literally biasing toward the stocks that move the least. If you want safety, that's what the trailing stop is for.</p>
+
+        <h3>3. 20% trailing stop is way too wide</h3>
+        <p>On a $100 stock, a 20% trailing stop means you're willing to lose $20/share before exiting. With 5 positions at 30/25/20/15/10% sizing, a single 20% loss on your largest position is <strong>6% of your portfolio</strong>. Two of those in a month and you're down 12%. The trailing stop should be 5-8% max, or better yet, use ATR-based stops that adapt to volatility.</p>
+
+        <h3>4. RSI &gt; 60 as a buy signal buys into overbought conditions</h3>
+        <p>RSI &gt; 60 means the stock is already extended. In strong trends this works (momentum begets momentum), but in choppy markets you're buying the top. RSI pullbacks to 40-50 would give better entries.</p>
+
+        <h3>5. Volume &gt; 1.2× average is too weak</h3>
+        <p>A 20% volume surge is noise. Real accumulation shows 2-3× average volume. You'll get whipsawed by normal volume fluctuations.</p>
+
+        <!-- ============================================================ -->
+        <!-- RISK MANAGEMENT GAPS -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-red">✗</span> Risk Management Gaps</h2>
+
+        <h3>1. No correlation check between positions</h3>
+        <p>You could easily end up with 5 positions that are all financial stocks (JPM, GS, AXP, SCHW, WFC — exactly what happened in the log). A sector-specific shock wipes you out. There's no sector exposure limit, no correlation matrix, nothing.</p>
+
+        <h3>2. No portfolio-level stop loss</h3>
+        <p>Each position has a 20% trailing stop, but there's no circuit breaker for the portfolio. If all 5 positions drop 10% simultaneously (a normal correction), you're down 10% with no mechanism to stop the bleeding.</p>
+
+        <h3>3. No gap risk protection</h3>
+        <p>A stock gaps down 15% overnight (earnings miss, FDA rejection, etc.) — your trailing stop triggers at 20% below the pre-gap price, which is now <strong>below the gap-down price</strong>. The stop never fires because the stock never recovers to the trail level. You're holding a loser indefinitely.</p>
+        <div class="callout callout-red">
+            <strong>Fix:</strong> Use hard stop-loss orders (not trailing) for gap protection, or at minimum check for overnight gaps and exit immediately.
+        </div>
+
+        <h3>4. Crisis override only checks SPY</h3>
+        <p>SPY at 200-day high is one measure, but what about sector-specific crashes? What about VIX spikes? What about a stock-specific black swan? The crisis override is too narrow.</p>
+
+        <h3>5. No earnings date awareness</h3>
+        <p>You're buying stocks without checking if they have earnings in the next 5 days. An earnings miss can gap a stock down 20-30% instantly — your trailing stop won't save you. This is the single biggest risk for a momentum strategy.</p>
+
+        <!-- ============================================================ -->
+        <!-- EXECUTION ISSUES -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-orange">!</span> Execution Issues</h2>
+
+        <h3>1. Market orders for entry and exit</h3>
+        <p>You're using market orders for everything. In a calm market this is fine, but during high volatility (exactly when you want to exit), market orders get terrible fills. Use limit orders with a 0.5-1% tolerance.</p>
+
+        <h3>2. Bracket orders with trailing stop AND take profit</h3>
+        <div class="code-block">order_kwargs["stop_loss"] = {
+    "stop_price": str(stop_price),
+    "trail_percent": str(trail_percent * 100),
+}</div>
+        <p>You're setting both a fixed stop price AND a trail percent. Alpaca may handle this, but the semantics are unclear — does the trail start from the stop price or the market price? This is a potential source of unexpected behavior.</p>
+
+        <h3>3. No order status verification</h3>
+        <p>After submitting orders, you never check if they filled. A bracket order might get rejected, partially fill, or get canceled. You assume success and move on.</p>
+
+        <h3>4. Cron runs at 8 PM ET — data is 2+ hours stale</h3>
+        <p>The DB updates at 6 PM, you run at 8 PM. By the time orders execute the next morning, the data is 14+ hours old. A lot can happen in after-hours trading.</p>
+
+        <!-- ============================================================ -->
+        <!-- MARKET MECHANICS MISUNDERSTANDINGS -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-purple">?</span> Market Mechanics Misunderstandings</h2>
+
+        <h3>1. Short selling is not a mirror of long buying</h3>
+        <p>The long/short variant treats short signals as the exact inverse of long signals (death cross + RSI &lt; 40 + bearish stack). Short selling has fundamentally different mechanics:</p>
+        <ul>
+            <li><strong>Borrow costs</strong> can be 20-100%+ APR for hard-to-borrow stocks</li>
+            <li><strong>Short squeezes</strong> can double a stock in days (see: GME, AMC)</li>
+            <li><strong>Unlimited downside</strong> — a short can lose more than 100%</li>
+            <li><strong>Buy-ins</strong> — the lender can recall the shares at any time</li>
+        </ul>
+        <p>Your 20% trailing stop on shorts is a joke. A short that moves against you 20% is already a disaster. And you're not even checking borrow rates.</p>
+
+        <h3>2. Position sizing for shorts is wrong</h3>
+        <p>You're using the same 30/25/20/15/10% sizing for shorts as longs. Shorts should be <strong>smaller</strong> — the risk profile is completely different. A 30% short position can lose 60%+ of portfolio value in a squeeze.</p>
+
+        <h3>3. The 60/40 long/short capital split is arbitrary</h3>
+        <p>Why 60/40? Why not 50/50 or 70/30? There's no analysis behind this. In a bull market (which is most of the time), the short leg will be a persistent drag. You're paying borrow costs to lose money on the short side.</p>
+
+        <!-- ============================================================ -->
+        <!-- RECOMMENDATIONS TABLE -->
+        <!-- ============================================================ -->
+        <h2><span class="badge badge-blue">→</span> Specific Recommendations</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Fix</th>
+                    <th>Why</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>P0</td>
+                    <td>Batch-fetch DB queries</td>
+                    <td>1500 sequential queries will break under load</td>
+                </tr>
+                <tr>
+                    <td>P0</td>
+                    <td>Add earnings date filter</td>
+                    <td>Skip stocks with earnings in next 5 days — one gap wipes out a month</td>
+                </tr>
+                <tr>
+                    <td>P0</td>
+                    <td>Add sector exposure limit</td>
+                    <td>Max 2 positions per sector to prevent concentration risk</td>
+                </tr>
+                <tr>
+                    <td>P1</td>
+                    <td>Reduce trailing stop to 8% (or ATR-based)</td>
+                    <td>20% is too wide — a single loss hits 6% of portfolio</td>
+                </tr>
+                <tr>
+                    <td>P1</td>
+                    <td>Replace market orders with limit orders</td>
+                    <td>0.5% tolerance limit orders prevent bad fills in volatility</td>
+                </tr>
+                <tr>
+                    <td>P1</td>
+                    <td>Add portfolio-level stop loss</td>
+                    <td>Close all if down 15% in a week — circuit breaker for the book</td>
+                </tr>
+                <tr>
+                    <td>P1</td>
+                    <td>Add gap protection</td>
+                    <td>Check overnight gap % and exit immediately if &gt;5%</td>
+                </tr>
+                <tr>
+                    <td>P2</td>
+                    <td>Reduce market cap weight from 40% to 20%</td>
+                    <td>Large caps move less — you're biasing toward stagnation</td>
+                </tr>
+                <tr>
+                    <td>P2</td>
+                    <td>Add VIX filter</td>
+                    <td>Don't enter new positions when VIX &gt; 30</td>
+                </tr>
+                <tr>
+                    <td>P2</td>
+                    <td>Add order fill verification loop</td>
+                    <td>Check order status after 30s, retry if needed</td>
+                </tr>
+                <tr>
+                    <td>P2</td>
+                    <td>Build a backtest</td>
+                    <td>Even a simple VectorBT backtest before going live</td>
+                </tr>
+                <tr>
+                    <td>P3</td>
+                    <td>ATR-based position sizing</td>
+                    <td>Volatility-adjusted sizing instead of fixed percentages</td>
+                </tr>
+                <tr>
+                    <td>P3</td>
+                    <td>Add correlation matrix</td>
+                    <td>Prevent concentrated sector risk across positions</td>
+                </tr>
+                <tr>
+                    <td>P3</td>
+                    <td>Tighten trailing stop as position ages</td>
+                    <td>Start 8%, tighten to 4% after 20 days — let winners run, cut losers fast</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- ============================================================ -->
+        <!-- BOTTOM LINE -->
+        <!-- ============================================================ -->
+        <h2>Bottom Line</h2>
+        <p>The strategy has a solid skeleton — the scoring system, the two-entry design, the rotation logic, and the crisis override show real thinking. But it's not ready for live trading. The three killers are:</p>
+        <ol>
+            <li><strong>1500 sequential DB queries</strong> — this will fail under any real load</li>
+            <li><strong>No earnings filter</strong> — one earnings gap will wipe out a month of gains</li>
+            <li><strong>No backtest</strong> — you're flying blind with real money</li>
+        </ol>
+        <p>Fix those three things and you have something worth paper-trading. Leave them unfixed and you'll learn the same lessons the hard way.</p>
+
+        <p class="tag">Generated from expert code review — July 2026</p>
+
+    </div>
+</body>
+</html>

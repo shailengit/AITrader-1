@@ -1,10 +1,12 @@
 """
-Indicator Registry — unified catalog of technical indicators from all available sources.
+Indicator Registry — unified catalog of technical indicators.
 
 Aggregates indicator metadata from:
-  - ta (ta-lib wrapper)
-  - vectorbt (VBT)
-  - pandas-ta
+  - ta (ta-lib wrapper) — primary source for the catalog
+  - pandas-ta — used only for indicators with no `ta`-library equivalent
+    (KDJ, Supertrend, TTM Squeeze). Removed: vectorbt entries, which
+    duplicated the `ta` library (VBT MA, VBT RSI, VBT BBANDS, VBT MACD,
+    VBT STOCH, VBT ATR, VBT OBV).
 
 Each indicator is a dict with the shape documented in get_indicator_catalog().
 """
@@ -253,94 +255,12 @@ TA_INDICATORS: list[dict[str, Any]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# VectorBT Indicators
-# ---------------------------------------------------------------------------
-
-VBT_INDICATORS: list[dict[str, Any]] = [
-    {
-        "name": "VBT MA",
-        "source": "vectorbt",
-        "category": "trend",
-        "description": "VectorBT Moving Average — flexible MA supporting SMA, EMA, WMA, etc.",
-        "params": [
-            {"name": "window", "type": "int", "default": 20, "min": 1, "max": 200, "description": "Lookback period"},
-            {"name": "ewm", "type": "bool", "default": False, "description": "Use exponential weighting if True"},
-        ],
-        "code_snippet": "import vectorbt as vbt\nma = vbt.MA.run(close, window=20, ewm=False).ma",
-        "pine_equivalent": "ta.sma(src, len) / ta.ema(src, len)",
-    },
-    {
-        "name": "VBT RSI",
-        "source": "vectorbt",
-        "category": "momentum",
-        "description": "VectorBT RSI — Relative Strength Index with vectorized computation",
-        "params": [
-            {"name": "window", "type": "int", "default": 14, "min": 2, "max": 100, "description": "Lookback period"}
-        ],
-        "code_snippet": "import vectorbt as vbt\nrsi = vbt.RSI.run(close, window=14).rsi",
-        "pine_equivalent": "ta.rsi(src, len)",
-    },
-    {
-        "name": "VBT BBANDS",
-        "source": "vectorbt",
-        "category": "volatility",
-        "description": "VectorBT Bollinger Bands — volatility bands with vectorized computation",
-        "params": [
-            {"name": "window", "type": "int", "default": 20, "min": 2, "max": 100, "description": "SMA period"},
-            {"name": "alpha", "type": "float", "default": 2.0, "min": 0.5, "max": 5.0, "description": "Standard deviation multiplier"},
-        ],
-        "code_snippet": "import vectorbt as vbt\nbb = vbt.BBANDS.run(close, window=20, alpha=2)\nupper = bb.upper\nlower = bb.lower",
-        "pine_equivalent": "ta.bb(src, len, mult)",
-    },
-    {
-        "name": "VBT MACD",
-        "source": "vectorbt",
-        "category": "momentum",
-        "description": "VectorBT MACD — Moving Average Convergence Divergence with vectorized computation",
-        "params": [
-            {"name": "fast_window", "type": "int", "default": 12, "min": 2, "max": 100, "description": "Fast EMA period"},
-            {"name": "slow_window", "type": "int", "default": 26, "min": 2, "max": 200, "description": "Slow EMA period"},
-            {"name": "signal_window", "type": "int", "default": 9, "min": 2, "max": 100, "description": "Signal line period"},
-        ],
-        "code_snippet": "import vectorbt as vbt\nmacd = vbt.MACD.run(close, fast_window=12, slow_window=26, signal_window=9)\nhist = macd.histogram",
-        "pine_equivalent": "ta.macd(src, fastlen, slowlen, siglen)",
-    },
-    {
-        "name": "VBT STOCH",
-        "source": "vectorbt",
-        "category": "momentum",
-        "description": "VectorBT Stochastic Oscillator — compares close to high-low range over a period",
-        "params": [
-            {"name": "k_window", "type": "int", "default": 14, "min": 2, "max": 100, "description": "%K lookback period"},
-            {"name": "d_window", "type": "int", "default": 3, "min": 1, "max": 50, "description": "%D smoothing period"},
-        ],
-        "code_snippet": "import vectorbt as vbt\nstoch = vbt.STOCH.run(high, low, close, k_window=14, d_window=3)\nk = stoch.percent_k\nd = stoch.percent_d",
-        "pine_equivalent": "ta.stoch(high, low, close, klen, dlen)",
-    },
-    {
-        "name": "VBT ATR",
-        "source": "vectorbt",
-        "category": "volatility",
-        "description": "VectorBT Average True Range — volatility measure with vectorized computation",
-        "params": [
-            {"name": "window", "type": "int", "default": 14, "min": 2, "max": 100, "description": "Lookback period"}
-        ],
-        "code_snippet": "import vectorbt as vbt\natr = vbt.ATR.run(high, low, close, window=14).atr",
-        "pine_equivalent": "ta.atr(high, low, close, len)",
-    },
-    {
-        "name": "VBT OBV",
-        "source": "vectorbt",
-        "category": "volume",
-        "description": "VectorBT On-Balance Volume — cumulative volume indicator with vectorized computation",
-        "params": [],
-        "code_snippet": "import vectorbt as vbt\nobv = vbt.OBV.run(close, volume).obv",
-        "pine_equivalent": "ta.obv(src, volume)",
-    },
-]
-
-# ---------------------------------------------------------------------------
 # pandas-ta Indicators
+#
+# These are pandas-ta-only indicators with no direct `ta`-library equivalent
+# (KDJ's third J-line, Supertrend's price band, TTM Squeeze's BB/KC
+# cross). Removed: any VBT/vectorbt entries that duplicate the `ta` library
+# (VBT MA, VBT RSI, VBT BBANDS, VBT MACD, VBT STOCH, VBT ATR, VBT OBV).
 # ---------------------------------------------------------------------------
 
 PANDAS_TA_INDICATORS: list[dict[str, Any]] = [
@@ -387,7 +307,7 @@ PANDAS_TA_INDICATORS: list[dict[str, Any]] = [
 # Combined catalog
 # ---------------------------------------------------------------------------
 
-_ALL_INDICATORS: list[dict[str, Any]] = TA_INDICATORS + VBT_INDICATORS + PANDAS_TA_INDICATORS
+_ALL_INDICATORS: list[dict[str, Any]] = TA_INDICATORS + PANDAS_TA_INDICATORS
 
 
 def get_indicator_catalog(
@@ -426,7 +346,7 @@ def get_indicator_catalog(
 
 def get_indicator_sources() -> list[str]:
     """Return the list of available indicator source names."""
-    return ["ta", "vectorbt", "pandas-ta"]
+    return ["ta", "pandas-ta"]
 
 
 def get_indicator_categories() -> list[str]:
