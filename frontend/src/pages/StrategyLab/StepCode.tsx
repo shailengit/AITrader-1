@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
+import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
 
 interface StepCodeProps {
   session: StrategySession;
@@ -478,6 +479,12 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
             </div>
           </motion.div>
         )}
+
+        {/* ChatPanel */}
+        <ChatPanel
+          sessionId={session.id}
+          defaultModelId={session.model_id}
+        />
       </div>
     </>
   );

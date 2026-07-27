@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Rocket, Check, X, AlertCircle, History, FileCode, RotateCcw } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
+import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
 
 interface StepDeployProps {
   session: StrategySession;
@@ -261,6 +262,12 @@ export function StepDeploy({ session, experimentId, onDeployed }: StepDeployProp
             )}
           </div>
         </div>
+
+        {/* ChatPanel */}
+        <ChatPanel
+          sessionId={session.id}
+          defaultModelId={session.model_id}
+        />
       </div>
 
       {/* Confirm modal */}

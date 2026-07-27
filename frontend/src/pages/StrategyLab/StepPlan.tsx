@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowRight, RefreshCw, FileText } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
+import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
 
 interface StepPlanProps {
   session: StrategySession;
@@ -228,6 +229,12 @@ export function StepPlan({ session, model, onPlanApproved }: StepPlanProps) {
               {save.isPending && <span className="slab-mono slab-mono--xs slab-mono--dim">saving…</span>}
               {save.isSuccess && <span className="slab-mono slab-mono--xs slab-mono--terminal">✓ saved</span>}
             </div>
+
+            {/* ChatPanel */}
+            <ChatPanel
+              sessionId={session.id}
+              defaultModelId={session.model_id}
+            />
           </motion.div>
         )}
       </div>

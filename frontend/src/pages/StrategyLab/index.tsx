@@ -98,7 +98,7 @@ export default function StrategyLabPage() {
           {activeStep === 0 ? (
             <StepLibrary key="step-0" onLoadSession={handleLoadSession} />
           ) : activeStep === 1 || !sessionId ? (
-            <StepIdea key="step-1" onCreated={handleCreated} />
+            <StepIdea key="step-1" onCreated={handleCreated} sessionId={sessionId || undefined} />
           ) : activeStep === 2 && session.data ? (
             <StepPlan
               key={`step-2-${session.data.id}`}

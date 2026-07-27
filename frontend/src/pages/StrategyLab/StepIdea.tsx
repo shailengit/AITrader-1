@@ -3,10 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowRight, Cpu, Cloud } from "lucide-react";
 import { strategyLabApi, type OllamaModel, type ModelVariant } from "../../lib/strategyLab";
+import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
 
 interface StepIdeaProps {
   onCreated: (sessionId: string) => void;
   defaultModel?: string;
+  sessionId?: string;  // if set, shows ChatPanel after creation
 }
 
 const DEFAULT_MODEL = "deepseek-v4-flash:cloud";
@@ -17,7 +19,7 @@ const EXAMPLE_PROMPTS = [
   "Mean-reversion on RSI(2) oversold in uptrending sectors, ranked by relative strength.",
 ];
 
-export function StepIdea({ onCreated, defaultModel = DEFAULT_MODEL }: StepIdeaProps) {
+export function StepIdea({ onCreated, defaultModel = DEFAULT_MODEL, sessionId }: StepIdeaProps) {
   const [prompt, setPrompt] = useState("");
   const [name, setName] = useState("");
   const [model, setModel] = useState(defaultModel);
@@ -154,6 +156,14 @@ export function StepIdea({ onCreated, defaultModel = DEFAULT_MODEL }: StepIdeaPr
             )}
           </div>
         </div>
+
+        {/* ChatPanel — only shown after session is created */}
+        {sessionId && (
+          <ChatPanel
+            sessionId={sessionId}
+            defaultModelId={model}
+          />
+        )}
       </div>
     </>
   );
