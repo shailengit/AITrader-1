@@ -20,6 +20,8 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         ws: true,
+        proxyTimeout: 300000,  // 5 min — code gen can take 60-90s
+        timeout: 300000,       // 5 min socket timeout
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error:', err);

@@ -177,11 +177,13 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+async function postJson<T>(url: string, body: unknown, timeoutMs?: number): Promise<T> {
+  const signal = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     // Try to parse the error body so the UI can show a useful message
@@ -241,7 +243,7 @@ export const strategyLabApi = {
     postJson<PlanResponse>(`${base}/sessions/${id}/plan`, body),
 
   generateCode: (id: string, body: { model?: string; plan_text?: string } = {}) =>
-    postJson<GenerateCodeResponse>(`${base}/sessions/${id}/generate-code`, body),
+    postJson<GenerateCodeResponse>(`${base}/sessions/${id}/generate-code`, body, 300000),
 
   refineCode: (id: string, body: { model?: string; current_code?: string; instruction: string }) =>
     postJson<RefineCodeResponse>(`${base}/sessions/${id}/refine-code`, body),
@@ -277,7 +279,7 @@ export const strategyLabApi = {
   },
 
   refineDirect: (id: string, body: { instruction: string; model?: string; validation_runs?: number }) =>
-    postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body),
+    postJson<RefineDirectResponse>(`${base}/sessions/${id}/refine-direct`, body, 300000),
 
   saveToLibrary: (id: string, body: { name: string; change_description?: string; model?: string }) =>
     postJson<LibraryEntryResponse>(`${base}/sessions/${id}/library/save`, body),

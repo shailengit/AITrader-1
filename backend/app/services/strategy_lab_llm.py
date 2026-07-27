@@ -65,6 +65,10 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
     # Resolve fallback model: explicit model arg → env var → hardcoded default
     fallback_model = os.environ.get("OLLAMA_MODEL_FALLBACK", "minimax-m3:cloud")
 
+    logger.info(
+        "LLM call: model=%s max_tokens=%d timeout=%ds temperature=%.1f messages=%d",
+        model_name, max_tokens, timeout, temperature, len(messages),
+    )
     for attempt, current_model in enumerate([model_name, fallback_model]):
         if attempt > 0:
             logger.info("Falling back to model %s after %s failed", current_model, model_name)
@@ -78,9 +82,19 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
             )
         except Exception as e:
             err_str = f"{type(e).__name__}: {e}"
+            is_timeout = isinstance(e, TimeoutError) or "timeout" in err_str.lower() or "read" in err_str.lower()
             is_model_error = "not found" in err_str.lower() or "404" in err_str or "model" in err_str.lower()
-            if is_model_error and attempt == 0:
+            if is_timeout:
+                logger.error(
+                    "LLM timeout after %ds (model=%s, timeout_setting=%ds, attempt=%d): %s",
+                    timeout, current_model, timeout, attempt, err_str,
+                )
+            elif is_model_error and attempt == 0:
                 logger.warning("Model %s failed (%s), trying fallback %s", current_model, err_str, fallback_model)
+                continue
+            else:
+                logger.error("LLM call failed (model=%s, attempt=%d): %s", current_model, attempt, err_str)
+            if is_model_error and attempt == 0:
                 continue
             return None, None, f"LLM call failed: {err_str}"
 
