@@ -411,6 +411,7 @@ def post_apply_diff(
 class RefineDirectRequest(BaseModel):
     instruction: str = Field(..., min_length=1)
     model: Optional[str] = None
+    validation_runs: int = Field(10, ge=1, le=50)  # NEW: number of backtest runs for validation
 
 
 class RefineDirectResponse(BaseModel):
@@ -455,39 +456,60 @@ def post_refine_direct(
     code = modified
     validation_log.append(f"Code modified ({len(code)} chars)")
 
-    # Step 2: Validate + debug loop
-    for cycle in range(max_debug_cycles + 1):
-        try:
-            result = _run_one(
-                code_text=code,
-                session_id=str(session_id),
-                as_of="2022-01-01",
-                end_date="2024-01-01",
-                run_index=0,
-            )
-        except Exception as validate_err:
-            result = {"status": "failed", "error_message": f"{type(validate_err).__name__}: {validate_err}"}
+    # Step 2: Validate + debug loop (mini-batch of N runs)
+    import random as _random
+    from datetime import datetime as _dt, timedelta as _td
 
-        if result["status"] == "completed":
-            k = result.get("kpis", {})
-            logger.info("Refine validation passed on cycle %d: ret=%.2f%%", cycle, k.get("total_return_pct", 0))
+    for cycle in range(max_debug_cycles + 1):
+        # Run a mini-batch of N backtests with random start dates
+        failed_count = 0
+        last_error = None
+        start_base = _dt.strptime("2022-01-01", "%Y-%m-%d")
+        start_max = _dt.strptime("2024-01-01", "%Y-%m-%d")
+        day_range = (start_max - start_base).days
+
+        for i in range(body.validation_runs):
+            random_start = start_base + _td(days=_random.randint(0, max(0, day_range)))
+            try:
+                result = _run_one(
+                    code_text=code,
+                    session_id=str(session_id),
+                    as_of=random_start.strftime("%Y-%m-%d"),
+                    end_date="2024-01-01",
+                    run_index=i,
+                )
+            except Exception as validate_err:
+                result = {"status": "failed", "error_message": f"{type(validate_err).__name__}: {validate_err}"}
+
+            if result["status"] != "completed":
+                failed_count += 1
+                last_error = result.get("error_message", "unknown error")
+
+        if failed_count == 0:
+            # All runs passed
+            logger.info(
+                "Refine validation passed on cycle %d: all %d runs OK",
+                cycle, body.validation_runs,
+            )
             svc_update_session(db, session_id, code_text=code)
             return RefineDirectResponse(
                 code=code,
                 summary=f"Applied: {body.instruction[:120]}",
                 validation_status="passed",
-                validation_log=validation_log,
+                validation_log=validation_log + [f"All {body.validation_runs} runs passed"],
             )
 
-        last_error = result.get("error_message", "unknown error")
-        validation_log.append(f"Debug cycle {cycle}: backtest failed — {last_error}")
+        last_error_msg = last_error or "unknown error"
+        validation_log.append(
+            f"Debug cycle {cycle}: {failed_count}/{body.validation_runs} runs failed — {last_error_msg}"
+        )
 
         if cycle >= max_debug_cycles:
             break
 
         # Debug: call LLM to fix
         try:
-            fixed, debug_err = debug_code(code, last_error, model=body.model)
+            fixed, debug_err = debug_code(code, last_error_msg, model=body.model)
             if debug_err or fixed is None:
                 validation_log.append(f"Debug cycle {cycle}: debugger failed — {debug_err}")
                 continue
@@ -896,6 +918,7 @@ class ChatMessageResponse(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     history: List[ChatMessageResponse]
+    code_change_instruction: Optional[str] = None  # NEW: parsed from [CODE_CHANGE: ...] marker
 
 
 @router.post("/sessions/{session_id}/chat", response_model=ChatResponse)
@@ -911,7 +934,7 @@ def post_chat(
         raise HTTPException(status_code=404, detail="session not found")
     try:
         critique_uuid = uuid.UUID(body.critique_of) if body.critique_of else None
-        response_text, history = chat_with_llm(
+        response_text, history, code_change_instruction = chat_with_llm(
             db, session_id, body.message,
             model=body.model, critique_of=critique_uuid,
         )
@@ -921,6 +944,7 @@ def post_chat(
     return ChatResponse(
         response=response_text,
         history=[ChatMessageResponse(**h) for h in history],
+        code_change_instruction=code_change_instruction,
     )
 
 
