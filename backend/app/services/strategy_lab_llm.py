@@ -41,7 +41,13 @@ def _get_client_and_model(model: Optional[str] = None) -> Tuple[Optional[OpenAI]
     api_base = os.environ.get("LOCAL_LLM_API_BASE", "http://localhost:11434/v1")
     api_key = os.environ.get("LOCAL_LLM_API_KEY", "not-needed")
     try:
-        client = OpenAI(base_url=api_base, api_key=api_key, timeout=300, max_retries=2)
+        # NOTE: max_retries=0 to disable SDK-level retries. The Ollama cloud
+        # returns 502 after ~60s (its internal timeout), and the SDK would
+        # immediately retry with a cached/instant 502 response, burning ~60s
+        # per attempt with no benefit. Our outer retry loop in
+        # post_generate_code and post_refine_direct handles retries with
+        # proper backoff instead.
+        client = OpenAI(base_url=api_base, api_key=api_key, timeout=300, max_retries=0)
     except Exception as e:
         logger.error("Failed to create OpenAI client: %s", e)
         return None, ""
@@ -83,18 +89,16 @@ def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
         except Exception as e:
             err_str = f"{type(e).__name__}: {e}"
             is_timeout = isinstance(e, TimeoutError) or "timeout" in err_str.lower() or "read" in err_str.lower()
-            is_model_error = "not found" in err_str.lower() or "404" in err_str or "model" in err_str.lower()
             if is_timeout:
                 logger.error(
                     "LLM timeout after %ds (model=%s, timeout_setting=%ds, attempt=%d): %s",
                     timeout, current_model, timeout, attempt, err_str,
                 )
-            elif is_model_error and attempt == 0:
-                logger.warning("Model %s failed (%s), trying fallback %s", current_model, err_str, fallback_model)
-                continue
             else:
                 logger.error("LLM call failed (model=%s, attempt=%d): %s", current_model, attempt, err_str)
-            if is_model_error and attempt == 0:
+            # Try fallback model on ANY error during the primary attempt
+            if attempt == 0:
+                logger.warning("Trying fallback model %s after %s failed", fallback_model, current_model)
                 continue
             return None, None, f"LLM call failed: {err_str}"
 
