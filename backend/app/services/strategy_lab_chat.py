@@ -59,17 +59,21 @@ def add_chat_message(db: Session, session_id: UUID, role: str, content: str,
 
 
 def _extract_code_change(text: str) -> Tuple[str, Optional[str]]:
-    """Parse [CODE_CHANGE: ...] marker from the end of the response.
+    """Parse [CODE_CHANGE: ...] marker from the response.
 
-    Returns (cleaned_text, instruction_or_None). The marker must be on
-    its own line at the very end of the response.
+    Returns (cleaned_text, instruction_or_None). The marker can appear
+    anywhere in the text — the LAST occurrence wins. The marker is
+    stripped from the cleaned text.
     """
-    m = re.search(r'\n?\[CODE_CHANGE:\s*(.+?)\]\s*$', text, re.DOTALL)
-    if m:
-        instruction = m.group(1).strip()
-        cleaned = text[:m.start()].strip()
-        return cleaned, instruction
-    return text, None
+    # Find ALL occurrences and take the last one
+    matches = list(re.finditer(r'\[CODE_CHANGE:\s*(.+?)\]\s*', text))
+    if not matches:
+        return text, None
+    last = matches[-1]
+    instruction = last.group(1).strip()
+    # Remove the marker from the text
+    cleaned = (text[:last.start()] + text[last.end():]).strip()
+    return cleaned, instruction
 
 
 def build_chat_context(db: Session, session: StrategySession) -> str:
@@ -158,21 +162,28 @@ def chat_with_llm(db: Session, session_id: UUID, user_message: str,
             "Be specific — reference actual numbers and runs. Be concise.\n\n"
             f"## Session Context\n\n{context}\n\n"
             "---\n"
-            "CODE CHANGE INSTRUCTIONS:\n"
-            "If the user asks you to modify the strategy code (add/remove/change filters, "
-            "adjust parameters, change exit logic, etc.), include a code-change marker at "
-            "the END of your response in this exact format:\n\n"
+            "## CODE CHANGE MARKER — YOU MUST FOLLOW THIS\n\n"
+            "When the user asks you to MODIFY the strategy code (add/remove/change filters, "
+            "adjust parameters, change exit logic, etc.), you MUST end your response with "
+            "the exact marker on its own line:\n\n"
             "[CODE_CHANGE: <one-line instruction describing the change>]\n\n"
-            "The marker must be on its own line at the very end. "
-            "If the user is just asking a question or requesting analysis, do NOT include the marker.\n\n"
-            "If the user asks to modify the code but the request is ambiguous or "
-            "could be interpreted multiple ways, ask ONE clarifying question before "
-            "proceeding. For example:\n"
-            "  User: \"make it more aggressive\"\n"
-            "  Bot: \"Do you mean widen the trailing stop, increase max_holdings, "
-            "or reduce min_hold_days?\"\n\n"
-            "Only include the [CODE_CHANGE: ...] marker when the instruction is "
-            "clear and specific enough to act on."
+            "This is NOT optional. If the user asks for a code change and you do NOT include "
+            "this marker, the change will NOT be applied. The marker is the ONLY mechanism "
+            "the system has to apply your suggested changes.\n\n"
+            "EXAMPLES:\n"
+            "  User: \"add a filter that SPY must be above its 20d MA\"\n"
+            "  Bot: \"Looking at the worst runs... [analysis...]\n\n"
+            "[CODE_CHANGE: add SPY > 20d MA filter to entry_score]\"\n\n"
+            "  User: \"widen the trailing stop to 25%\"\n"
+            "  Bot: \"The trailing stop at 20% is too tight...\n\n"
+            "[CODE_CHANGE: set trailing_stop=0.25]\"\n\n"
+            "  User: \"apply the changes you suggested\"\n"
+            "  Bot: \"Here are the changes...\n\n"
+            "[CODE_CHANGE: add SPY > 200d MA regime filter to entry_score]\"\n\n"
+            "  User: \"why did run 3 underperform?\"\n"
+            "  Bot: \"Run 3 started in a bear market...\" (no marker — analysis only)\n\n"
+            "If the request is ambiguous, ask ONE clarifying question before including the marker. "
+            "But once the user confirms, you MUST include the marker."
         )
 
     # Load conversation history (last 20 messages)
