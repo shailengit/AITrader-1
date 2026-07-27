@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, RefreshCw, AlertCircle, MessageSquare } from "lucide-react";
+import { Send, Bot, User, RefreshCw, AlertCircle, MessageSquare, Wand2, Save } from "lucide-react";
 import { strategyLabApi, type ChatMessage } from "../../lib/strategyLab";
 
 interface ChatPanelProps {
@@ -16,6 +16,12 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
   const [critiquingId, setCritiquingId] = useState<string | null>(null);
   const [critiqueModel, setCritiqueModel] = useState("");
   const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [applyingInstruction, setApplyingInstruction] = useState<string | null>(null);
+  const [applyTimer, setApplyTimer] = useState(0);
+  const [pendingSave, setPendingSave] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState(sessionId ? `strategy-${sessionId.slice(0, 8)}` : "strategy");
+  const [saveDescription, setSaveDescription] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
   // Load available models for the dropdown
@@ -48,15 +54,118 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
     }
   }, [messages]);
 
+  // Live timer for apply in progress
+  useEffect(() => {
+    if (!applyingInstruction) return;
+    const startedAt = Date.now();
+    setApplyTimer(0);
+    const id = setInterval(() => setApplyTimer(Math.floor((Date.now() - startedAt) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [applyingInstruction]);
+
   const send = useMutation({
     mutationFn: (body: { message: string; model: string; critique_of?: string }) =>
       strategyLabApi.chat(sessionId, body),
-    onSuccess: (r) => setMessages(r.history),
+    onSuccess: (r) => {
+      setMessages(r.history);
+      // If the response has a code_change_instruction, we don't auto-apply —
+      // the "Apply change" button lets the user decide.
+    },
+  });
+
+  const applyChange = useMutation({
+    mutationFn: (instruction: string) =>
+      strategyLabApi.refineDirect(sessionId, {
+        instruction,
+        model: selectedModel,
+        validation_runs: 10,
+      }),
+    onSuccess: (r) => {
+      setApplyingInstruction(null);
+      setApplyTimer(0);
+      const statusMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: r.validation_status === "passed"
+          ? `✅ Change applied and verified with 10 backtest runs.`
+          : `⚠️ Change applied but some validation runs failed (${r.validation_status}). Check the code in Step 3.`,
+        model_id: "system",
+        critique_of: undefined,
+        code_change_instruction: undefined,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, statusMsg]);
+      setPendingSave(true);
+    },
+    onError: (e) => {
+      setApplyingInstruction(null);
+      setApplyTimer(0);
+      const errMsg = extractErrorMessage(e);
+      const statusMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Failed to apply change: ${errMsg}`,
+        model_id: "system",
+        critique_of: undefined,
+        code_change_instruction: undefined,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, statusMsg]);
+    },
+  });
+
+  const saveToLib = useMutation({
+    mutationFn: () => strategyLabApi.saveToLibrary(sessionId, {
+      name: saveName,
+      change_description: saveDescription,
+    }),
+    onSuccess: () => {
+      setSaveDialogOpen(false);
+      setPendingSave(false);
+      setSaveDescription("");
+      const statusMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `✅ Saved to library as "${saveName}".`,
+        model_id: "system",
+        critique_of: undefined,
+        code_change_instruction: undefined,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, statusMsg]);
+    },
+    onError: (e) => {
+      const errMsg = extractErrorMessage(e);
+      const statusMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Failed to save to library: ${errMsg}`,
+        model_id: "system",
+        critique_of: undefined,
+        code_change_instruction: undefined,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, statusMsg]);
+    },
   });
 
   const handleSend = () => {
     if (!input.trim() || send.isPending) return;
-    send.mutate({ message: input.trim(), model: selectedModel });
+    const msg = input.trim();
+
+    // Check for natural language approval of a pending code change
+    const approvalKeywords = ["yes", "apply", "make the change", "do it", "go ahead", "sure", "please do"];
+    const lastBotWithChange = [...messages].reverse().find(
+      (m) => m.role === "assistant" && m.code_change_instruction
+    );
+    if (lastBotWithChange && approvalKeywords.some(k => msg.toLowerCase().includes(k))) {
+      // Auto-trigger apply
+      setApplyingInstruction(lastBotWithChange.code_change_instruction!);
+      applyChange.mutate(lastBotWithChange.code_change_instruction!);
+    }
+
+    // Always send the message to chat
+    send.mutate({ message: msg, model: selectedModel });
     setInput("");
   };
 
@@ -99,7 +208,7 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
           <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--slab-paper-faint)" }}>
             <MessageSquare size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
             <p className="slab-prose" style={{ fontSize: 14 }}>
-              Ask about performance — e.g. "why did run 3 underperform?" or "what do the worst runs have in common?"
+              Ask about performance — e.g. "why did run 3 underperform?" or "add a SPY > 20d MA filter"
             </p>
           </div>
         )}
@@ -209,6 +318,33 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
                   </button>
                 </motion.div>
               )}
+
+              {/* Apply change button — shown on bot messages that contain a code_change_instruction */}
+              {msg.code_change_instruction && (
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  {applyingInstruction === msg.code_change_instruction ? (
+                    <span className="slab-status slab-status--live">
+                      <span className="slab-status__dot" />
+                      Applying change
+                      <span className="slab-mono slab-mono--xs slab-mono--dim" style={{ marginLeft: 8 }}>
+                        {applyTimer}s
+                      </span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApplyingInstruction(msg.code_change_instruction!);
+                        applyChange.mutate(msg.code_change_instruction!);
+                      }}
+                      disabled={applyChange.isPending}
+                      className="slab-btn slab-btn--sm slab-btn--primary"
+                    >
+                      <Wand2 size={10} /> Apply change
+                    </button>
+                  )}
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -232,6 +368,72 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
             <button type="button" onClick={() => send.mutate({ message: input, model: selectedModel })} className="slab-btn slab-btn--xs">
               <RefreshCw size={10} /> Retry
             </button>
+          </div>
+        )}
+
+        {/* Save to library prompt — shown after a successful apply */}
+        {pendingSave && !saveDialogOpen && (
+          <div style={{ display: "flex", gap: 8, padding: "8px 0", borderTop: "1px solid var(--slab-rule)", marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => setSaveDialogOpen(true)}
+              className="slab-btn slab-btn--sm slab-btn--terminal"
+            >
+              <Save size={10} /> Save to library
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingSave(false)}
+              className="slab-btn slab-btn--sm slab-btn--ghost"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Save dialog */}
+        {saveDialogOpen && (
+          <div style={{ padding: "12px 0", borderTop: "1px solid var(--slab-rule)", marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+            <span className="slab-eyebrow slab-eyebrow--gold" style={{ fontSize: 11 }}>// Save to library</span>
+            <input
+              type="text"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="Strategy name"
+              className="slab-input"
+              style={{ fontSize: 13 }}
+            />
+            <input
+              type="text"
+              value={saveDescription}
+              onChange={(e) => setSaveDescription(e.target.value)}
+              placeholder="What changed?"
+              className="slab-input"
+              style={{ fontSize: 13 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => saveToLib.mutate()}
+                disabled={!saveName.trim() || saveToLib.isPending}
+                className="slab-btn slab-btn--sm slab-btn--primary"
+              >
+                {saveToLib.isPending ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaveDialogOpen(false)}
+                className="slab-btn slab-btn--sm slab-btn--ghost"
+              >
+                Cancel
+              </button>
+              {saveToLib.isError && (
+                <span className="slab-mono slab-mono--sm slab-mono--rose" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <AlertCircle size={12} />
+                  {extractErrorMessage(saveToLib.error)}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -265,7 +467,7 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder="Ask about performance..."
+          placeholder="Ask about performance or suggest a code change..."
           className="slab-input"
           style={{ flex: 1, fontSize: 13 }}
           disabled={send.isPending}
@@ -282,4 +484,22 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
       </div>
     </div>
   );
+}
+
+// Parse a FastAPI error response into a user-friendly string.
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "Unknown error";
+  const e = err as { message?: string; detail?: unknown };
+  let d: unknown = e.detail;
+  if (typeof d === "object" && d !== null && "detail" in (d as object)) {
+    d = (d as { detail: unknown }).detail;
+  }
+  if (typeof d === "object" && d !== null) {
+    const obj = d as { details?: string; error?: string };
+    if (obj.details) return obj.details;
+    if (obj.error) return obj.error;
+  }
+  if (typeof d === "string") return d;
+  if (e.message) return e.message;
+  return String(err);
 }
