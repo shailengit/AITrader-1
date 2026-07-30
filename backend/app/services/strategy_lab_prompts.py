@@ -359,3 +359,52 @@ def make_refine_direct_prompt(code: str, instruction: str) -> List[Dict[str, str
             ),
         },
     ]
+
+
+def make_refine_strategy_direct_prompt(
+    current_code: str,
+    instruction: str,
+    batch_summary: str,
+    worst_runs_table: str,
+) -> List[Dict[str, str]]:
+    """Prompt the LLM to modify strategy code based on batch performance + user instruction.
+
+    The LLM outputs the COMPLETE modified file (not a diff), along with a brief
+    summary of what changed and why.
+    """
+    user_instruction = f"\nThe user specifically asks: {instruction}" if instruction else ""
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are a quant strategy refiner. Given a current strategy file, "
+                "an AI-generated analysis of backtest runs, the worst-performing runs, "
+                "and optionally a user instruction, propose a code change that improves "
+                "the strategy.\n\n"
+                "OUTPUT FORMAT: a single Python file wrapped in a markdown ```python block, "
+                "followed by a brief summary on the last line prefixed with '## SUMMARY:'.\n\n"
+                "Example output:\n"
+                "```python\nimport ...\n...\n```\n"
+                "## SUMMARY: Adjusted trailing stop from 20% to 25%, added SPY > 200d MA filter\n\n"
+                "Rules:\n"
+                "- Output the COMPLETE modified Python file — not a diff\n"
+                "- Keep ALL imports, engine wiring, and CONFIG exactly as they are\n"
+                "- Make ONLY the changes needed to address the worst runs and user instruction\n"
+                "- The output must be a complete, valid Python file\n"
+                "- Common improvements: adjust thresholds, widen/narrow stops, add filters, "
+                "change position sizing, adjust take profit / time stop levels\n"
+                "- CRITICAL: holding_score() MUST return a DYNAMIC score. "
+                "TAKE_PROFIT must be enabled. TIME_STOP_DAYS must be reasonable."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Current strategy code:\n\n```python\n{current_code}\n```\n\n"
+                f"Backtest analysis:\n{batch_summary}\n\n"
+                f"Worst-performing runs (lowest Sharpe):\n{worst_runs_table}\n"
+                f"{user_instruction}\n\n"
+                "Output the COMPLETE modified Python file followed by ## SUMMARY: with a one-line description of changes."
+            ),
+        },
+    ]
