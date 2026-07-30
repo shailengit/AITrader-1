@@ -151,11 +151,13 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   });
 
   const apply = useMutation({
-    mutationFn: (diff: string) => strategyLabApi.applyDiff(session.id, { instruction: diff }),
+    mutationFn: async (_code: string) => {
+      // Code is already saved by the refine endpoint — this is a no-op
+      // that just updates UI state
+      return;
+    },
     onSuccess: () => {
       setApplyError(null);
-      setRefine(null);
-      setTimeout(() => start.mutate(), 500);
     },
     onError: (e) => {
       const err = e as { detail?: unknown; message?: string };

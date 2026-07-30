@@ -1,3 +1,8 @@
+/**
+ * DEPRECATED: This component is no longer used by the refine flow.
+ * The refine flow now shows KPI comparison tables instead of diffs.
+ * Kept for reference only.
+ */
 import { useMemo } from "react";
 import { Check, X } from "lucide-react";
 

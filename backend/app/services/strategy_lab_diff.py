@@ -1,3 +1,9 @@
+"""
+DEPRECATED: This module is no longer used by the refine flow.
+The refine flow now uses complete-file replacement (refine_code_direct)
+instead of unified diffs. Kept for reference only.
+"""
+
 """Parse and apply unified diffs.
 
 Used to apply LLM-generated diffs to user-edited strategy code. Falls back
