@@ -5,6 +5,7 @@ import "xterm/css/xterm.css";
 
 interface TerminalComponentProps {
   sessionId: string;
+  onReady?: () => void;
   onDisconnected?: (exitCode?: number) => void;
 }
 
@@ -13,7 +14,7 @@ const WS_BASE = (() => {
   return `${proto}//${window.location.host}/api/terminal/ws`;
 })();
 
-export function TerminalComponent({ sessionId, onDisconnected }: TerminalComponentProps) {
+export function TerminalComponent({ sessionId, onReady, onDisconnected }: TerminalComponentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -76,6 +77,27 @@ export function TerminalComponent({ sessionId, onDisconnected }: TerminalCompone
     };
 
     ws.onmessage = (event) => {
+      // Handle JSON control messages from the backend
+      if (typeof event.data === "string" && event.data.startsWith("{")) {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "ready") {
+            onReady?.();
+            return;
+          }
+          if (msg.type === "info") {
+            term.write(`\r\n${msg.message}\r\n`);
+            return;
+          }
+          if (msg.type === "error") {
+            term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
+            return;
+          }
+        } catch {
+          // Not JSON, treat as regular terminal output
+        }
+      }
+
       if (event.data instanceof Blob) {
         event.data.arrayBuffer().then((buf) => {
           const decoder = new TextDecoder("utf-8");
@@ -119,7 +141,7 @@ export function TerminalComponent({ sessionId, onDisconnected }: TerminalCompone
       ws.close();
       term.dispose();
     };
-  }, [sessionId, onDisconnected]);
+  }, [sessionId, onReady, onDisconnected]);
 
   useEffect(() => {
     const cleanup = connect();

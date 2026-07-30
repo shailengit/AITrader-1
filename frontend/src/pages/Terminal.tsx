@@ -137,6 +137,7 @@ export default function TerminalPage() {
         ) : (
           <TerminalComponent
             sessionId={sessionId}
+            onReady={() => setStatus("connected")}
             onDisconnected={handleDisconnected}
           />
         )}

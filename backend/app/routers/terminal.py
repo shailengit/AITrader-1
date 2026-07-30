@@ -25,11 +25,17 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
         await websocket.close()
         return
 
-    # Get or create session
+    import asyncio
+
+    # Get or create session (spawn Claude Code in background to avoid blocking)
     term_session = manager.get_session(session)
     if term_session is None:
+        await websocket.send_json({"type": "info", "message": "Starting Claude Code session..."})
         try:
-            term_session = manager.create_session(session)
+            # Run the blocking spawn in a thread to not block the event loop
+            loop = asyncio.get_event_loop()
+            term_session = await loop.run_in_executor(None, lambda: manager.create_session(session))
+            await websocket.send_json({"type": "ready"})
         except RuntimeError as e:
             await websocket.send_json({"type": "error", "message": str(e)})
             await websocket.close()
@@ -51,12 +57,10 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
                     })
                     break
                 else:
-                    import asyncio
                     await asyncio.sleep(0.05)
             except Exception:
                 break
 
-    import asyncio
     read_task = asyncio.create_task(read_pty())
 
     try:
