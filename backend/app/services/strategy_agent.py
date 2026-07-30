@@ -371,7 +371,39 @@ class StrategyAgent:
         has_config = bool(re.search(r"CONFIG\s*=", self.code))
         checks["config"] = has_config
 
-        # 4. Check for anti-patterns (only in non-comment code)
+        # 4. Check for TODO placeholders in function bodies
+        has_no_todos = True
+        todo_functions = []
+        for func_name in ["precompute", "entry_score", "holding_score", "exit_check"]:
+            # Find the function body and check for TODO
+            func_match = re.search(
+                rf'def {func_name}\(.*?\):.*?""".*?""".*?(?=\n\S|\Z)',
+                self.code, re.DOTALL
+            )
+            if func_match:
+                func_body = func_match.group(0)
+                if "TODO" in func_body or "todo" in func_body:
+                    has_no_todos = False
+                    todo_functions.append(func_name)
+        checks["no_todos"] = has_no_todos
+
+        # 5. Check precompute doesn't just return empty dict
+        precompute_returns_empty = False
+        pc_match = re.search(
+            r'def precompute\(.*?\):.*?""".*?""".*?(?=\n\S|\Z)',
+            self.code, re.DOTALL
+        )
+        if pc_match:
+            pc_body = pc_match.group(0)
+            if "return {}" in pc_body:
+                precompute_returns_empty = True
+                checks["precompute_not_empty"] = False
+            else:
+                checks["precompute_not_empty"] = True
+        else:
+            checks["precompute_not_empty"] = True  # function not found, handled by functions check
+
+        # 6. Check for anti-patterns (only in non-comment code)
         has_no_anti_patterns = True
         anti_patterns_found = []
         code_lines = self.code.split("\n")
@@ -394,6 +426,9 @@ class StrategyAgent:
             imports_ok=checks["imports"],
             functions_found=4 if checks["functions"] else sum([has_precompute, has_entry_score, has_holding_score, has_exit_check]),
             config_ok=checks["config"],
+            no_todos=checks.get("no_todos", True),
+            todo_functions=todo_functions if not has_no_todos else None,
+            precompute_not_empty=checks.get("precompute_not_empty", True),
             anti_patterns_ok=checks["anti_patterns"],
             anti_patterns_found=anti_patterns_found if anti_patterns_found else None,
             detail="All checks passed" if all_pass else "Some checks failed",
@@ -863,6 +898,14 @@ try:
     sys.modules["strategies_engine"] = _engine_mod
     _engine_spec.loader.exec_module(_engine_mod)
     StrategyEngine = _engine_mod.StrategyEngine
+
+    # Set dynamic dates on CONFIG (template has hardcoded defaults)
+    from datetime import datetime as _dt
+    _now = _dt.now()
+    _end = _now.strftime("%Y-%m-%d")
+    _start = _dt(_now.year - 3, _now.month, _now.day).strftime("%Y-%m-%d")
+    mod.CONFIG.as_of = _start
+    mod.CONFIG.end = _end
 
     # Run the engine
     engine = mod.CONFIG
