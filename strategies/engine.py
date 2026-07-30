@@ -106,7 +106,10 @@ class StrategyEngine:
         # ── 3. Build trading calendar ───────────────────────────────────
         all_trading_dates = set()
         for ticker, data in stock_db.items():
-            for d in data["dates"]:
+            dates_arr = data.get("dates")
+            if dates_arr is None or len(dates_arr) == 0:
+                continue
+            for d in dates_arr:
                 ds = str(pd.Timestamp(d))[:10]
                 if cfg.as_of <= ds <= cfg.end:
                     all_trading_dates.add(ds)
@@ -147,7 +150,7 @@ class StrategyEngine:
         portfolio_value = cfg.capital
 
         # Pre-compute market-cap normalization stats
-        all_market_caps = [v.get("market_cap", 0) for v in stock_db.values() if v.get("market_cap", 0) > 0]
+        all_market_caps = [v.get("market_cap", 0) for v in stock_db.values() if v.get("market_cap") is not None and v.get("market_cap", 0) > 0]
         cap_max = max(all_market_caps) if all_market_caps else 1
         cap_min = min(all_market_caps) if all_market_caps else 0
         cap_range = cap_max - cap_min if cap_max > cap_min else 1
@@ -157,8 +160,10 @@ class StrategyEngine:
             data = stock_db.get(ticker)
             if data is None:
                 return 0.0
-            arr = data[field]
-            dates = data["dates"]
+            arr = data.get(field)
+            dates = data.get("dates")
+            if arr is None or dates is None:
+                return 0.0
             target = pd.Timestamp(date_str)
             for i in range(len(dates) - 1, -1, -1):
                 if pd.Timestamp(dates[i]) <= target:
@@ -367,11 +372,21 @@ class StrategyEngine:
 
         # Annualized Sharpe ratio from daily equity
         sharpe = 0.0
+        max_dd = 0.0
         if len(daily_equity) > 1:
             eq_vals = np.array([d["value"] for d in daily_equity], dtype=float)
             daily_rets = np.diff(eq_vals) / eq_vals[:-1]
             if np.std(daily_rets) > 0 and len(daily_rets) > 0:
                 sharpe = float(np.mean(daily_rets) / np.std(daily_rets) * np.sqrt(252))
+            # Max drawdown from peak
+            peak = eq_vals[0]
+            for v in eq_vals:
+                if v > peak:
+                    peak = v
+                dd = (peak - v) / peak
+                if dd > max_dd:
+                    max_dd = dd
+        max_dd_pct = round(max_dd * 100, 2)
 
         def _json_safe(val: float) -> float:
             """Replace Infinity/NaN with 0.0 for JSON serialization."""
@@ -385,6 +400,7 @@ class StrategyEngine:
             "total_return_pct": _json_safe(round(total_ret, 2)),
             "cagr_pct": _json_safe(round(cagr, 2)),
             "sharpe_ratio": _json_safe(round(sharpe, 2)),
+            "max_drawdown_pct": _json_safe(max_dd_pct),
             "total_trades": len(sell_trades),
             "win_rate": _json_safe(round(win_rate, 1)),
             "profit_factor": _json_safe(round(profit_factor, 2)),
@@ -394,6 +410,21 @@ class StrategyEngine:
             "spy_return_pct": _json_safe(round(spy_ret, 2)),
             "alpha_pct": _json_safe(round(total_ret - spy_ret, 2)),
         }
+
+        # Add top winners/losers for the run viewer report
+        sell_trades_sorted = sorted(sell_trades, key=lambda t: t.get("pnl_dollars", 0), reverse=True)
+        top_winners = sell_trades_sorted[:5]
+        top_losers = sell_trades_sorted[-5:] if len(sell_trades_sorted) >= 5 else sell_trades_sorted[::-1]
+        summary["top_winners"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_winners
+        ]
+        summary["top_losers"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_losers
+        ]
 
         return {"trades": trades, "daily_equity": daily_equity, "summary": summary}
 

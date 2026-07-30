@@ -343,6 +343,56 @@ def post_generate_code(
     )
 
 
+class AgentGenerateResponse(BaseModel):
+    agent_session_id: str
+    message: str
+
+
+@router.post("/sessions/{session_id}/generate-code-agent", response_model=AgentGenerateResponse)
+async def post_generate_code_agent(
+    session_id: uuid.UUID,
+    body: GenerateCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Start an agent-based code generation that runs in the background
+    and streams progress via SSE.
+
+    The agent:
+      1. Reads the plan from the session
+      2. Generates code using the agent loop (generate → validate → backtest → debug → improve)
+      3. Saves the code back to the session when complete
+      4. Streams progress events via /api/strategy-agent/{agent_session_id}/stream
+
+    Returns an agent_session_id immediately. Connect to the SSE stream
+    to receive live progress.
+    """
+    from app.services.strategy_agent import start_agent_with_plan
+
+    sess = svc_get_session(db, session_id)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    plan = body.plan_text or sess.plan_text
+    if not plan:
+        raise HTTPException(status_code=400, detail="no plan_text available — call /plan first")
+
+    agent_session_id = await start_agent_with_plan(
+        plan_text=plan,
+        strategy_session_id=str(session_id),
+        model=body.model,
+    )
+
+    logger.info(
+        "Started agent code generation for session %s: agent_session=%s",
+        session_id, agent_session_id,
+    )
+
+    return AgentGenerateResponse(
+        agent_session_id=agent_session_id,
+        message="Agent started. Connect to /api/strategy-agent/{agent_session_id}/stream for live progress.",
+    )
+
+
 @router.post("/sessions/{session_id}/refine-code", response_model=RefineCodeResponse)
 def post_refine_code(
     session_id: uuid.UUID,
@@ -536,6 +586,7 @@ class ExperimentRequest(BaseModel):
     end_date: str = Field(..., description="YYYY-MM-DD, e.g. '2024-12-31'")
     start_date_min: str = Field("2002-01-01", description="Earliest random start date")
     start_date_max: str = Field("2024-01-01", description="Latest random start date")
+    fixed_start_dates: Optional[List[str]] = Field(None, description="Exact start dates to reuse from a previous batch (apples-to-apples comparison)")
     model: Optional[str] = None  # currently unused, kept for future per-run model selection
 
 
@@ -588,6 +639,7 @@ def start_experiments(
         end_date=body.end_date,
         start_date_min=body.start_date_min,
         start_date_max=body.start_date_max,
+        fixed_start_dates=body.fixed_start_dates,
     )
     return ExperimentStartResponse(batch_id=batch_id)
 

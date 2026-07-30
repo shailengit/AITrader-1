@@ -9,39 +9,6 @@ TradeCraft is a unified trading platform combining three tools:
 2. **AI Stock Screener** - Multi-agent technical and fundamental stock screening
 3. **QuantGen Strategy Builder** - AI-powered quantitative strategy generation with VectorBT
 
-## Architecture
-
-```
-TradeCraft/
-├── backend/                 # FastAPI Python backend
-│   ├── app/
-│   │   ├── main.py          # FastAPI entry point with CORS, security headers
-│   │   ├── routers/         # API endpoints
-│   │   │   ├── sectors.py    # Sector rotation: /api/sectors, /api/stocks/:sector
-│   │   │   ├── screener.py  # AI screener: /api/screener/scan, /api/screener/parse-filters, /api/screener/status/:id
-│   │   │   ├── quantgen.py  # Strategy builder: /api/generate, /api/run, /api/optimize
-│   │   │   └── health.py     # Health check: /api/health, /api/db-status
-│   │   ├── services/        # Business logic
-│   │   │   ├── agno_screener.py  # Multi-agent AI screener (Dormant Giant, Quant Strategy)
-│   │   │   └── data_service.py  # PostgreSQL data access (replaces yfinance)
-│   │   └── db/
-│   │       └── database.py  # SQLAlchemy connection pool, sector ETF mappings
-│   └── requirements.txt
-├── frontend/                # React + TypeScript + Tailwind CSS
-│   ├── src/
-│   │   ├── App.tsx          # React Router with tabs
-│   │   ├── components/layout/Layout.tsx  # Sidebar navigation
-│   │   ├── pages/
-│   │   │   ├── Landing.tsx        # Dashboard with three app cards
-│   │   │   ├── SectorRotation.tsx # Sector ETF analysis with Recharts
-│   │   │   ├── StockScreener.tsx  # AI screener with mode selection
-│   │   │   └── QuantGen.tsx       # Strategy builder with Monaco Editor
-│   │   └── styles/index.css # Tailwind + dark theme CSS variables
-│   ├── vite.config.ts       # Vite with API proxy to FastAPI
-│   └── package.json
-└── README.md
-```
-
 ## Commands
 
 ### Backend (from `backend/` directory)
@@ -152,12 +119,6 @@ const res = await fetch('/api/sectors')
 - No future data used in decision-making (avoids curve-fitting)
 
 **Implementation:** `backend/app/services/continuous_wfo.py` — uses `PortfolioTracker` to maintain position state across windows.
-
-## Available Skills
-
-The following Claude Code skills are used in this project:
-- **cli-anything-tradecraft** - General-purpose CLI automation and task execution
-- **playwright-cli** - Browser automation, UI testing, and screenshot capture
 
 ## Original Repositories
 
@@ -388,3 +349,11 @@ Key rules:
 - Guard `market_cap` against NULL
 - Use `max_tokens=32768` for code generation calls
 - Always validate generated code with a single backtest run before presenting to the user
+
+**Run Viewer Reports:** After every batch backtest (standalone or Strategy Lab), an interactive HTML report is auto-generated at `docs/reports/batch_<name>_<timestamp>.html`. It includes summary stats, a sortable run table, expandable per-run detail (metrics, trades, exit reasons), and strategy code/parameters. The file path is printed at the end of every experiment.
+
+**Critical rotation rules (violations produce losing strategies):**
+- `holding_score()` MUST return a DYNAMIC score based on current indicators — returning `1.0` disables rotation and loses money
+- `TAKE_PROFIT` must be enabled (e.g. 0.30) — setting to 999.0 means winners never get locked in
+- `TIME_STOP_DAYS` must be reasonable (e.g. 60-120) — setting to 9999 means stale positions held forever
+- `MIN_HOLD_DAYS` should be >= 7 to prevent excessive churn

@@ -20,9 +20,9 @@ interface StepBacktestProps {
 
 export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const [nRuns, setNRuns] = useState(10);
-  const [endDate, setEndDate] = useState("2024-01-01");
-  const [startDateMin, setStartDateMin] = useState("2022-01-01");
-  const [startDateMax, setStartDateMax] = useState("2024-01-01");
+  const [endDate, setEndDate] = useState("2026-06-01");
+  const [startDateMin, setStartDateMin] = useState("2000-01-01");
+  const [startDateMax, setStartDateMax] = useState("2020-01-01");
   const [batchId, setBatchId] = useState<string | null>(null);
   const [experiments, setExperiments] = useState<ExperimentRow[]>([]);
   const [stats, setStats] = useState<BatchStats | null>(null);
@@ -32,6 +32,8 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [equityExperimentId, setEquityExperimentId] = useState<string | null>(null);
+  // Save the exact start dates from the first batch so refinement reuses them (apples-to-apples)
+  const [previousStartDates, setPreviousStartDates] = useState<string[] | null>(null);
 
   const equityCurve = useQuery({
     queryKey: ["equity-curve", equityExperimentId],
@@ -66,13 +68,25 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
   }, [session.id]);
 
   const start = useMutation({
-    mutationFn: () =>
-      strategyLabApi.startExperiments(session.id, {
+    mutationFn: () => {
+      // If we have fixed start dates from a previous batch (e.g. after refinement),
+      // pass them so the new batch runs on the exact same time windows.
+      // This enables apples-to-apples comparison of strategy changes.
+      const body: {
+        n_runs: number; end_date: string;
+        start_date_min?: string; start_date_max?: string;
+        fixed_start_dates?: string[]; model?: string;
+      } = {
         n_runs: nRuns,
         end_date: endDate,
         start_date_min: startDateMin,
         start_date_max: startDateMax,
-      }),
+      };
+      if (previousStartDates && previousStartDates.length > 0) {
+        body.fixed_start_dates = previousStartDates;
+      }
+      return strategyLabApi.startExperiments(session.id, body);
+    },
     onSuccess: (r) => {
       setBatchId(r.batch_id);
       setExperiments([]);
@@ -95,8 +109,16 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
         setExperiments(rows);
         setStats(s);
         setProgress({ completed: s.n_completed, total: s.n_total, failed: s.n_failed });
-        if (s.n_completed + s.n_failed >= nRuns && pollRef.current) {
-          clearInterval(pollRef.current);
+        // Save start dates once the batch completes (for apples-to-apples comparison on refinement)
+        if (s.n_completed + s.n_failed >= nRuns && rows.length > 0) {
+          const dates = rows
+            .filter((r) => r.start_date)
+            .map((r) => r.start_date!.slice(0, 10))
+            .sort((a, b) => (a < b ? -1 : 1));
+          if (dates.length > 0) {
+            setPreviousStartDates(dates);
+          }
+          if (pollRef.current) clearInterval(pollRef.current);
         }
       } catch {
         // ignore transient poll errors
@@ -198,6 +220,28 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
               batchId={batchId}
             />
 
+            {/* All-failed banner */}
+            {isDone && progress.failed > 0 && progress.completed === 0 && (
+              <div
+                className="slab-panel"
+                style={{ maxWidth: 1280, marginTop: 16, borderColor: "var(--slab-rose)", backgroundColor: "color-mix(in srgb, var(--slab-rose) 8%, transparent)" }}
+              >
+                <div style={{ padding: 16, display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <AlertCircle size={18} style={{ color: "var(--slab-rose)", flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--slab-rose)", marginBottom: 4 }}>
+                      All {progress.total} experiments failed
+                    </div>
+                    <p style={{ fontSize: 13, color: "var(--slab-paper-subtle)", lineHeight: 1.5 }}>
+                      Every run returned an error. This usually means the strategy code has a bug —
+                      check the <strong>error messages</strong> in the <strong>Status</strong> column below
+                      for details. Common causes: missing imports, database query errors, or division by zero.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {experiments.length > 0 && (
               <ExperimentTable
                 rows={experiments}
@@ -259,7 +303,7 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
                   isSummarizing={summarize.isPending}
                   onRefine={() => refineMut.mutate()}
                   isRefining={refineMut.isPending}
-                  onAnotherBatch={() => setBatchId(null)}
+                  onAnotherBatch={() => { setBatchId(null); setPreviousStartDates(null); }}
                   summary={summary}
                   refine={refine}
                   onAcceptRefine={(d) => apply.mutate(d)}
@@ -533,7 +577,14 @@ function ExperimentRowView({ row, isSelected, onPick, onShowEquity }: {
         {row.status === "completed" ? (
           <span className="slab-tag slab-tag--terminal">OK</span>
         ) : (
-          <span className="slab-tag slab-tag--rose" title={row.error_message ?? ""}>FAIL</span>
+          <span className="slab-tag slab-tag--rose" title={row.error_message ?? ""}>
+            FAIL
+            {row.error_message && (
+              <span style={{ display: "block", fontSize: 10, fontWeight: 400, marginTop: 2, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {row.error_message}
+              </span>
+            )}
+          </span>
         )}
       </td>
       <td>

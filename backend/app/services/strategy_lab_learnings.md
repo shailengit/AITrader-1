@@ -125,6 +125,10 @@ query = text(
 | Plain dict `CONFIG = {...}` | Engine expects `StrategyConfig` | Use `_engine.StrategyConfig(...)` |
 | VBT/vectorbt APIs | Not compatible with StrategyEngine | Use pandas/numpy only |
 | `pd.Timestamp(x)` with numpy arrays | Type mismatch | Use `np.datetime64()` for searchsorted keys |
+| `holding_score` returning `1.0` | Disables rotation — portfolio holds stale positions indefinitely, loses money | Return a dynamic score based on current indicator values (EMA spread, RSI, etc.) |
+| `TAKE_PROFIT = 999.0` | Winners never locked in — they reverse and become losers | Set to 0.20-0.30 for most strategies |
+| `TIME_STOP_DAYS = 9999` | Stagnant positions held forever, blocking better opportunities | Set to 60-120 days |
+| `MIN_HOLD_DAYS = 0` | Positions rotated out the day after entry — excessive churn | Set to >= 7 |
 
 ---
 
@@ -213,4 +217,54 @@ The `strategy_experiments` table has an `equity_curve` JSONB column that stores 
 - [ ] No `os.environ.setdefault()` for DB config
 - [ ] Python syntax valid (`ast.parse` passes)
 - [ ] Single backtest run completes (not crashes)
+
+## KPI Key Audit — Engine ↔ Runner ↔ Display
+
+**CRITICAL:** Every layer must use the EXACT SAME key names. The engine (`strategies/engine.py`) defines the canonical keys. All consumers must match.
+
+### Canonical Keys (from `strategies/engine.py` summary dict)
+
+| Key | Type | Example | Description |
+|-----|------|---------|-------------|
+| `total_return_pct` | float | 47.3 | Total return as a percentage (47.3 = 47.3%) |
+| `cagr_pct` | float | 12.5 | CAGR as a percentage |
+| `sharpe_ratio` | float | 1.52 | Annualized Sharpe ratio |
+| `max_drawdown_pct` | float | -15.2 | Max drawdown as a percentage (negative) |
+| `total_trades` | int | 45 | Number of closed sell trades |
+| `win_rate` | float | 55.3 | Win rate as a percentage (55.3 = 55.3%) |
+| `profit_factor` | float | 2.1 | Gross profit / gross loss |
+| `avg_winner` | float | 1200.50 | Average winning trade in dollars |
+| `avg_loser` | float | -450.30 | Average losing trade in dollars |
+| `spy_return_pct` | float | 25.1 | SPY benchmark return as a percentage |
+| `alpha_pct` | float | 22.2 | Total return − SPY return |
+
+### Agent Internal KPI Dict (`strategy_agent.py` runner → display)
+
+The agent's `_run_backtest_subprocess` normalizes engine percentages to **decimal fractions** for internal use:
+
+| Agent Key | Source | Type | Example | Display Formula |
+|-----------|--------|------|---------|----------------|
+| `total_return` | `total_return_pct / 100` | decimal | 0.473 | `* 100` → "47.3%" |
+| `total_return_pct` | `total_return_pct` (passthrough) | float | 47.3 | raw |
+| `sharpe_ratio` | `sharpe_ratio` (passthrough) | float | 1.52 | raw |
+| `max_drawdown` | `max_drawdown_pct / 100` | decimal | -0.152 | `* 100` → "-15.2%" |
+| `win_rate` | `win_rate / 100` | decimal | 0.553 | `* 100` → "55.3%" |
+| `n_trades` | `total_trades` (renamed) | int | 45 | raw |
+| `profit_factor` | `profit_factor` (passthrough) | float | 2.1 | raw |
+
+### Frontend SortKey (`StepBacktest.tsx`)
+
+The frontend reads directly from the engine's canonical keys (stored in DB via orchestrator):
+
+```
+"total_return_pct" | "alpha_pct" | "win_rate" | "cagr_pct" | "total_trades" | "sharpe_ratio"
+```
+
+### Rules to Prevent Drift
+
+1. **Engine is the source of truth.** All KPI keys are defined in `strategies/engine.py`'s `summary` dict. Never add a KPI key anywhere else without also adding it to the engine.
+2. **Agent normalizes to decimal.** The agent's runner converts engine percentages to decimal fractions (`/ 100`) so the improve-threshold checks (`if tr >= 0.10`) read naturally. Display code always multiplies back by 100.
+3. **Orchestrator passes through.** `strategy_lab_orchestrator.py` stores the engine's summary dict as-is in the database. No key renaming.
+4. **Frontend reads engine keys.** `StepBacktest.tsx` accesses `kpis.total_return_pct`, `kpis.sharpe_ratio`, etc. — matching the engine exactly.
+5. **When adding a new KPI:** Add it to the engine's summary dict first, then update the agent's runner mapping, then update the frontend's SortKey type and display. Verify all three layers in one pass.
 - [ ] 10-run batch completes with 0 failures

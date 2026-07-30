@@ -251,7 +251,7 @@ export const strategyLabApi = {
   applyDiff: (id: string, body: { instruction: string; current_code?: string }) =>
     postJson<ApplyDiffResponse>(`${base}/sessions/${id}/apply-diff`, body),
 
-  startExperiments: (id: string, body: { n_runs: number; end_date: string; start_date_min?: string; start_date_max?: string; model?: string }) =>
+  startExperiments: (id: string, body: { n_runs: number; end_date: string; start_date_min?: string; start_date_max?: string; fixed_start_dates?: string[]; model?: string }) =>
     postJson<{ batch_id: string }>(`${base}/sessions/${id}/experiments`, body),
 
   listExperiments: (id: string) => getJson<ExperimentRow[]>(`${base}/sessions/${id}/experiments`),

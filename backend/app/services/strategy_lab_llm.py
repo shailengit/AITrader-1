@@ -56,8 +56,8 @@ def _get_client_and_model(model: Optional[str] = None) -> Tuple[Optional[OpenAI]
 
 
 def _chat(messages: List[Dict[str, str]], model: Optional[str] = None,
-          max_tokens: int = 16384, temperature: float = 0.0,
-          timeout: int = 180) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+          max_tokens: int = 65536, temperature: float = 0.0,
+          timeout: int = 300) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Call the LLM with messages, return (content, finish_reason, error).
 
     finish_reason is one of: "stop" (clean), "length" (truncated — max_tokens
@@ -233,7 +233,7 @@ def generate_code(plan: str, model: Optional[str] = None) -> Tuple[Optional[str]
     # the response gets cut off mid-code-block (finish_reason=length)
     # and the regex can't find a closing ``` fence, surfacing as a
     # confusing "no code block" error after a 30-40s wait.
-    content, finish_reason, err = _chat(messages, model=model, max_tokens=32768, temperature=0.0, timeout=300)
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=131072, temperature=0.0, timeout=300)
     if err:
         return None, err
     code = _extract_code_block(content or "")
@@ -273,7 +273,126 @@ def generate_code(plan: str, model: Optional[str] = None) -> Tuple[Optional[str]
         ast.parse(code)
     except SyntaxError as e:
         return None, f"Generated code has invalid syntax: {e}"
+
+    # Validate strategy-specific anti-patterns
+    warnings = _validate_strategy_code(code)
+    if warnings:
+        logger.warning("Strategy code validation warnings:\n%s", "\n".join(warnings))
+
+    # Auto-fix common LLM code-generation bugs before returning
+    code = _fix_common_code_bugs(code)
+
     return code, None
+
+
+def _validate_strategy_code(code: str) -> List[str]:
+    """Check generated strategy code for known anti-patterns that produce losing strategies.
+
+    Returns a list of warning strings (empty = no issues found).
+    """
+    warnings = []
+
+    # 1. Check holding_score doesn't always return 1.0
+    # Look for the holding_score function body
+    hs_match = re.search(
+        r'def holding_score\(.*?\):\s*""".*?"""\s*(.*?)(?=\n\S|\Z)',
+        code, re.DOTALL
+    )
+    if hs_match:
+        hs_body = hs_match.group(1)
+        # Check if the body always returns 1.0 (ignoring comments/whitespace)
+        hs_stripped = re.sub(r'#.*', '', hs_body).strip()
+        if hs_stripped == 'return 1.0' or hs_stripped == 'return 1':
+            warnings.append(
+                "⚠️  holding_score() always returns 1.0 — this DISABLES ROTATION. "
+                "The portfolio will hold stale positions indefinitely. "
+                "Return a dynamic score based on current indicator values instead."
+            )
+
+    # 2. Check TAKE_PROFIT is not disabled
+    tp_match = re.search(r'TAKE_PROFIT\s*=\s*(\d+(?:\.\d+)?)', code)
+    if tp_match:
+        tp_val = float(tp_match.group(1))
+        if tp_val >= 999:
+            warnings.append(
+                "⚠️  TAKE_PROFIT is disabled (>= 999). Winners will never be locked in — "
+                "they will reverse and become losers. Set to 0.20-0.30 for most strategies."
+            )
+
+    # 3. Check TIME_STOP_DAYS is not disabled
+    ts_match = re.search(r'TIME_STOP_DAYS\s*=\s*(\d+)', code)
+    if ts_match:
+        ts_val = int(ts_match.group(1))
+        if ts_val >= 9999:
+            warnings.append(
+                "⚠️  TIME_STOP_DAYS is disabled (>= 9999). Stagnant positions will be held "
+                "indefinitely, blocking better opportunities. Set to 60-120 days."
+            )
+
+    # 4. Check MIN_HOLD_DAYS is not 0
+    mh_match = re.search(r'MIN_HOLD_DAYS\s*=\s*(\d+)', code)
+    if mh_match:
+        mh_val = int(mh_match.group(1))
+        if mh_val == 0:
+            warnings.append(
+                "⚠️  MIN_HOLD_DAYS is 0. Positions can be rotated out the day after entry, "
+                "causing excessive churn. Set to >= 7."
+            )
+
+    # 5. Check for wrong import: ``from app.services.strategy_base import StrategyConfig``
+    if "from app.services.strategy_base import StrategyConfig" in code:
+        warnings.append(
+            "⚠️  Code imports StrategyConfig from 'app.services.strategy_base' which does not exist. "
+            "The template uses importlib to load the engine — this import will be auto-fixed."
+        )
+
+    # 6. Check for ``.strftime()`` on raw numpy.datetime64 (not wrapped in pd.Timestamp)
+    strftime_calls = re.findall(r'(\w+)\[(\w+)\]\.strftime\(', code)
+    if strftime_calls:
+        warnings.append(
+            f"⚠️  Found {len(strftime_calls)} call(s) to .strftime() on raw numpy.datetime64 "
+            f"objects (e.g. {strftime_calls[0][0]}[{strftime_calls[0][1]}].strftime(...)). "
+            f"These will be auto-fixed by wrapping in pd.Timestamp()."
+        )
+
+    return warnings
+
+
+def _fix_common_code_bugs(code: str) -> str:
+    """Auto-fix common LLM code-generation bugs before the code reaches experiments.
+
+    Fixes:
+      1. Wrong import: ``from app.services.strategy_base import StrategyConfig``
+         → replaced with the template's importlib engine-loading pattern.
+      2. ``.strftime()`` on raw ``numpy.datetime64`` objects
+         → wrapped in ``pd.Timestamp(...).strftime(...)``.
+    """
+    original = code
+
+    # 1. Fix wrong import: ``from app.services.strategy_base import StrategyConfig``
+    #    The template uses importlib to load the engine; the LLM sometimes writes
+    #    its own import that points to a non-existent module.
+    if "from app.services.strategy_base import StrategyConfig" in code:
+        logger.info("Auto-fix: replacing wrong import 'from app.services.strategy_base import StrategyConfig'")
+        code = code.replace(
+            "from app.services.strategy_base import StrategyConfig",
+            "# (import removed — engine is loaded via importlib below)",
+        )
+
+    # 2. Fix ``.strftime()`` on raw ``numpy.datetime64`` objects.
+    #    The LLM sometimes writes ``dates[i].strftime(...)`` instead of
+    #    ``pd.Timestamp(dates[i]).strftime(...)`` (rule #6 in the prompt).
+    #    Pattern: a variable that looks like a date array element, followed by .strftime(
+    #    We look for ``<identifier>[<index>].strftime(`` and wrap in pd.Timestamp().
+    code = re.sub(
+        r'(\w+)\[(\w+)\]\.strftime\(',
+        r'pd.Timestamp(\1[\2]).strftime(',
+        code,
+    )
+
+    if code != original:
+        logger.info("Auto-fix applied common code-generation bugs")
+    return code
 
 
 def generate_refine_diff(current_code: str, instruction: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
@@ -340,6 +459,12 @@ def debug_code(code: str, error: str, model: Optional[str] = None) -> Tuple[Opti
         ast.parse(fixed)
     except SyntaxError as e:
         return None, f"Debugger produced invalid syntax: {e}"
+
+    # Validate strategy-specific anti-patterns
+    warnings = _validate_strategy_code(fixed)
+    if warnings:
+        logger.warning("Debugged strategy code validation warnings:\n%s", "\n".join(warnings))
+
     return fixed, None
 
 
@@ -367,4 +492,10 @@ def refine_code_direct(code: str, instruction: str, model: Optional[str] = None)
         ast.parse(modified)
     except SyntaxError as e:
         return None, f"Refine produced invalid syntax: {e}"
+
+    # Validate strategy-specific anti-patterns
+    warnings = _validate_strategy_code(modified)
+    if warnings:
+        logger.warning("Refined strategy code validation warnings:\n%s", "\n".join(warnings))
+
     return modified, None

@@ -1,5 +1,16 @@
 """Strategy template — fill in the 4 functions below.
 
+⚠️  CRITICAL WARNINGS — violations produce LOSING strategies:
+1. holding_score() MUST return a DYNAMIC score based on current indicators.
+   Returning 1.0 disables rotation — the portfolio will hold stale positions
+   indefinitely and lose money. Always re-score using current EMA spread, RSI,
+   or whatever signal your strategy uses.
+2. TAKE_PROFIT must be enabled (e.g. 0.30). Disabling it means winners never
+   get locked in — they reverse and become losers.
+3. TIME_STOP_DAYS must be reasonable (e.g. 60-120). Disabling it means
+   stagnant positions are held forever, blocking better opportunities.
+4. MIN_HOLD_DAYS should be >= 7 to prevent excessive churn.
+
 This is a KNOWN-WORKING template. Do NOT change:
 - The imports at the top
 - The engine wiring at the bottom
@@ -26,10 +37,10 @@ AS_OF = "2020-01-01"
 END = "2026-07-08"
 CAPITAL = 100_000.0
 MAX_HOLDINGS = 5
-MIN_HOLD_DAYS = 0
+MIN_HOLD_DAYS = 7         # minimum days before rotation — prevents churn
 TRAILING_STOP = 0.20
-TAKE_PROFIT = 999.0       # disabled by default
-TIME_STOP_DAYS = 9999     # disabled by default
+TAKE_PROFIT = 0.30        # 30% take profit — locks in winners
+TIME_STOP_DAYS = 60       # max hold — prevents indefinite holding of stale positions
 MAX_SECTOR_COUNT = 2
 BULL_EXPOSURE = 1.0
 BEAR_EXPOSURE = 0.50
@@ -80,14 +91,20 @@ def entry_score(candidate: dict, market_cap_stats: dict) -> float:
 def holding_score(ticker: str, date_str: str, holding: dict, market_cap_stats: dict) -> float:
     """Re-score an existing holding in [0, 1]. 0 = weak, rotate out.
 
+    CRITICAL: This function MUST return a dynamic score based on current indicator
+    values. Returning 1.0 disables rotation and will produce a LOSING strategy.
+    The original golden cross strategy re-scores using the current EMA20/EMA200
+    spread normalized to [0,1] and combines with market cap.
+
     holding has: entry_date, entry_price, peak_price, shares, score, angle,
                  market_cap, sector, _stock_data
     holding._stock_data has the precomputed arrays: close, dates, ema20, ema200
 
     Use np.searchsorted(dates, np.datetime64(date_str)) to find the current index.
     """
-    # TODO: implement
-    return 1.0
+    # TODO: implement — must return a dynamic score, NOT 1.0
+    # Example: compute current EMA20/EMA200 spread, normalize, combine with market cap
+    return 0.5
 
 
 def exit_check(ticker: str, date_str: str, holding: dict, stock_db: dict) -> Optional[str]:

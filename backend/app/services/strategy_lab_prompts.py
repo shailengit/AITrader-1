@@ -64,7 +64,8 @@ def entry_score(candidate: dict, market_cap_stats: dict) -> float:
 
 def holding_score(ticker: str, date_str: str, holding: dict, market_cap_stats: dict) -> float:
     """Re-score an existing holding. holding._stock_data is the precomputed entry.
-    Return a float in [0, 1]. 0 means "weak, rotate out"."""
+    Return a float in [0, 1]. 0 means "weak, rotate out".
+    ⚠️  MUST return a DYNAMIC score — returning 1.0 disables rotation and LOSES money."""
     pass
 
 def exit_check(ticker: str, date_str: str, holding: dict, stock_db: dict) -> Optional[str]:
@@ -130,25 +131,19 @@ def make_code_prompt(plan: str) -> List[Dict[str, str]]:
     except Exception:
         template_code = "# (template not found)"
 
-    # Load learnings from the ever-evolving reference file
+    # Load learnings from the ever-evolving reference file (full content)
     _learnings_path = Path(__file__).resolve().parent / "strategy_lab_learnings.md"
     try:
-        learnings = _learnings_path.read_text()
-        # Only include the Golden Rules and Anti-Patterns sections
-        learnings_sections = []
-        capture = False
-        for line in learnings.split("\n"):
-            if line.startswith("## Golden Rules"):
-                capture = True
-            if line.startswith("## Known Anti-Patterns"):
-                capture = True
-            if line.startswith("## Validation Checklist"):
-                capture = False
-            if capture:
-                learnings_sections.append(line)
-        learnings_text = "\n".join(learnings_sections)
+        learnings_text = _learnings_path.read_text()
     except Exception:
         learnings_text = ""
+
+    # Load the gold-standard reference strategy (full file)
+    _gold_path = Path(__file__).resolve().parent.parent.parent.parent / "strategies" / "golden_cross_rotation.py"
+    try:
+        gold_text = _gold_path.read_text()
+    except Exception:
+        gold_text = ""
 
     return [
         {
@@ -179,7 +174,22 @@ def make_code_prompt(plan: str) -> List[Dict[str, str]]:
                 "10. Wrap `get_safe_table_name(ticker)` in try/except ValueError and `continue`\n"
                 "11. Always call `.mean()` on `.ewm()` before accessing `.values`: "
                 "`close.ewm(span=20, adjust=False).mean().values` — "
-                "`ExponentialMovingWindow` has no `.values` attribute\n\n"
+                "`ExponentialMovingWindow` has no `.values` attribute\n"
+                "12. ⚠️  holding_score() MUST return a DYNAMIC score based on current indicator "
+                "values (e.g. current EMA20/EMA200 spread, RSI, etc.). "
+                "Returning 1.0 disables rotation and will produce a LOSING strategy. "
+                "Always re-score using the current indicator state from holding._stock_data.\n"
+                "13. ⚠️  TAKE_PROFIT must be enabled at a reasonable level (e.g. 0.20-0.30). "
+                "Setting it to 999.0 (disabled) means winners never get locked in — "
+                "they reverse and become losers. Only disable for strategies that "
+                "explicitly don't want take profit.\n"
+                "14. ⚠️  TIME_STOP_DAYS must be set to a reasonable value (e.g. 60-120). "
+                "Setting it to 9999 (disabled) means stagnant positions are held "
+                "indefinitely, blocking better opportunities.\n"
+                "15. ⚠️  MIN_HOLD_DAYS should be >= 7 to prevent excessive churn. "
+                "Setting it to 0 means positions can be rotated out the day after entry.\n\n"
+                "GOLD STANDARD REFERENCE (study these patterns — your code should follow the same style):\n"
+                f"```python\n{gold_text}\n```\n\n"
                 "ENGINE CONTRACT (do not reproduce this code, just match the signatures):\n"
                 f"{ENGINE_CONTRACT}"
             ),

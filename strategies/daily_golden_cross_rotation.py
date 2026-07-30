@@ -734,6 +734,56 @@ def main():
         json.dump(summary, f, indent=2)
     print(f"  📊 Data exported to {report_dir}/")
 
+    # ── Generate interactive HTML run viewer ─────────────────────────────────
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+        from app.services.run_viewer_generator import generate_run_viewer
+
+        # Build experiment-like dicts for the generator
+        sell_trades_sorted = sorted(sell_trades, key=lambda t: t.get("pnl_dollars", 0), reverse=True)
+        top_winners = sell_trades_sorted[:5]
+        top_losers = sell_trades_sorted[-5:] if len(sell_trades_sorted) >= 5 else sell_trades_sorted[::-1]
+
+        summary["top_winners"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_winners
+        ]
+        summary["top_losers"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_losers
+        ]
+
+        strategy_params = {
+            "AS_OF": AS_OF, "END": END, "CAPITAL": CAPITAL,
+            "MAX_HOLDINGS": MAX_HOLDINGS, "MIN_HOLD_DAYS": MIN_HOLD_DAYS,
+            "TRAILING_STOP": TRAILING_STOP, "TAKE_PROFIT": TAKE_PROFIT,
+            "TIME_STOP_DAYS": TIME_STOP_DAYS, "MAX_SECTOR_COUNT": MAX_SECTOR_COUNT,
+            "ANGLE_WEIGHT": ANGLE_WEIGHT, "CAP_WEIGHT": CAP_WEIGHT,
+            "BULL_EXPOSURE": BULL_EXPOSURE, "BEAR_EXPOSURE": BEAR_EXPOSURE,
+        }
+
+        report_path = generate_run_viewer(
+            experiments=[{
+                "status": "completed",
+                "kpis": summary,
+                "start_date": AS_OF,
+                "end_date": END,
+                "run_index": 1,
+            }],
+            strategy_name="Daily Golden Cross Rotation",
+            strategy_code=open(__file__).read(),
+            strategy_params=strategy_params,
+        )
+        # OSC 8 terminal hyperlink for clickable link
+        link_esc = f"\033]8;;file://{report_path}\033\\"
+        link_close = "\033]8;;\033\\"
+        print(f"  📊 Interactive report: {link_esc}{report_path}{link_close}")
+        print(f"  💡 Click the link above or run: open '{report_path}'")
+    except Exception as e:
+        print(f"  ⚠️  Could not generate HTML report: {e}")
+
 
 if __name__ == "__main__":
     main()

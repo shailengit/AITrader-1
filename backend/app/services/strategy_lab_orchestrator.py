@@ -57,6 +57,8 @@ class ExperimentBatch:
     start_date_min: str
     start_date_max: str
     code_text: str
+    # Optional: exact start dates to reuse (from a previous batch for apples-to-apples comparison)
+    fixed_start_dates: Optional[List[str]] = None
     # Thread-safe queue (not asyncio.Queue — we run from worker threads)
     queue: thread_queue.Queue = field(default_factory=thread_queue.Queue)
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -200,6 +202,25 @@ def _run_one(
             indices = [0] + [int(i * step) for i in range(1, 498)] + [len(equity_curve) - 1]
             equity_curve = [equity_curve[i] for i in sorted(set(indices))]
 
+        # Extract top winners/losers from trades for the report
+        trades = result_data.get("trades", [])
+        sell_trades = [t for t in trades if t.get("side") == "SELL"]
+        sell_trades_sorted = sorted(sell_trades, key=lambda t: t.get("pnl_dollars", 0), reverse=True)
+        top_winners = sell_trades_sorted[:5]
+        top_losers = sell_trades_sorted[-5:] if len(sell_trades_sorted) >= 5 else sell_trades_sorted[::-1]
+
+        # Add trade details to KPIs for the report
+        summary["top_winners"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_winners
+        ]
+        summary["top_losers"] = [
+            {"ticker": t.get("ticker", ""), "return_pct": t.get("return_pct", 0),
+             "pnl_dollars": t.get("pnl_dollars", 0), "exit_reason": t.get("exit_reason", "")}
+            for t in top_losers
+        ]
+
         return {
             "run_index": run_index,
             "status": "completed",
@@ -229,8 +250,14 @@ def run_batch(
     end_date: str,
     start_date_min: str,
     start_date_max: str,
+    fixed_start_dates: Optional[List[str]] = None,
 ) -> str:
     """Start a batch of n_runs backtests in a background thread.
+
+    If fixed_start_dates is provided (list of YYYY-MM-DD strings), those exact
+    dates are used instead of generating random ones. This enables apples-to-apples
+    comparison when refining a strategy — the refined strategy runs on the same
+    time windows as the original.
 
     Returns the batch_id immediately. The actual runs execute in a thread
     pool; each result is persisted to the DB and pushed to the in-memory
@@ -245,6 +272,7 @@ def run_batch(
         start_date_min=start_date_min,
         start_date_max=start_date_max,
         code_text=code_text,
+        fixed_start_dates=fixed_start_dates,
     )
     _RUNNING_BATCHES[batch_id] = batch
 
@@ -272,23 +300,34 @@ def run_batch(
 
     def _worker():
         import traceback as _tb
+        # Collect all results for the report
+        all_results: List[Dict[str, Any]] = []
         try:
             # Log that worker started
             with open("/tmp/strategy_lab_worker.log", "a") as _f:
                 _f.write(f"Worker started for batch {batch_id}\n")
-            with ThreadPoolExecutor(max_workers=min(4, n_runs)) as ex:
+            with ThreadPoolExecutor(max_workers=1) as ex:
                 futures = []
                 for i in range(n_runs):
-                    as_of = _random_date_in_range(start_date_min, start_date_max)
+                    # Use fixed start dates if provided (apples-to-apples comparison)
+                    if batch.fixed_start_dates and i < len(batch.fixed_start_dates):
+                        as_of = batch.fixed_start_dates[i]
+                    else:
+                        as_of = _random_date_in_range(start_date_min, start_date_max)
                     fut = ex.submit(_run_one, code_text, session_id, as_of, end_date, i + 1)
                     futures.append(fut)
 
                 for fut in as_completed(futures):
                     try:
-                        result = fut.result()
+                        result = fut.result(timeout=120)  # 2 min per experiment
+                    except TimeoutError:
+                        logger.warning("Experiment timed out after 120s")
+                        continue
                     except Exception as run_err:
                         logger.exception("Run failed: %s", run_err)
                         continue
+                    # Collect for report
+                    all_results.append(result)
                     # Persist to DB (durable, survives SSE disconnects)
                     _persist_event(result)
                     # Push to in-memory queue (SSE stream)
@@ -298,6 +337,11 @@ def run_batch(
             with open("/tmp/strategy_lab_worker.log", "a") as _f:
                 _f.write(f"Batch {batch_id} failed: {e}\n{_tb.format_exc()}\n")
         finally:
+            # Generate run viewer report after all runs complete
+            try:
+                _generate_batch_report(batch, all_results)
+            except Exception as report_err:
+                logger.exception("Failed to generate batch report: %s", report_err)
             # Mark done and push sentinel
             with batch.lock:
                 batch.is_done = True
@@ -346,3 +390,67 @@ def is_batch_done(batch_id: str) -> bool:
         return True
     with batch.lock:
         return batch.is_done
+
+
+def _generate_batch_report(batch: ExperimentBatch, results: List[Dict[str, Any]]):
+    """Generate the interactive HTML run-viewer report after a batch completes.
+
+    Extracts strategy parameters from the code_text, generates the report,
+    and logs the file path so the user can open it.
+    """
+    from app.services.run_viewer_generator import generate_run_viewer
+
+    # Extract strategy name and parameters from code_text
+    strategy_name = "Unnamed Strategy"
+    strategy_params = {}
+
+    code_text = batch.code_text
+    if code_text:
+        # Extract STRATEGY_NAME
+        import re
+        name_match = re.search(r'STRATEGY_NAME\s*=\s*"([^"]+)"', code_text)
+        if name_match:
+            strategy_name = name_match.group(1)
+
+        # Extract key parameters
+        param_patterns = [
+            "AS_OF", "END", "CAPITAL", "MAX_HOLDINGS", "MIN_HOLD_DAYS",
+            "TRAILING_STOP", "TAKE_PROFIT", "TIME_STOP_DAYS",
+            "MAX_SECTOR_COUNT", "BULL_EXPOSURE", "BEAR_EXPOSURE",
+            "ANGLE_WEIGHT", "CAP_WEIGHT",
+        ]
+        for param in param_patterns:
+            m = re.search(rf'{param}\s*=\s*([^\n#]+)', code_text)
+            if m:
+                val = m.group(1).strip().strip('"').strip("'")
+                strategy_params[param] = val
+
+    report_path = generate_run_viewer(
+        experiments=results,
+        strategy_name=strategy_name,
+        strategy_code=code_text,
+        strategy_params=strategy_params,
+        batch_id=batch.batch_id,
+        session_id=batch.session_id,
+    )
+
+    # Log the report path prominently with a clickable terminal hyperlink
+    # OSC 8 escape sequence for clickable links in modern terminals
+    link_esc = f"\033]8;;file://{report_path}\033\\"
+    link_close = "\033]8;;\033\\"
+    clickable_link = f"{link_esc}📊 {report_path}{link_close}"
+
+    logger.info(
+        "Batch report generated: file://%s",
+        report_path,
+    )
+    print(f"\n{'='*70}")
+    print(f"  📊 BATCH REPORT GENERATED")
+    print(f"  {'='*70}")
+    print(f"  Strategy: {strategy_name}")
+    print(f"  Runs:     {len(results)} ({sum(1 for r in results if r.get('status')=='completed')} completed)")
+    print(f"  Report:   {clickable_link}")
+    print(f"  {'='*70}")
+    print(f"  💡 Click the link above or open in browser:")
+    print(f"     open '{report_path}'")
+    print(f"{'='*70}\n")
