@@ -809,14 +809,21 @@ def summarize_batch(
 
 
 class RefineStrategyRequest(BaseModel):
+    instruction: str = Field(default="", description="Optional user instruction for the AI to focus on")
     model: Optional[str] = None
+    validation_runs: int = Field(default=10, ge=1, le=50)
 
 
 class RefineStrategyResponse(BaseModel):
-    diff: str = ""
+    code: str = ""
     summary: str = ""
     rationale: str = ""
-    error: Optional[str] = None  # the LLM's reasoning
+    before_kpis: Dict[str, Any] = Field(default_factory=dict)
+    after_kpis: Dict[str, Any] = Field(default_factory=dict)
+    validation_log: List[str] = Field(default_factory=list)
+    validation_status: str = "unknown"
+    version: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 
 @router.post("/sessions/{session_id}/batches/{batch_id}/refine", response_model=RefineStrategyResponse)
@@ -826,10 +833,14 @@ def refine_strategy_after_batch(
     body: RefineStrategyRequest,
     db: Session = Depends(get_db),
 ):
-    """LLM proposes a code change based on the worst-performing runs of a batch."""
+    """LLM proposes a code change based on the worst-performing runs of a batch + user instruction.
+
+    Uses the complete-file approach (not diff) — generates modified code, validates
+    with a single backtest run, and auto-saves to library.
+    """
     from app.services.strategy_lab_experiments import list_experiments, get_batch_stats, list_batch_summaries
-    from app.services.strategy_lab_llm import refine_strategy
-    from app.services.strategy_lab_diff import diff_summary
+    from app.services.strategy_lab_llm import refine_strategy_with_instruction
+    from app.services.strategy_lab_session import update_session as svc_update_session
     sess = svc_get_session(db, session_id)
     if sess is None or not sess.code_text:
         raise HTTPException(status_code=400, detail="session has no code_text")
@@ -839,14 +850,124 @@ def refine_strategy_after_batch(
     summaries = list_batch_summaries(db, session_id=session_id, batch_id=batch_id)
     summary_text = summaries[0].summary_text if summaries else ""
     worst_table = json.dumps(stats["worst_3"], indent=2, default=str)
-    diff, err = refine_strategy(sess.code_text, summary_text, worst_table, model=body.model)
-    if err or diff is None:
+
+    # Compute before_kpis from batch stats
+    all_scored = (stats.get("top_3") or []) + (stats.get("worst_3") or [])
+    if all_scored:
+        rets = [r.get("kpis", {}).get("total_return_pct", 0) or 0 for r in all_scored]
+        shs = [r.get("kpis", {}).get("sharpe_ratio", 0) or 0 for r in all_scored]
+        wrs = [r.get("kpis", {}).get("win_rate", 0) or 0 for r in all_scored]
+        trs = [r.get("kpis", {}).get("total_trades", 0) or 0 for r in all_scored]
+        dds = [r.get("kpis", {}).get("max_drawdown_pct", 0) or 0 for r in all_scored]
+        before_kpis = {
+            "total_return_pct": sum(rets) / len(rets) if rets else None,
+            "sharpe_ratio": sum(shs) / len(shs) if shs else None,
+            "win_rate": sum(wrs) / len(wrs) if wrs else None,
+            "total_trades": sum(trs) / len(trs) if trs else None,
+            "max_drawdown_pct": sum(dds) / len(dds) if dds else None,
+        }
+    else:
+        before_kpis = {}
+
+    # Call LLM to generate modified code
+    modified_code, change_summary, err = refine_strategy_with_instruction(
+        sess.code_text, body.instruction, summary_text, worst_table,
+        model=body.model,
+    )
+    if err or modified_code is None:
         logger.error("Refine strategy failed: %s", err)
-        return RefineStrategyResponse(diff="", summary="", rationale="", error=err or "LLM returned no diff")
+        return RefineStrategyResponse(
+            code="", summary="", rationale="",
+            before_kpis=before_kpis, after_kpis={},
+            validation_log=[], validation_status="failed",
+            error=err or "LLM returned no code",
+        )
+
+    # Run a single validation backtest using the orchestrator's _run_one
+    validation_log = []
+    validation_status = "passed"
+    after_kpis = {}
+    try:
+        from app.services.strategy_lab_orchestrator import _run_one
+
+        # Parse date range from the original batch
+        batch_experiments = list_experiments(db, session_id, batch_id=batch_id)
+        start_dates = [e.start_date for e in batch_experiments if e.start_date and e.status == "completed"]
+        if start_dates:
+            min_date = min(start_dates)
+            max_date = max(start_dates)
+            min_date_str = min_date.isoformat()[:10] if hasattr(min_date, 'isoformat') else str(min_date)[:10]
+            max_date_str = max_date.isoformat()[:10] if hasattr(max_date, 'isoformat') else str(max_date)[:10]
+        else:
+            min_date_str = "2020-01-01"
+            max_date_str = "2024-01-01"
+
+        # Use the median start date for validation
+        val_dates = sorted(set(
+            str(d)[:10] for d in start_dates
+        )) if start_dates else [min_date_str]
+        median_date = val_dates[len(val_dates) // 2] if val_dates else min_date_str
+
+        result = _run_one(
+            code_text=modified_code,
+            session_id=str(session_id),
+            as_of=median_date,
+            end_date=max_date_str,
+            run_index=999,
+        )
+        if result["status"] == "completed" and result.get("kpis"):
+            k = result["kpis"]
+            after_kpis = {
+                "total_return_pct": k.get("total_return_pct", 0),
+                "sharpe_ratio": k.get("sharpe_ratio", 0),
+                "win_rate": k.get("win_rate", 0),
+                "total_trades": k.get("total_trades", 0),
+                "max_drawdown_pct": k.get("max_drawdown_pct", 0),
+            }
+            validation_log.append(f"Validation backtest: OK (return={k.get('total_return_pct', 0):.1f}%)")
+        else:
+            validation_log.append(f"Validation backtest: FAILED ({result.get('error_message', 'unknown')})")
+            validation_status = "partial"
+
+    except Exception as e:
+        logger.warning("Validation backtest failed: %s", e)
+        validation_log.append(f"Validation error: {e}")
+        validation_status = "partial"
+
+    # Auto-save to library using save_strategy
+    version_info = None
+    try:
+        from app.services.strategy_lab_library import save_strategy
+        meta = save_strategy(
+            name=f"{sess.name or 'strategy'}-v{1}",
+            code=modified_code,
+            prompt=sess.prompt or "",
+            plan=sess.plan_text or "",
+            kpis=after_kpis or None,
+            change_description=change_summary or (summary_text[:100] if summary_text else "AI-refined strategy"),
+            model_id=sess.model_id,
+            session_id=str(session_id),
+        )
+        version_info = {
+            "version": meta["version"],
+            "strategy_name": meta["strategy_name"],
+            "change_description": meta["change_description"],
+        }
+    except Exception as e:
+        logger.warning("Auto-save to library failed: %s", e)
+
+    # Save code to session
+    svc_update_session(db, session_id, code_text=modified_code)
+
     return RefineStrategyResponse(
-        diff=diff,
-        summary=diff_summary(diff),
-        rationale=summary_text[:200] + "..." if summary_text else "",
+        code=modified_code,
+        summary=change_summary or "Code updated",
+        rationale=summary_text[:300] + "..." if summary_text and len(summary_text) > 300 else (summary_text or ""),
+        before_kpis=before_kpis,
+        after_kpis=after_kpis,
+        validation_log=validation_log,
+        validation_status=validation_status,
+        version=version_info,
     )
 
 
