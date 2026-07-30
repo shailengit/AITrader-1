@@ -312,8 +312,6 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
                 <PostBatchActions
                   onSummarize={() => summarize.mutate()}
                   isSummarizing={summarize.isPending}
-                  onRefine={() => refineMut.mutate()}
-                  isRefining={refineMut.isPending}
                   onAnotherBatch={() => { setBatchId(null); setPreviousStartDates(null); }}
                   summary={summary}
                   refine={refine}
@@ -321,7 +319,6 @@ export function StepBacktest({ session, onWinnerPicked }: StepBacktestProps) {
                   onRejectRefine={() => { setRefine(null); setRefineStep("idle"); }}
                   isApplying={apply.isPending}
                   applyError={applyError}
-                  // NEW props
                   refineInstruction={refineInstruction}
                   setRefineInstruction={setRefineInstruction}
                   refineStep={refineStep}
@@ -641,14 +638,12 @@ function ExperimentRowView({ row, isSelected, onPick, onShowEquity }: {
 // ── Post-batch actions ────────────────────────────────────────────────
 function PostBatchActions(props: {
   onSummarize: () => void; isSummarizing: boolean;
-  onRefine: () => void; isRefining: boolean;
   onAnotherBatch: () => void;
   summary: SummarizeResponse | null;
   refine: RefineStrategyResponse | null;
-  onAcceptRefine: (diff: string) => void; onRejectRefine: () => void;
+  onAcceptRefine: (code: string) => void; onRejectRefine: () => void;
   isApplying: boolean;
   applyError: string | null;
-  // NEW props
   refineInstruction: string;
   setRefineInstruction: (v: string) => void;
   refineStep: "idle" | "input" | "review" | "done";

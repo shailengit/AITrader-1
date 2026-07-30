@@ -125,10 +125,8 @@ export function ChatPanel({ sessionId, defaultModelId, onReRun }: ChatPanelProps
   });
 
   const saveToLib = useMutation({
-    mutationFn: () => strategyLabApi.saveToLibrary(sessionId, {
-      name: saveName,
-      change_description: saveDescription,
-    }),
+    mutationFn: (body: { name: string; change_description: string }) =>
+      strategyLabApi.saveToLibrary(sessionId, body),
     onSuccess: () => {
       setSaveDialogOpen(false);
       setPendingSave(false);
@@ -434,7 +432,7 @@ export function ChatPanel({ sessionId, defaultModelId, onReRun }: ChatPanelProps
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
-                onClick={() => saveToLib.mutate()}
+                onClick={() => saveToLib.mutate({ name: saveName, change_description: saveDescription })}
                 disabled={!saveName.trim() || saveToLib.isPending}
                 className="slab-btn slab-btn--sm slab-btn--primary"
               >
