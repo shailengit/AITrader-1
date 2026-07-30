@@ -106,9 +106,18 @@ export interface SummarizeResponse {
 }
 
 export interface RefineStrategyResponse {
-  diff: string;
+  code: string;
   summary: string;
   rationale: string;
+  before_kpis: Record<string, any>;
+  after_kpis: Record<string, any>;
+  validation_log: string[];
+  validation_status: string;  // "passed" | "partial" | "failed"
+  version: {
+    version: number;
+    strategy_name: string;
+    change_description: string;
+  } | null;
   error?: string;
 }
 
@@ -265,7 +274,7 @@ export const strategyLabApi = {
   summarizeBatch: (id: string, batchId: string, body: { model?: string } = {}) =>
     postJson<SummarizeResponse>(`${base}/sessions/${id}/batches/${batchId}/summarize`, body),
 
-  refineAfterBatch: (id: string, batchId: string, body: { model?: string } = {}) =>
+  refineAfterBatch: (id: string, batchId: string, body: { model?: string; instruction?: string } = {}) =>
     postJson<RefineStrategyResponse>(`${base}/sessions/${id}/batches/${batchId}/refine`, body),
 
   deploy: (id: string, body: { experiment_id: string; class_name?: string }) =>
