@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
@@ -18,8 +18,14 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const onReadyRef = useRef(onReady);
+  const onDisconnectedRef = useRef(onDisconnected);
 
-  const connect = useCallback(() => {
+  // Keep callback refs in sync without triggering re-renders
+  onReadyRef.current = onReady;
+  onDisconnectedRef.current = onDisconnected;
+
+  useEffect(() => {
     if (!containerRef.current) return;
 
     // Create xterm.js terminal
@@ -58,8 +64,9 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
     term.loadAddon(fitAddon);
     term.open(containerRef.current);
 
-    // Fit terminal to container after a short delay (needs layout to settle)
-    setTimeout(() => fitAddon.fit(), 50);
+    // Fit terminal to container after layout settles
+    const fitTerminal = () => fitAddon.fit();
+    setTimeout(fitTerminal, 50);
 
     termRef.current = term;
 
@@ -69,7 +76,6 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
 
     ws.onopen = () => {
       term.focus();
-      // Send initial terminal size
       const dims = fitAddon.proposeDimensions();
       if (dims) {
         ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
@@ -82,7 +88,7 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "ready") {
-            onReady?.();
+            onReadyRef.current?.();
             return;
           }
           if (msg.type === "info") {
@@ -109,7 +115,7 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
     };
 
     ws.onclose = (event) => {
-      onDisconnected?.(event.code);
+      onDisconnectedRef.current?.(event.code);
     };
 
     ws.onerror = () => {
@@ -135,18 +141,13 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
       observer.observe(containerRef.current);
     }
 
-    // Cleanup on unmount
+    // Cleanup on unmount or sessionId change
     return () => {
       observer.disconnect();
       ws.close();
       term.dispose();
     };
-  }, [sessionId, onReady, onDisconnected]);
-
-  useEffect(() => {
-    const cleanup = connect();
-    return () => cleanup?.();
-  }, [connect]);
+  }, [sessionId]); // Only reconnect when sessionId changes
 
   return (
     <div

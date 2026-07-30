@@ -14,6 +14,10 @@ export default function TerminalPage() {
     setExitCode(undefined);
   }, []);
 
+  const handleReady = useCallback(() => {
+    setStatus("connected");
+  }, []);
+
   const handleDisconnected = useCallback((code?: number) => {
     setStatus("disconnected");
     setExitCode(code);
@@ -137,7 +141,7 @@ export default function TerminalPage() {
         ) : (
           <TerminalComponent
             sessionId={sessionId}
-            onReady={() => setStatus("connected")}
+            onReady={handleReady}
             onDisconnected={handleDisconnected}
           />
         )}
