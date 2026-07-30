@@ -435,6 +435,60 @@ def refine_strategy(current_code: str, summary: str, worst_runs_table: str,
     return diff, None
 
 
+def refine_strategy_with_instruction(
+    current_code: str,
+    instruction: str,
+    batch_summary: str,
+    worst_runs_table: str,
+    model: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Modify strategy code based on batch performance + user instruction.
+
+    The LLM produces the COMPLETE modified file (not a diff). Returns
+    (modified_code, change_summary, error).
+    """
+    from app.services.strategy_lab_prompts import make_refine_strategy_direct_prompt
+
+    messages = make_refine_strategy_direct_prompt(
+        current_code, instruction, batch_summary, worst_runs_table,
+    )
+    content, finish_reason, err = _chat(messages, model=model, max_tokens=16384, temperature=0.2)
+    if err:
+        return None, None, err
+
+    # Extract the code block
+    modified = _extract_code_block(content or "")
+    if modified is None:
+        if finish_reason == "length":
+            detail = "response was truncated (finish_reason=length) before closing the ```python fence"
+        else:
+            detail = "response contained no ```python code block"
+        return None, None, f"LLM {detail} (content length={len(content or '')})"
+
+    # Extract the summary from the ## SUMMARY: marker
+    summary_text = ""
+    summary_match = re.search(r'## SUMMARY:\s*(.+?)(?:\n|$)', content or "")
+    if summary_match:
+        summary_text = summary_match.group(1).strip()
+
+    # Validate syntax
+    import ast
+    try:
+        ast.parse(modified)
+    except SyntaxError as e:
+        return None, None, f"Refine produced invalid syntax: {e}"
+
+    # Validate strategy-specific anti-patterns
+    warnings = _validate_strategy_code(modified)
+    if warnings:
+        logger.warning("Refined strategy code validation warnings:\n%s", "\n".join(warnings))
+
+    # Auto-fix common bugs
+    modified = _fix_common_code_bugs(modified)
+
+    return modified, summary_text, None
+
+
 def debug_code(code: str, error: str, model: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Given a failing strategy and its error, ask the LLM to produce a fixed version.
 
