@@ -13,6 +13,7 @@ import MarkovChartView from './pages/Markov/MarkovChartView'
 import CoachIndex from './pages/Coach'
 import CoachTrades from './pages/Coach/trades'
 import StrategyLabPage from './pages/StrategyLab'
+import TerminalPage from './pages/Terminal'
 
 function App() {
   return (
@@ -76,6 +77,11 @@ function App() {
             <Route path="strategy-lab" element={
               <ErrorBoundary>
                 <StrategyLabPage />
+              </ErrorBoundary>
+            } />
+            <Route path="terminal" element={
+              <ErrorBoundary>
+                <TerminalPage />
               </ErrorBoundary>
             } />
           </Route>

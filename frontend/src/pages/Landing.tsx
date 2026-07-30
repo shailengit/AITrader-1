@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar, BookOpen, FlaskConical } from 'lucide-react'
+import { Database, ArrowRight, Sparkles, TrendingUp, Code, Gauge, Calendar, BookOpen, FlaskConical, Terminal } from 'lucide-react'
 import { ThemeToggle } from '../components/ui'
 import { useTheme } from '../context/ThemeContext'
 
@@ -63,6 +63,16 @@ const tools = [
     link: '/strategy-lab',
     stat: '5-step workflow',
     detail: 'Auto-generated strategy code with OOS-validated deploy',
+  },
+  {
+    id: 'terminal',
+    title: 'AI Terminal',
+    description: 'Full Claude Code CLI in your browser. Read, write, run code, git, and more.',
+    icon: Terminal,
+    accent: '#10B981',
+    link: '/terminal',
+    stat: 'Claude Code',
+    detail: 'Direct project access with all tools and skills',
   },
 ]
 
