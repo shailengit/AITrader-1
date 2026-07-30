@@ -2,6 +2,7 @@
 
 import json
 import logging
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.terminal_manager import manager
 
@@ -25,21 +26,27 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
         await websocket.close()
         return
 
-    import asyncio
-
-    # Get or create session (spawn Claude Code in background to avoid blocking)
+    # Get or create session (spawns Claude Code in a background thread)
     term_session = manager.get_session(session)
     if term_session is None:
         await websocket.send_json({"type": "info", "message": "Starting Claude Code session..."})
-        try:
-            # Run the blocking spawn in a thread to not block the event loop
-            loop = asyncio.get_event_loop()
-            term_session = await loop.run_in_executor(None, lambda: manager.create_session(session))
-            await websocket.send_json({"type": "ready"})
-        except RuntimeError as e:
-            await websocket.send_json({"type": "error", "message": str(e)})
+        term_session = manager.create_session(session)
+
+        # Wait for the process to start (up to 30s)
+        started = term_session.wait_ready(timeout=30.0)
+        if not started:
+            await websocket.send_json({"type": "error", "message": "Timed out waiting for Claude Code to start"})
             await websocket.close()
+            manager.destroy_session(session)
             return
+
+        if term_session.error:
+            await websocket.send_json({"type": "error", "message": term_session.error})
+            await websocket.close()
+            manager.destroy_session(session)
+            return
+
+        await websocket.send_json({"type": "ready"})
 
     logger.info("WebSocket connected: session=%s", session)
 
@@ -53,7 +60,7 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
                 elif not term_session.is_alive():
                     await websocket.send_json({
                         "type": "exit",
-                        "code": term_session.process.exitstatus if term_session.process else -1,
+                        "code": -1,
                     })
                     break
                 else:
