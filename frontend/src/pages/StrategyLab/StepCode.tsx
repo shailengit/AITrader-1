@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowRight, Wand2, FileCode, Save, RefreshCw, AlertCircle, CheckCircle, Activity } from "lucide-react";
 import { strategyLabApi, type StrategySession } from "../../lib/strategyLab";
 import { ChatPanel } from "../../components/strategy-lab/ChatPanel";
+import AgentProgress from "../../components/quantgen/AgentProgress";
 
 interface StepCodeProps {
   session: StrategySession;
@@ -43,6 +44,7 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
 
   const [validationLog, setValidationLog] = useState<string[]>([]);
   const [validationAttempts, setValidationAttempts] = useState(0);
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
 
   const generate = useMutation({
     mutationFn: () => strategyLabApi.generateCode(session.id, { model }),
@@ -58,6 +60,20 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
         setValidationAttempts(0);
       }
     },
+  });
+
+  const generateAgent = useMutation({
+    mutationFn: () => strategyLabApi.generateWithAgent(session.id, { model }),
+    onSuccess: (r) => {
+      setAgentSessionId(r.agent_session_id);
+    },
+  });
+
+  // Refresh session data to get the latest code after agent completes
+  const { refetch: refetchSession } = useQuery({
+    queryKey: ["strategy-session", session.id],
+    queryFn: () => strategyLabApi.getSession(session.id),
+    enabled: false,
   });
 
   const save = useMutation({
@@ -96,13 +112,13 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
   // the LLM takes to write the strategy code (or fails).
   const [codeElapsed, setCodeElapsed] = useState(0);
   useEffect(() => {
-    if (!generate.isPending && !refine.isPending) return;
+    if (!generate.isPending && !refine.isPending && !generateAgent.isPending) return;
     const startedAt = Date.now();
     setCodeElapsed(0);
     const id = setInterval(() => setCodeElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generate.isPending, refine.isPending]);
+  }, [generate.isPending, refine.isPending, generateAgent.isPending]);
 
   // Build a synthetic class file name from the session name
   const fileName = (session.name || "strategy")
@@ -191,7 +207,27 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
 
         {/* Action row */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, maxWidth: 1280, flexWrap: "wrap" }}>
-          {generate.isPending ? (
+          {agentSessionId ? (
+            <AgentProgress
+              sessionId={agentSessionId}
+              onComplete={(code, _kpis) => {
+                if (code) setCode(code);
+                setAgentSessionId(null);
+                // Also refresh the session to persist
+                refetchSession();
+              }}
+              onError={(err) => {
+                console.error("Agent error:", err);
+                setAgentSessionId(null);
+              }}
+              isDarkMode={true}
+            />
+          ) : generateAgent.isPending ? (
+            <span className="slab-status slab-status--live">
+              <span className="slab-status__dot" />
+              Starting agent...
+            </span>
+          ) : generate.isPending ? (
             <span className="slab-status slab-status--live">
               <span className="slab-status__dot" />
               Generating code
@@ -200,15 +236,26 @@ export function StepCode({ session, model, onCodeReady }: StepCodeProps) {
               </span>
             </span>
           ) : (
-            <button
-              type="button"
-              onClick={() => generate.mutate()}
-              disabled={!session.plan_text}
-              className="slab-btn"
-            >
-              <RefreshCw size={11} />
-              {isInitialState ? "Generate code" : "Regenerate code"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => generateAgent.mutate()}
+                disabled={!session.plan_text || generateAgent.isPending}
+                className="slab-btn slab-btn--primary"
+              >
+                <Activity size={11} />
+                {isInitialState ? "Generate with Agent" : "Regenerate with Agent"}
+              </button>
+              <button
+                type="button"
+                onClick={() => generate.mutate()}
+                disabled={!session.plan_text}
+                className="slab-btn"
+              >
+                <RefreshCw size={11} />
+                Generate code (simple)
+              </button>
+            </>
           )}
 
           {save.isPending && (

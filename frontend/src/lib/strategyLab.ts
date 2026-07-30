@@ -254,6 +254,9 @@ export const strategyLabApi = {
   generateCode: (id: string, body: { model?: string; plan_text?: string } = {}) =>
     postJson<GenerateCodeResponse>(`${base}/sessions/${id}/generate-code`, body, 300000),
 
+  generateWithAgent: (id: string, body: { model?: string; plan_text?: string } = {}) =>
+    postJson<{ agent_session_id: string; message: string }>(`${base}/sessions/${id}/generate-code-agent`, body),
+
   refineCode: (id: string, body: { model?: string; current_code?: string; instruction: string }) =>
     postJson<RefineCodeResponse>(`${base}/sessions/${id}/refine-code`, body),
 
