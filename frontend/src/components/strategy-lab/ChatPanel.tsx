@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, RefreshCw, AlertCircle, MessageSquare, Wand2, Save } from "lucide-react";
+import { Send, Bot, User, RefreshCw, AlertCircle, MessageSquare, Wand2, Save, RotateCcw } from "lucide-react";
 import { strategyLabApi, type ChatMessage } from "../../lib/strategyLab";
 
 interface ChatPanelProps {
   sessionId: string;
   defaultModelId: string;
+  onReRun?: () => void;
 }
 
-export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
+export function ChatPanel({ sessionId, defaultModelId, onReRun }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState(defaultModelId);
@@ -18,6 +19,7 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [applyingInstruction, setApplyingInstruction] = useState<string | null>(null);
   const [applyTimer, setApplyTimer] = useState(0);
+  const lastCodeChangeInstruction = useRef<string | null>(null);
   const [pendingSave, setPendingSave] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState(sessionId ? `strategy-${sessionId.slice(0, 8)}` : "strategy");
@@ -83,12 +85,20 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
     onSuccess: (r) => {
       setApplyingInstruction(null);
       setApplyTimer(0);
+
+      // Auto-save to library
+      const changeDesc = lastCodeChangeInstruction.current || "AI-suggested improvement";
+      saveToLib.mutate({
+        name: `strategy-${sessionId.slice(0, 8)}-v${Date.now()}`,
+        change_description: changeDesc,
+      });
+
       const statusMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         content: r.validation_status === "passed"
-          ? `✅ Change applied and verified with 10 backtest runs.`
-          : `⚠️ Change applied but some validation runs failed (${r.validation_status}). Check the code in Step 3.`,
+          ? `✅ Change applied and verified with backtest runs.`
+          : `⚠️ Change applied but some validation runs failed (${r.validation_status}).`,
         model_id: "system",
         critique_of: undefined,
         code_change_instruction: undefined,
@@ -335,6 +345,7 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
                       type="button"
                       onClick={() => {
                         setApplyingInstruction(msg.code_change_instruction!);
+                        lastCodeChangeInstruction.current = msg.code_change_instruction!;
                         applyChange.mutate(msg.code_change_instruction!);
                       }}
                       disabled={applyChange.isPending}
@@ -381,6 +392,15 @@ export function ChatPanel({ sessionId, defaultModelId }: ChatPanelProps) {
             >
               <Save size={10} /> Save to library
             </button>
+            {onReRun && (
+              <button
+                type="button"
+                onClick={onReRun}
+                className="slab-btn slab-btn--sm slab-btn--primary"
+              >
+                <RotateCcw size={10} /> Re-run with same dates
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setPendingSave(false)}
