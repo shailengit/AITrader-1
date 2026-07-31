@@ -1,8 +1,9 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "../ui/ThemeToggle";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, Terminal } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useEffect, useState } from "react";
+import { TerminalHost } from "../terminal/TerminalHost";
 
 const pageTitles: Record<string, string> = {
   "/sectors": "Sector Rotation Scanner",
@@ -12,6 +13,7 @@ const pageTitles: Record<string, string> = {
   "/markov": "Markov Chain Trader",
   "/coach": "Trade Coach",
   "/strategy-lab": "AI Strategy Builder",
+  "/terminal": "AI Terminal",
 };
 
 const REFERRER_KEY = "tc_last_app_referrer";
@@ -178,6 +180,36 @@ export default function Layout() {
                   Back to {referrer.label}
                 </button>
               )}
+            {location.pathname !== "/terminal" && (
+              <button
+                onClick={() => {
+                  clearAppReferrer();
+                  navigate("/terminal");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: `1px solid ${colors.border}`,
+                  cursor: "pointer",
+                  backgroundColor: "transparent",
+                  color: "#10B981",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <Terminal size={18} />
+                AI Terminal
+              </button>
+            )}
           </div>
         )}
         <div
@@ -287,6 +319,12 @@ export default function Layout() {
       >
         <Outlet />
       </main>
+
+      {/* TerminalHost — sibling of Outlet so route changes inside the
+          shell never unmount the terminal. TerminalHost reads
+          useLocation and morphs between full-page (when route is
+          /terminal) and FloatingPanel (anywhere else inside Layout). */}
+      <TerminalHost />
     </div>
   );
 }
