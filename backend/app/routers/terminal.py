@@ -1,8 +1,8 @@
 """WebSocket terminal router — streams Claude Code CLI to the browser."""
 
+import asyncio
 import json
 import logging
-import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.terminal_manager import manager
 
@@ -18,6 +18,10 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
     Each connection gets its own Claude Code process. The session
     parameter allows reconnection to an existing session within the
     idle timeout window.
+
+    PTY I/O is wired to asyncio via ``loop.add_reader()`` so the
+    master fd wakes the event loop when data is available, instead of
+    blocking the loop in a synchronous ``read()`` syscall.
     """
     await websocket.accept()
 
@@ -47,30 +51,86 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
             return
 
         await websocket.send_json({"type": "ready"})
+    else:
+        # Reconnecting to an existing session — cancel any pending
+        # destroy (StrictMode double-mount / transient blip) and tell
+        # the client we're already attached.
+        manager.cancel_pending_destroy(session)
+        if term_session.is_alive():
+            await websocket.send_json({
+                "type": "ready",
+                "reconnected": True,
+            })
+        else:
+            # Session exists but its Claude child has died (e.g. user
+            # exited Claude). Recreate with the same ID.
+            await websocket.send_json({
+                "type": "info",
+                "message": "Previous session ended. Starting new Claude Code session...",
+            })
+            term_session = manager.create_session(session)
+            started = term_session.wait_ready(timeout=30.0)
+            if not started or term_session.error:
+                msg = term_session.error or "Timed out waiting for Claude Code to start"
+                await websocket.send_json({"type": "error", "message": msg})
+                await websocket.close()
+                manager.destroy_session(session)
+                return
+            await websocket.send_json({"type": "ready"})
 
     logger.info("WebSocket connected: session=%s", session)
 
-    async def read_pty():
-        """Background task: poll PTY stdout and send to WebSocket."""
-        while True:
-            try:
-                data = term_session.read()
-                if data:
-                    await websocket.send_bytes(data)
-                elif not term_session.is_alive():
-                    await websocket.send_json({
-                        "type": "exit",
-                        "code": -1,
-                    })
-                    break
-                else:
-                    await asyncio.sleep(0.05)
-            except Exception:
-                break
+    loop = asyncio.get_running_loop()
+    reader_attached = False
+    exit_sent = False
 
-    read_task = asyncio.create_task(read_pty())
+    def on_pty_readable() -> None:
+        """Called by the event loop when the PTY master fd has data.
+
+        Runs on the event loop thread, so it's safe to call
+        ``websocket.send_*`` here. Uses non-blocking read so it
+        returns immediately if there's only a partial chunk.
+        """
+        nonlocal exit_sent
+        try:
+            data = term_session.read_nonblocking()
+        except Exception as e:
+            logger.warning("PTY read error: %s", e)
+            return
+        if data:
+            # Schedule send on the loop to avoid awaiting inside the
+            # synchronous reader callback.
+            asyncio.ensure_future(_safe_send_bytes(data), loop=loop)
+            return
+        # No data: either still warming up, or EOF (process died).
+        if not term_session.is_alive() and not exit_sent:
+            exit_sent = True
+            asyncio.ensure_future(_safe_send_exit(), loop=loop)
+
+    async def _safe_send_bytes(data: bytes) -> None:
+        try:
+            await websocket.send_bytes(data)
+        except Exception:
+            pass
+
+    async def _safe_send_exit() -> None:
+        try:
+            await websocket.send_json({"type": "exit", "code": -1})
+        except Exception:
+            pass
 
     try:
+        try:
+            fd = term_session.fileno()
+        except OSError as e:
+            await websocket.send_json({"type": "error", "message": str(e)})
+            await websocket.close()
+            manager.destroy_session(session)
+            return
+
+        loop.add_reader(fd, on_pty_readable)
+        reader_attached = True
+
         while True:
             message = await websocket.receive()
 
@@ -101,7 +161,11 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
     except WebSocketDisconnect:
         pass
     finally:
-        read_task.cancel()
+        if reader_attached:
+            try:
+                loop.remove_reader(fd)
+            except (OSError, ValueError, Exception):
+                pass
         manager.destroy_session(session)
         logger.info("WebSocket disconnected: session=%s", session)
 

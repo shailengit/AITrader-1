@@ -14,6 +14,14 @@ const WS_BASE = (() => {
   return `${proto}//${window.location.host}/api/terminal/ws`;
 })();
 
+// Maximum number of automatic reconnects before we give up and surface
+// the disconnected state to the user. StrictMode double-mount counts as
+// one reconnect, so this needs to be high enough to absorb that plus a
+// few transient network blips.
+const MAX_AUTO_RECONNECTS = 8;
+const RECONNECT_BASE_DELAY_MS = 250;
+const RECONNECT_MAX_DELAY_MS = 4000;
+
 export function TerminalComponent({ sessionId, onReady, onDisconnected }: TerminalComponentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -21,12 +29,19 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
   const onReadyRef = useRef(onReady);
   const onDisconnectedRef = useRef(onDisconnected);
 
+  // Reconnect bookkeeping (refs so the auto-reconnect logic doesn't
+  // trigger React re-renders and re-create the terminal).
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intentionallyClosedRef = useRef(false);
+
   // Keep callback refs in sync without triggering re-renders
   onReadyRef.current = onReady;
   onDisconnectedRef.current = onDisconnected;
 
   useEffect(() => {
     if (!containerRef.current) return;
+    intentionallyClosedRef.current = false;
 
     // Create xterm.js terminal
     const term = new Terminal({
@@ -70,81 +85,126 @@ export function TerminalComponent({ sessionId, onReady, onDisconnected }: Termin
 
     termRef.current = term;
 
-    // Connect WebSocket
-    const ws = new WebSocket(`${WS_BASE}?session=${sessionId}`);
-    wsRef.current = ws;
+    const openSocket = () => {
+      const ws = new WebSocket(`${WS_BASE}?session=${sessionId}`);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      term.focus();
-      const dims = fitAddon.proposeDimensions();
-      if (dims) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
-      }
-    };
-
-    ws.onmessage = (event) => {
-      // Handle JSON control messages from the backend
-      if (typeof event.data === "string" && event.data.startsWith("{")) {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "ready") {
-            onReadyRef.current?.();
-            return;
-          }
-          if (msg.type === "info") {
-            term.write(`\r\n${msg.message}\r\n`);
-            return;
-          }
-          if (msg.type === "error") {
-            term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
-            return;
-          }
-        } catch {
-          // Not JSON, treat as regular terminal output
+      ws.onopen = () => {
+        // Successful connection — reset backoff.
+        reconnectAttemptsRef.current = 0;
+        term.focus();
+        const dims = fitAddon.proposeDimensions();
+        if (dims) {
+          ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
         }
-      }
+      };
 
-      if (event.data instanceof Blob) {
-        event.data.arrayBuffer().then((buf) => {
-          const decoder = new TextDecoder("utf-8");
-          term.write(decoder.decode(buf));
-        });
-      } else {
-        term.write(event.data);
-      }
+      ws.onmessage = (event) => {
+        // Handle JSON control messages from the backend
+        if (typeof event.data === "string" && event.data.startsWith("{")) {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "ready") {
+              onReadyRef.current?.();
+              return;
+            }
+            if (msg.type === "info") {
+              term.write(`\r\n${msg.message}\r\n`);
+              return;
+            }
+            if (msg.type === "error") {
+              term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
+              return;
+            }
+          } catch {
+            // Not JSON, treat as regular terminal output
+          }
+        }
+
+        if (event.data instanceof Blob) {
+          event.data.arrayBuffer().then((buf) => {
+            const decoder = new TextDecoder("utf-8");
+            term.write(decoder.decode(buf));
+          });
+        } else {
+          term.write(event.data);
+        }
+      };
+
+      ws.onclose = (event) => {
+        // If we closed intentionally (sessionId change, unmount),
+        // surface the close to the parent. Otherwise try to reconnect
+        // silently — the user has not asked to end the session.
+        if (intentionallyClosedRef.current) {
+          onDisconnectedRef.current?.(event.code);
+          return;
+        }
+        if (event.code === 1000 || event.code === 1001) {
+          // Normal closure — don't reconnect.
+          onDisconnectedRef.current?.(event.code);
+          return;
+        }
+        if (reconnectAttemptsRef.current < MAX_AUTO_RECONNECTS) {
+          const attempt = reconnectAttemptsRef.current++;
+          const delay = Math.min(
+            RECONNECT_BASE_DELAY_MS * 2 ** attempt,
+            RECONNECT_MAX_DELAY_MS,
+          );
+          term.write(
+            `\r\n\x1b[33mConnection lost — reconnecting in ${Math.round(delay / 100) / 10}s…\x1b[0m\r\n`,
+          );
+          reconnectTimerRef.current = setTimeout(() => {
+            if (!intentionallyClosedRef.current) openSocket();
+          }, delay);
+          return;
+        }
+        // Out of retries — give up.
+        onDisconnectedRef.current?.(event.code);
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after this
+      };
+
+      // Forward keystrokes to WebSocket
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+
+      // (Resize observer attached once, outside openSocket, so it isn't
+      // duplicated across reconnects.)
     };
 
-    ws.onclose = (event) => {
-      onDisconnectedRef.current?.(event.code);
-    };
-
-    ws.onerror = () => {
-      // onclose will fire after this
-    };
-
-    // Forward keystrokes to WebSocket
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
-
-    // Forward resize events
+    // Forward resize events (attached once)
     const observer = new ResizeObserver(() => {
       fitAddon.fit();
       const dims = fitAddon.proposeDimensions();
-      if (dims && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
+      if (dims && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }),
+        );
       }
     });
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
 
+    openSocket();
+
     // Cleanup on unmount or sessionId change
     return () => {
+      intentionallyClosedRef.current = true;
       observer.disconnect();
-      ws.close();
+      if (reconnectTimerRef.current !== null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
       term.dispose();
     };
   }, [sessionId]); // Only reconnect when sessionId changes
