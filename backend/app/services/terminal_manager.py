@@ -9,8 +9,9 @@ import errno
 import logging
 import time
 import threading
-import ptyprocess
+from collections import deque
 from typing import Optional
+import ptyprocess
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +31,18 @@ class TerminalSession:
     asyncio's event loop via `loop.add_reader()` without freezing the
     loop. Use `read_nonblocking()` (returns ``b""`` if no data is
     available instead of blocking).
+
+    Each session also maintains a bounded ring buffer of the most recent
+    PTY output (``SCROLLBACK_MAX_BYTES``). The router replays this
+    buffer to the client on every WebSocket connect so the user-visible
+    scrollback is restored after navigation or a transient disconnect.
     """
 
-    def __init__(self, session_id: str):
+    SCROLLBACK_MAX_BYTES = 256 * 1024  # 256 KB cap
+
+    def __init__(self, session_id: str, resume: bool = False):
         self.session_id = session_id
+        self.resume = resume
         self.process: Optional[ptyprocess.PtyProcess] = None
         self.last_activity = time.time()
         self.created_at = time.time()
@@ -42,6 +51,12 @@ class TerminalSession:
         self.ready_event = threading.Event()
         self._lock = threading.Lock()
 
+        # Scrollback ring buffer for replay on (re)connect.
+        self._scrollback: deque[bytes] = deque()
+        self._scrollback_bytes = 0
+        self._scrollback_seq = 0
+        self._scrollback_lock = threading.Lock()
+
         # Start spawn in background thread
         self._spawn_thread = threading.Thread(target=self._spawn, daemon=True)
         self._spawn_thread.start()
@@ -49,10 +64,14 @@ class TerminalSession:
     def _spawn(self):
         """Spawn Claude Code inside a pseudo-terminal (runs in background thread)."""
         try:
-            proc = ptyprocess.PtyProcess.spawn(
-                ["claude"],
-                cwd=PROJECT_ROOT,
-            )
+            cmd = ["claude"]
+            if self.resume:
+                # Claude CLI accepts --resume <sessionId> to restore its
+                # conversation from its own session store. The flag is
+                # only set on the respawn path; initial spawn uses a
+                # fresh session.
+                cmd.extend(["--resume", self.session_id])
+            proc = ptyprocess.PtyProcess.spawn(cmd, cwd=PROJECT_ROOT)
             # Put the master fd in non-blocking mode so callers can poll
             # it from asyncio's event loop without freezing the loop.
             try:
@@ -65,8 +84,8 @@ class TerminalSession:
                 self._ready = True
             self.ready_event.set()
             logger.info(
-                "Terminal session %s started (PID %d, fd=%d)",
-                self.session_id, proc.pid, proc.fd,
+                "Terminal session %s started (PID %d, fd=%d, resume=%s)",
+                self.session_id, proc.pid, proc.fd, self.resume,
             )
         except FileNotFoundError:
             self._error = "Claude Code not found. Install with: npm install -g @anthropic-ai/claude-code"
@@ -188,6 +207,33 @@ class TerminalSession:
         with self._lock:
             return self._alive_unlocked()
 
+    def append_scrollback(self, chunk: bytes) -> None:
+        """Append PTY output to the scrollback ring buffer. Trims oldest
+        bytes when over ``SCROLLBACK_MAX_BYTES``. Thread-safe."""
+        if not chunk:
+            return
+        with self._scrollback_lock:
+            self._scrollback.append(chunk)
+            self._scrollback_bytes += len(chunk)
+            self._scrollback_seq += 1
+            while (
+                self._scrollback_bytes > self.SCROLLBACK_MAX_BYTES
+                and self._scrollback
+            ):
+                old = self._scrollback.popleft()
+                self._scrollback_bytes -= len(old)
+
+    def get_scrollback(self) -> tuple[bytes, int]:
+        """Return ``(concat_scrollback, current_seq)``.
+
+        ``current_seq`` is monotonic and increments once per
+        ``append_scrollback`` call. The current router always replays
+        the full buffer; the seq is exposed for future incremental
+        replay without changing the API.
+        """
+        with self._scrollback_lock:
+            return b"".join(self._scrollback), self._scrollback_seq
+
     @property
     def idle_seconds(self) -> float:
         return time.time() - self.last_activity
@@ -203,17 +249,20 @@ class TerminalManager:
     navigation without losing the spawned Claude Code child.
     """
 
-    destroy_grace_seconds: float = 10.0
+    destroy_grace_seconds: float = 3600.0
 
     def __init__(self):
         self._sessions: dict[str, TerminalSession] = {}
         self._pending_destroys: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
 
-    def create_session(self, session_id: str) -> TerminalSession:
+    def create_session(self, session_id: str, *, resume: bool = False) -> TerminalSession:
         """Reuse a live session if one exists (cancelling any pending
-        destroy), otherwise create a new one. This means reconnecting
-        within the grace period reattaches to the existing Claude child.
+        destroy), otherwise create a new one.
+
+        If ``resume=True`` and no live session exists, the new session
+        is spawned with ``claude --resume <sessionId>`` so its
+        conversation context is restored from Claude's session store.
         """
         with self._lock:
             existing = self._sessions.get(session_id)
@@ -226,7 +275,7 @@ class TerminalManager:
             return existing
 
         # No existing session — create a new one.
-        session = TerminalSession(session_id)
+        session = TerminalSession(session_id, resume=resume)
         with self._lock:
             self._sessions[session_id] = session
         return session
