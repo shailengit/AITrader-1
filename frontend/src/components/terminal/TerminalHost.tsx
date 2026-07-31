@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
@@ -236,15 +236,6 @@ export function TerminalHost() {
     navigate("/terminal");
   }, [navigate]);
 
-  // === xterm mount — always rendered, never recreated on mode change ===
-  const xtermMount = (
-    <div
-      ref={containerRef}
-      key={`xterm-${sessionId}`}
-      style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: 8 }}
-    />
-  );
-
   // === status bits shared by both modes ===
   const statusLabel =
     status === "connected"
@@ -255,33 +246,85 @@ export function TerminalHost() {
   const statusColor =
     status === "connected" ? "#10B981" : status === "connecting" ? "#F59E0B" : "#EF4444";
 
-  if (mode === "fullpage") {
-    return (
-      <FullPageTerminal
-        statusLabel={statusLabel}
-        statusColor={statusColor}
-        isDarkMode={isDarkMode}
-        onNewSession={handleNewSession}
-        exitCode={exitCode}
-        status={status}
-        xtermMount={xtermMount}
-      />
-    );
-  }
+  // === Render the xterm mount EXACTLY ONCE at the top level of this
+  // component's JSX. React mounts it once; route changes only flip the
+  // chrome wrapper above it. The xterm <div> stays in the DOM with the
+  // same ref across the fullpage <-> floating morph, so xterm.js keeps
+  // writing to a live, attached DOM node.
+  //
+  // The mount is positioned via CSS to fill whichever region the chrome
+  // currently claims (full viewport when mode==="fullpage", panel
+  // rect when mode==="floating"). The chrome is rendered on top with
+  // pointer-events:none on its background so clicks fall through to xterm.
+  const xtermRegionStyle: React.CSSProperties =
+    mode === "fullpage"
+      ? {
+          position: "fixed",
+          left: 0,
+          top: 56, // below the full-page toolbar
+          right: 0,
+          bottom: 0,
+          padding: 8,
+          boxSizing: "border-box",
+          zIndex: 498,
+        }
+      : {
+          position: "fixed",
+          left: panelState.minimized ? panelState.x : panelState.x + 10,
+          top: panelState.minimized ? panelState.y : panelState.y + 36, // below title bar
+          width: panelState.minimized ? 0 : panelState.width - 20,
+          height: panelState.minimized ? 0 : panelState.height - 50, // minus title + resize handle margin
+          zIndex: 998,
+        };
+
+  // Hide the xterm mount entirely if the session ended — the chrome's
+  // disconnected view will fill the space instead.
+  const showXterm = status !== "disconnected";
 
   return (
-    <FloatingPanel
-      panelState={panelState}
-      onPanelStateChange={setPanelState}
-      onMaximize={handleMaximize}
-      onNewSession={handleNewSession}
-      title="AI Terminal"
-      statusLabel={statusLabel}
-      statusColor={statusColor}
-      isDarkMode={isDarkMode}
-    >
-      {xtermMount}
-    </FloatingPanel>
+    <>
+      {/* Xterm mount — anchored, persistent. */}
+      {showXterm && (
+        <div
+          ref={containerRef}
+          key={`xterm-${sessionId}`}
+          style={{
+            ...xtermRegionStyle,
+            overflow: "hidden",
+            borderRadius: 8,
+          }}
+        />
+      )}
+
+      {/* Chrome on top — pointer-events:none on transparent bg, auto on
+          interactive controls (buttons, etc. set pointer-events:auto
+          themselves). */}
+      {mode === "fullpage" ? (
+        <FullPageTerminal
+          statusLabel={statusLabel}
+          statusColor={statusColor}
+          isDarkMode={isDarkMode}
+          onNewSession={handleNewSession}
+          exitCode={exitCode}
+          status={status}
+        />
+      ) : (
+        <FloatingPanel
+          panelState={panelState}
+          onPanelStateChange={setPanelState}
+          onMaximize={handleMaximize}
+          onNewSession={handleNewSession}
+          title="AI Terminal"
+          statusLabel={statusLabel}
+          statusColor={statusColor}
+          isDarkMode={isDarkMode}
+        >
+          {/* Empty — xterm is rendered above. The panel is a chrome-only
+              container now; the children slot is reserved for future use. */}
+          <></>
+        </FloatingPanel>
+      )}
+    </>
   );
 }
 
@@ -292,13 +335,11 @@ function FullPageTerminal(props: {
   onNewSession: () => void;
   exitCode?: number;
   status: "connecting" | "connected" | "disconnected";
-  xtermMount: ReactNode;
 }) {
-  const { statusLabel, statusColor, isDarkMode, onNewSession, exitCode, status, xtermMount } =
-    props;
+  const { statusLabel, statusColor, isDarkMode, onNewSession, exitCode, status } = props;
   const colors = {
-    bg: isDarkMode ? "#050505" : "#f5f5f7",
-    surface: isDarkMode ? "#0a0a0a" : "#ffffff",
+    bg: isDarkMode ? "rgba(5,5,5,0.0)" : "rgba(245,245,247,0.0)", // transparent over xterm
+    surface: isDarkMode ? "rgba(10,10,10,0.85)" : "rgba(255,255,255,0.85)",
     text: isDarkMode ? "#ffffff" : "#1d1d1f",
     muted: isDarkMode ? "rgba(255,255,255,0.55)" : "#6e6e73",
     border: isDarkMode ? "rgba(255,255,255,0.08)" : "#d2d2d7",
@@ -309,10 +350,7 @@ function FullPageTerminal(props: {
       style={{
         position: "fixed",
         inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        backgroundColor: colors.bg,
-        color: colors.text,
+        pointerEvents: "none", // let clicks fall through to xterm
         zIndex: 500,
       }}
     >
@@ -326,6 +364,7 @@ function FullPageTerminal(props: {
           backgroundColor: colors.surface,
           height: 48,
           flexShrink: 0,
+          pointerEvents: "auto", // toolbar itself is interactive
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -368,42 +407,41 @@ function FullPageTerminal(props: {
         </button>
       </div>
 
-      <div style={{ flex: 1, padding: 8, overflow: "hidden" }}>
-        {status === "disconnected" ? (
-          <div
+      {status === "disconnected" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 48,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            color: colors.muted,
+            backgroundColor: colors.bg,
+            pointerEvents: "auto",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>
+            Session ended{exitCode != null ? ` (exit code ${exitCode})` : ""}
+          </span>
+          <button
+            onClick={onNewSession}
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              gap: 12,
-              color: colors.muted,
+              padding: "8px 20px",
+              borderRadius: 6,
+              border: "none",
+              backgroundColor: "#10B981",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
             }}
           >
-            <span style={{ fontSize: 16 }}>
-              Session ended{exitCode != null ? ` (exit code ${exitCode})` : ""}
-            </span>
-            <button
-              onClick={onNewSession}
-              style={{
-                padding: "8px 20px",
-                borderRadius: 6,
-                border: "none",
-                backgroundColor: "#10B981",
-                color: "#fff",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              New Session
-            </button>
-          </div>
-        ) : (
-          xtermMount
-        )}
-      </div>
+            New Session
+          </button>
+        </div>
+      )}
     </div>
   );
 }

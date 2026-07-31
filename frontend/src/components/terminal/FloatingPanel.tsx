@@ -203,7 +203,7 @@ export function FloatingPanel(props: FloatingPanelProps) {
         top: panelState.y,
         width: panelState.width,
         height: panelState.height,
-        backgroundColor: surface,
+        backgroundColor: "transparent", // transparent so xterm (rendered underneath) shows through
         border: `1px solid ${border}`,
         borderRadius: 8,
         boxShadow: "0 12px 32px rgba(0,0,0,0.30)",
@@ -212,9 +212,12 @@ export function FloatingPanel(props: FloatingPanelProps) {
         color: text,
         zIndex: 1000,
         overflow: "hidden",
+        pointerEvents: "none", // let clicks fall through to the xterm beneath; interactive children re-enable
       }}
     >
-      {/* Title bar — drag handle */}
+      {/* Title bar — drag handle. pointer-events:auto so the drag
+          handle and buttons are interactive despite the parent being
+          pointer-events:none. */}
       <div
         role="banner"
         style={{
@@ -223,11 +226,13 @@ export function FloatingPanel(props: FloatingPanelProps) {
           justifyContent: "space-between",
           padding: "6px 10px",
           borderBottom: `1px solid ${border}`,
+          backgroundColor: surface,
           cursor: "grab",
           userSelect: "none",
           gap: 8,
           height: 36,
           flexShrink: 0,
+          pointerEvents: "auto",
         }}
         onPointerDown={onTitlePointerDown}
         onPointerMove={onTitlePointerMove}
@@ -300,8 +305,11 @@ export function FloatingPanel(props: FloatingPanelProps) {
         </div>
       </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>{children}</div>
+      {/* Body — transparent so the xterm mount rendered at the top
+          level of TerminalHost (positioned underneath via z-index) is
+          visible through the panel chrome. The title bar has its own
+          opaque background. */}
+      <div style={{ flex: 1, overflow: "hidden", position: "relative", backgroundColor: "transparent" }}>{children}</div>
 
       {/* Resize handle */}
       <div
@@ -318,6 +326,7 @@ export function FloatingPanel(props: FloatingPanelProps) {
           height: 14,
           cursor: "nwse-resize",
           background: `linear-gradient(135deg, transparent 50%, ${border} 50%)`,
+          pointerEvents: "auto",
         }}
       />
     </div>
