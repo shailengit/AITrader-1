@@ -30,6 +30,14 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
         await websocket.close()
         return
 
+    async def send_scrollback() -> None:
+        """Replay the full scrollback buffer to the client so xterm rebuilds
+        its visible history. Sends raw bytes (may include ANSI escapes)
+        which the frontend writes to xterm verbatim."""
+        scrollback, _ = term_session.get_scrollback()
+        if scrollback:
+            await websocket.send_bytes(scrollback)
+
     # Get or create session (spawns Claude Code in a background thread)
     term_session = manager.get_session(session)
     if term_session is None:
@@ -51,6 +59,7 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
             return
 
         await websocket.send_json({"type": "ready"})
+        await send_scrollback()
     else:
         # Reconnecting to an existing session — cancel any pending
         # destroy (StrictMode double-mount / transient blip) and tell
@@ -61,14 +70,16 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
                 "type": "ready",
                 "reconnected": True,
             })
+            await send_scrollback()
         else:
             # Session exists but its Claude child has died (e.g. user
-            # exited Claude). Recreate with the same ID.
+            # exited Claude). Recreate with the same ID and ask Claude
+            # to resume its prior conversation from its own session store.
             await websocket.send_json({
                 "type": "info",
                 "message": "Previous session ended. Starting new Claude Code session...",
             })
-            term_session = manager.create_session(session)
+            term_session = manager.create_session(session, resume=True)
             started = term_session.wait_ready(timeout=30.0)
             if not started or term_session.error:
                 msg = term_session.error or "Timed out waiting for Claude Code to start"
@@ -77,6 +88,7 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
                 manager.destroy_session(session)
                 return
             await websocket.send_json({"type": "ready"})
+            await send_scrollback()
 
     logger.info("WebSocket connected: session=%s", session)
 
@@ -98,6 +110,9 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
             logger.warning("PTY read error: %s", e)
             return
         if data:
+            # Record before forwarding so a (re)connecting client can
+            # replay this byte from the scrollback buffer.
+            term_session.append_scrollback(data)
             # Schedule send on the loop to avoid awaiting inside the
             # synchronous reader callback.
             asyncio.ensure_future(_safe_send_bytes(data), loop=loop)
@@ -166,7 +181,11 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
                 loop.remove_reader(fd)
             except (OSError, ValueError, Exception):
                 pass
-        manager.destroy_session(session)
+        # Don't call destroy_session here — it would schedule a kill
+        # timer that fires even if a new WebSocket has already reclaimed
+        # the session (e.g. after page navigation). Let cleanup_idle
+        # handle stale sessions instead.
+        manager.cancel_pending_destroy(session)
         logger.info("WebSocket disconnected: session=%s", session)
 
 
