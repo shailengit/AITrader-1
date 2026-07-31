@@ -105,12 +105,12 @@ A draggable, resizable, minimizable, maximizable container.
 - Minimize: collapses to a 200×40 chip anchored to the panel's last `x`/`y` (top-right corner of panel). Chip shows "AI Terminal — {statusLabel}". Click restores.
 - Maximize: navigates to `/terminal` via `useNavigate()` (which flips `mode` back to "fullpage" in `TerminalHost`).
 - Close / "End session": calls `onNewSession` after a confirm dialog ("End current Claude session?"). Same as the existing "New Session" button.
-- Persists `panelState` to `localStorage` on every change (debounced 250 ms).
+- Persists `panelState` to `localStorage` on every change. React state updates immediately on pointermove; the localStorage write is debounced to 250 ms to avoid hammering disk during a drag.
 
-**Accessibility:**
-- Title bar is `role="banner"`; panel is `role="dialog"` `aria-label="AI Terminal"`
-- Drag/resize handles expose `aria-label` for screen readers
-- Esc closes (minimizes) the panel; Cmd/Ctrl+. toggles minimize
+**Keyboard:**
+- Esc while the panel has focus → minimize the panel
+- Cmd/Ctrl+. while anywhere in the app → toggle minimize
+- Both bindings are no-ops when the user is currently typing into an `<input>` / `<textarea>` / xterm (don't steal keystrokes from the terminal itself)
 
 #### 3. `frontend/src/components/layout/Layout.tsx` (MODIFY)
 
@@ -132,17 +132,19 @@ Critical: do NOT put `<TerminalHost />` inside `<Outlet />`. It must be a siblin
 
 #### 4. `frontend/src/pages/Terminal.tsx` (MODIFY — minimal)
 
-Becomes a thin wrapper that renders the full-page terminal chrome (title bar, status, "New Session" button) around a slot. All xterm/WS logic lives in `TerminalHost` now. The page no longer owns `sessionId` or the WebSocket — it just provides the full-page layout chrome that `TerminalHost` uses when `mode === "fullpage"`.
+Becomes a no-op stub:
 
-To keep things simple, `TerminalHost` will own both modes itself: when `mode === "fullpage"` it renders its own toolbar with title/status/New Session. `pages/Terminal.tsx` is then either deleted or kept as a placeholder that just renders `<Navigate to="/terminal" />` so the route still works.
+```tsx
+export default function TerminalPage() {
+  return null;
+}
+```
 
-Decision: delete `pages/Terminal.tsx` and have `App.tsx`'s `/terminal` route render `TerminalHost` directly when the pathname matches. But since `TerminalHost` is now at the Layout level, the route is just a marker — the App.tsx route can stay as-is and `TerminalHost` reads the pathname via `useLocation`.
-
-Final decision: keep `pages/Terminal.tsx` as a no-op stub (renders nothing) so the route stays valid; `TerminalHost` at the Layout level handles everything.
+Rationale: the route still needs a component to satisfy `App.tsx`'s `<Route element={<TerminalPage />} />`, but all terminal behavior (xterm, WS, sessionId, full-page chrome, floating panel) is now owned by `TerminalHost` at the Layout level. `TerminalHost` reads `useLocation().pathname` to decide whether to render in full-page or floating mode. The page component exists only as a route placeholder.
 
 #### 5. `frontend/src/App.tsx` (UNCHANGED)
 
-Routes remain as-is. `/terminal` route continues to exist but its page component is a no-op stub.
+Routes remain as-is. The `/terminal` route's component is the no-op stub from §4.
 
 ### Backend
 
