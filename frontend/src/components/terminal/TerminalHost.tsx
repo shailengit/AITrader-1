@@ -5,6 +5,27 @@ import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 import { FloatingPanel, type PanelState } from "./FloatingPanel";
 import { useTheme } from "../../context/ThemeContext";
+import {
+  TrendingUp,
+  Sparkles,
+  Calendar,
+  Code,
+  Gauge,
+  BookOpen,
+  FlaskConical,
+  LayoutDashboard,
+} from "lucide-react";
+
+const NAV_ITEMS = [
+  { label: "Home", icon: LayoutDashboard, path: "/" },
+  { label: "Sectors", icon: TrendingUp, path: "/sectors" },
+  { label: "Screener", icon: Sparkles, path: "/screener" },
+  { label: "Earnings", icon: Calendar, path: "/earnings" },
+  { label: "QuantGen", icon: Code, path: "/quantgen" },
+  { label: "Markov", icon: Gauge, path: "/markov" },
+  { label: "Coach", icon: BookOpen, path: "/coach" },
+  { label: "Strategy Lab", icon: FlaskConical, path: "/strategy-lab" },
+] as const;
 
 const WS_BASE = (() => {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -261,7 +282,7 @@ export function TerminalHost() {
       ? {
           position: "fixed",
           left: 0,
-          top: 56, // below the full-page toolbar
+          top: 92, // below toolbar (48px) + nav strip (36px) + 8px gap
           right: 0,
           bottom: 0,
           padding: 8,
@@ -337,12 +358,16 @@ function FullPageTerminal(props: {
   status: "connecting" | "connected" | "disconnected";
 }) {
   const { statusLabel, statusColor, isDarkMode, onNewSession, exitCode, status } = props;
+  const navigate = useNavigate();
+  const location = useLocation();
   const colors = {
     bg: isDarkMode ? "rgba(5,5,5,0.0)" : "rgba(245,245,247,0.0)", // transparent over xterm
     surface: isDarkMode ? "rgba(10,10,10,0.85)" : "rgba(255,255,255,0.85)",
     text: isDarkMode ? "#ffffff" : "#1d1d1f",
     muted: isDarkMode ? "rgba(255,255,255,0.55)" : "#6e6e73",
     border: isDarkMode ? "rgba(255,255,255,0.08)" : "#d2d2d7",
+    navActiveBg: isDarkMode ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.12)",
+    navHoverBg: isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
   };
 
   return (
@@ -354,6 +379,7 @@ function FullPageTerminal(props: {
         zIndex: 500,
       }}
     >
+      {/* Toolbar */}
       <div
         style={{
           display: "flex",
@@ -407,11 +433,70 @@ function FullPageTerminal(props: {
         </button>
       </div>
 
+      {/* Nav strip */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          padding: "0 12px",
+          height: 36,
+          borderBottom: `1px solid ${colors.border}`,
+          backgroundColor: colors.surface,
+          overflowX: "auto",
+          flexShrink: 0,
+          pointerEvents: "auto",
+        }}
+      >
+        {NAV_ITEMS.map((item) => {
+          const isActive = location.pathname === item.path;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              title={item.label}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: isActive ? 600 : 450,
+                color: isActive ? "#10B981" : colors.muted,
+                backgroundColor: isActive ? colors.navActiveBg : "transparent",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = colors.navHoverBg;
+                  e.currentTarget.style.color = colors.text;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = colors.muted;
+                }
+              }}
+            >
+              <Icon size={13} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
       {status === "disconnected" && (
         <div
           style={{
             position: "absolute",
-            inset: 48,
+            inset: "84px 0 0 0", // below toolbar (48px) + nav strip (36px)
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
