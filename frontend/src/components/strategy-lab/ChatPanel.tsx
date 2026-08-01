@@ -204,7 +204,8 @@ export function ChatPanel({ sessionId, defaultModelId, onReRun }: ChatPanelProps
       <div
         ref={listRef}
         style={{
-          maxHeight: 400,
+          maxHeight: "calc(100vh - 320px)",
+          minHeight: 200,
           overflowY: "auto",
           padding: "16px 20px",
           display: "flex",
