@@ -1,4 +1,4 @@
-"""WebSocket terminal router — streams Claude Code CLI to the browser."""
+"""WebSocket terminal router — streams a shell session to the browser."""
 
 import asyncio
 import json
@@ -13,9 +13,9 @@ router = APIRouter()
 
 @router.websocket("/terminal/ws")
 async def terminal_ws(websocket: WebSocket, session: str = ""):
-    """WebSocket endpoint that wraps a Claude Code PTY session.
+    """WebSocket endpoint that wraps a shell PTY session.
 
-    Each connection gets its own Claude Code process. The session
+    Each connection gets its own zsh process. The session
     parameter allows reconnection to an existing session within the
     idle timeout window.
 
@@ -41,13 +41,13 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
     # Get or create session (spawns Claude Code in a background thread)
     term_session = manager.get_session(session)
     if term_session is None:
-        await websocket.send_json({"type": "info", "message": "Starting Claude Code session..."})
+        await websocket.send_json({"type": "info", "message": "Starting shell session..."})
         term_session = manager.create_session(session)
 
         # Wait for the process to start (up to 30s)
         started = term_session.wait_ready(timeout=30.0)
         if not started:
-            await websocket.send_json({"type": "error", "message": "Timed out waiting for Claude Code to start"})
+            await websocket.send_json({"type": "error", "message": "Timed out waiting for shell to start"})
             await websocket.close()
             manager.destroy_session(session)
             return
@@ -77,7 +77,7 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
             # to resume its prior conversation from its own session store.
             await websocket.send_json({
                 "type": "info",
-                "message": "Previous session ended. Starting new Claude Code session...",
+                "message": "Previous session ended. Starting new shell session...",
             })
             term_session = manager.create_session(session, resume=True)
             started = term_session.wait_ready(timeout=30.0)
@@ -191,17 +191,10 @@ async def terminal_ws(websocket: WebSocket, session: str = ""):
 
 @router.get("/terminal/health")
 async def terminal_health():
-    """Check if Claude Code is available."""
+    """Check if zsh is available."""
     import subprocess
-    try:
-        result = subprocess.run(
-            ["claude", "--version"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if result.returncode == 0:
-            return {"available": True, "version": result.stdout.strip()}
-        return {"available": False, "error": result.stderr.strip()}
-    except FileNotFoundError:
-        return {"available": False, "error": "Claude Code not found. Install with: npm install -g @anthropic-ai/claude-code"}
-    except Exception as e:
-        return {"available": False, "error": str(e)}
+    import shutil
+    zsh_path = shutil.which("zsh")
+    if zsh_path:
+        return {"available": True, "path": zsh_path}
+    return {"available": False, "error": "zsh not found in PATH"}

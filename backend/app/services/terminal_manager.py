@@ -1,6 +1,6 @@
 """PTY-based terminal session manager for the web terminal.
 
-Spawns a Claude Code process inside a pseudo-terminal and manages
+Spawns a zsh shell process inside a pseudo-terminal and manages
 its lifecycle. One session per WebSocket connection.
 """
 
@@ -21,7 +21,7 @@ PROJECT_ROOT = os.path.abspath(
 
 
 class TerminalSession:
-    """A single Claude Code process running inside a PTY.
+    """A single zsh shell process running inside a PTY.
 
     The process is spawned in a background thread so it doesn't block
     the asyncio event loop. Poll `is_ready()` or wait for `ready_event`
@@ -62,15 +62,9 @@ class TerminalSession:
         self._spawn_thread.start()
 
     def _spawn(self):
-        """Spawn Claude Code inside a pseudo-terminal (runs in background thread)."""
+        """Spawn zsh inside a pseudo-terminal (runs in background thread)."""
         try:
-            cmd = ["claude"]
-            if self.resume:
-                # Claude CLI accepts --resume <sessionId> to restore its
-                # conversation from its own session store. The flag is
-                # only set on the respawn path; initial spawn uses a
-                # fresh session.
-                cmd.extend(["--resume", self.session_id])
+            cmd = ["zsh", "--login"]
             proc = ptyprocess.PtyProcess.spawn(cmd, cwd=PROJECT_ROOT)
             # Put the master fd in non-blocking mode so callers can poll
             # it from asyncio's event loop without freezing the loop.
@@ -88,10 +82,10 @@ class TerminalSession:
                 self.session_id, proc.pid, proc.fd, self.resume,
             )
         except FileNotFoundError:
-            self._error = "Claude Code not found. Install with: npm install -g @anthropic-ai/claude-code"
+            self._error = "zsh not found. Please ensure zsh is installed."
             self.ready_event.set()
         except Exception as e:
-            self._error = f"Failed to start Claude Code: {e}"
+            self._error = f"Failed to start shell: {e}"
             logger.error("Terminal session %s failed: %s", self.session_id, self._error)
             self.ready_event.set()
 
@@ -165,7 +159,7 @@ class TerminalSession:
                     pass
 
     def kill(self) -> None:
-        """Terminate the Claude Code process.
+        """Terminate the shell process.
 
         Close the master fd first so any reader on it gets EBADF and
         returns immediately, then force-terminate the child.
@@ -203,7 +197,7 @@ class TerminalSession:
             return False
 
     def is_alive(self) -> bool:
-        """Check if the Claude Code process is still running."""
+        """Check if the shell process is still running."""
         with self._lock:
             return self._alive_unlocked()
 
@@ -246,7 +240,7 @@ class TerminalManager:
     — there is a grace period (``destroy_grace_seconds``) during which
     a reconnecting client can claim the existing session. This handles
     React StrictMode double-mounts, transient network blips, and page
-    navigation without losing the spawned Claude Code child.
+    navigation without losing the spawned shell child.
     """
 
     destroy_grace_seconds: float = 3600.0
@@ -260,9 +254,9 @@ class TerminalManager:
         """Reuse a live session if one exists (cancelling any pending
         destroy), otherwise create a new one.
 
-        If ``resume=True`` and no live session exists, the new session
-        is spawned with ``claude --resume <sessionId>`` so its
-        conversation context is restored from Claude's session store.
+        The ``resume`` parameter is kept for API compatibility but has
+        no effect on shell sessions (shells have no conversation context
+        to restore).
         """
         with self._lock:
             existing = self._sessions.get(session_id)

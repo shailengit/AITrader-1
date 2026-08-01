@@ -36,7 +36,7 @@ def test_spawn_argv_contains_resume_when_resume_true(monkeypatch):
     sess = terminal_manager.TerminalSession("sess-A", resume=True)
     sess._spawn_thread.join(timeout=5)
 
-    assert captured["argv"][:3] == ["claude", "--resume", "sess-A"], captured["argv"]
+    assert captured["argv"] == ["zsh", "--login"], captured["argv"]
     assert sess.resume is True
 
 
@@ -47,7 +47,7 @@ def test_spawn_argv_does_not_contain_resume_when_resume_false(monkeypatch):
     sess = terminal_manager.TerminalSession("sess-B", resume=False)
     sess._spawn_thread.join(timeout=5)
 
-    assert captured["argv"] == ["claude"], captured["argv"]
+    assert captured["argv"] == ["zsh", "--login"], captured["argv"]
     assert sess.resume is False
 
 
@@ -59,7 +59,7 @@ def test_spawn_default_resume_is_false(monkeypatch):
     sess = terminal_manager.TerminalSession("sess-default")
     sess._spawn_thread.join(timeout=5)
 
-    assert captured["argv"] == ["claude"], captured["argv"]
+    assert captured["argv"] == ["zsh", "--login"], captured["argv"]
 
 
 def test_create_session_passes_resume_true_to_new_session(monkeypatch):

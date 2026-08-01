@@ -86,6 +86,12 @@ export function TerminalHost() {
   const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [exitCode, setExitCode] = useState<number | undefined>();
 
+  // === terminal dimensions ===
+  const [dims, setDims] = useState<{ cols: number; rows: number }>({ cols: 80, rows: 24 });
+  const [editingDims, setEditingDims] = useState(false);
+  const [editCols, setEditCols] = useState("80");
+  const [editRows, setEditRows] = useState("24");
+
   // === panel state ===
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState());
 
@@ -153,9 +159,12 @@ export function TerminalHost() {
       ws.onopen = () => {
         reconnectAttemptsRef.current = 0;
         term.focus();
-        const dims = fitAddon.proposeDimensions();
-        if (dims) {
-          ws.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
+        const proposed = fitAddon.proposeDimensions();
+        if (proposed) {
+          ws.send(JSON.stringify({ type: "resize", cols: proposed.cols, rows: proposed.rows }));
+          setDims({ cols: proposed.cols, rows: proposed.rows });
+          setEditCols(String(proposed.cols));
+          setEditRows(String(proposed.rows));
         }
       };
 
@@ -328,6 +337,29 @@ export function TerminalHost() {
           onNewSession={handleNewSession}
           exitCode={exitCode}
           status={status}
+          dims={dims}
+          editingDims={editingDims}
+          editCols={editCols}
+          editRows={editRows}
+          onStartEdit={() => setEditingDims(true)}
+          onColChange={(v) => setEditCols(v)}
+          onRowChange={(v) => setEditRows(v)}
+          onApply={() => {
+            const cols = parseInt(editCols, 10);
+            const rows = parseInt(editRows, 10);
+            if (cols >= 20 && cols <= 400 && rows >= 10 && rows <= 200) {
+              setDims({ cols, rows });
+              setEditingDims(false);
+              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({ type: "resize", cols, rows }));
+              }
+            }
+          }}
+          onCancel={() => {
+            setEditingDims(false);
+            setEditCols(String(dims.cols));
+            setEditRows(String(dims.rows));
+          }}
         />
       ) : (
         <FloatingPanel
@@ -349,6 +381,108 @@ export function TerminalHost() {
   );
 }
 
+function DimensionBadge({
+  dims,
+  editingDims,
+  editCols,
+  editRows,
+  onStartEdit,
+  onColChange,
+  onRowChange,
+  onApply,
+  onCancel,
+  isDarkMode,
+}: {
+  dims: { cols: number; rows: number };
+  editingDims: boolean;
+  editCols: string;
+  editRows: string;
+  onStartEdit: () => void;
+  onColChange: (v: string) => void;
+  onRowChange: (v: string) => void;
+  onApply: () => void;
+  onCancel: () => void;
+  isDarkMode: boolean;
+}) {
+  const [tempCols, setTempCols] = useState(editCols);
+  const [tempRows, setTempRows] = useState(editRows);
+
+  // Sync from parent when not editing
+  useEffect(() => {
+    if (!editingDims) {
+      setTempCols(String(dims.cols));
+      setTempRows(String(dims.rows));
+    }
+  }, [dims, editingDims]);
+
+  const inputStyle: React.CSSProperties = {
+    width: 40,
+    padding: "2px 4px",
+    fontSize: 12,
+    textAlign: "center",
+    background: isDarkMode ? "#1d1d1f" : "#fff",
+    color: isDarkMode ? "#e0e0e0" : "#1d1d1f",
+    border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.2)" : "#d2d2d7"}`,
+    borderRadius: 4,
+    outline: "none",
+  };
+
+  if (editingDims) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+        <input
+          type="number"
+          min={20}
+          max={400}
+          value={tempCols}
+          onChange={(e) => setTempCols(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { onColChange(tempCols); onRowChange(tempRows); onApply(); }
+            if (e.key === "Escape") { onCancel(); }
+          }}
+          onBlur={() => { onColChange(tempCols); onRowChange(tempRows); onApply(); }}
+          style={inputStyle}
+          autoFocus
+        />
+        <span style={{ color: isDarkMode ? "rgba(255,255,255,0.55)" : "#6e6e73" }}>×</span>
+        <input
+          type="number"
+          min={10}
+          max={200}
+          value={tempRows}
+          onChange={(e) => setTempRows(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { onColChange(tempCols); onRowChange(tempRows); onApply(); }
+            if (e.key === "Escape") { onCancel(); }
+          }}
+          onBlur={() => { onColChange(tempCols); onRowChange(tempRows); onApply(); }}
+          style={inputStyle}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      onClick={onStartEdit}
+      title="Click to resize terminal"
+      style={{
+        fontSize: 12,
+        color: isDarkMode ? "rgba(255,255,255,0.55)" : "#6e6e73",
+        cursor: "pointer",
+        padding: "2px 8px",
+        borderRadius: 4,
+        border: "1px solid transparent",
+        userSelect: "none",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = isDarkMode ? "rgba(255,255,255,0.15)" : "#d2d2d7"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "transparent"; }}
+    >
+      {dims.cols}×{dims.rows}
+    </span>
+  );
+}
+
 function FullPageTerminal(props: {
   statusLabel: string;
   statusColor: string;
@@ -356,8 +490,18 @@ function FullPageTerminal(props: {
   onNewSession: () => void;
   exitCode?: number;
   status: "connecting" | "connected" | "disconnected";
+  dims: { cols: number; rows: number };
+  editingDims: boolean;
+  editCols: string;
+  editRows: string;
+  onStartEdit: () => void;
+  onColChange: (v: string) => void;
+  onRowChange: (v: string) => void;
+  onApply: () => void;
+  onCancel: () => void;
 }) {
-  const { statusLabel, statusColor, isDarkMode, onNewSession, exitCode, status } = props;
+  const { statusLabel, statusColor, isDarkMode, onNewSession, exitCode, status,
+    dims, editingDims, editCols, editRows, onStartEdit, onColChange, onRowChange, onApply, onCancel } = props;
   const navigate = useNavigate();
   const location = useLocation();
   const colors = {
@@ -416,21 +560,35 @@ function FullPageTerminal(props: {
             {statusLabel}
           </span>
         </div>
-        <button
-          onClick={onNewSession}
-          style={{
-            padding: "6px 14px",
-            borderRadius: 6,
-            border: `1px solid ${colors.border}`,
-            background: "transparent",
-            color: colors.text,
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          New Session
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <DimensionBadge
+            dims={dims}
+            editingDims={editingDims}
+            editCols={editCols}
+            editRows={editRows}
+            onStartEdit={onStartEdit}
+            onColChange={onColChange}
+            onRowChange={onRowChange}
+            onApply={onApply}
+            onCancel={onCancel}
+            isDarkMode={isDarkMode}
+          />
+          <button
+            onClick={onNewSession}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 6,
+              border: `1px solid ${colors.border}`,
+              background: "transparent",
+              color: colors.text,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            New Session
+          </button>
+        </div>
       </div>
 
       {/* Nav strip */}
