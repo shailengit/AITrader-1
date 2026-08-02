@@ -1,32 +1,99 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { BookOpen, Terminal, BarChart3, Code } from "lucide-react";
+import {
+  BookOpen, Code, ArrowUpDown,
+  ArrowUp, ArrowDown, CheckCircle, XCircle, Play,
+} from "lucide-react";
 import { strategyLabApi } from "../../lib/strategyLab";
+
+interface StrategyClassItem {
+  name: string;
+  path: string;
+  description: string;
+  created_at: string | null;
+  modified_at: string | null;
+  cagr_pct: number | null;
+  sharpe_ratio: number | null;
+  total_return_pct: number | null;
+  win_rate: number | null;
+  max_drawdown_pct: number | null;
+  total_trades: number | null;
+  last_backtest: string | null;
+  deployed: boolean;
+  deployed_at: string | null;
+}
 
 interface StepLibraryProps {
   onSelectStrategy: (path: string) => void;
 }
 
+type SortKey = "name" | "created_at" | "cagr_pct" | "sharpe_ratio" | "total_return_pct" | "win_rate" | "total_trades" | "last_backtest" | "deployed";
+type SortDir = "asc" | "desc";
+
 export function StepLibrary({ onSelectStrategy }: StepLibraryProps) {
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
   const { data: classes, isLoading } = useQuery({
     queryKey: ["strategy-classes"],
     queryFn: () => strategyLabApi.listStrategyClasses(),
   });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const sorted = useMemo(() => {
+    if (!classes) return [];
+    const copy = [...classes];
+    copy.sort((a, b) => {
+      let va: any, vb: any;
+      if (keyIsString(sortKey)) {
+        va = (a as any)[sortKey] || "";
+        vb = (b as any)[sortKey] || "";
+      } else {
+        va = (a as any)[sortKey];
+        vb = (b as any)[sortKey];
+        if (va == null) va = sortKey === "deployed" ? false : -999999;
+        if (vb == null) vb = sortKey === "deployed" ? false : -999999;
+      }
+      return sortDir === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+    });
+    return copy;
+  }, [classes, sortKey, sortDir]);
+
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) return <ArrowUpDown size={10} style={{ opacity: 0.3, verticalAlign: "middle", marginLeft: 4 }} />;
+    return sortDir === "asc"
+      ? <ArrowUp size={10} style={{ verticalAlign: "middle", marginLeft: 4 }} />
+      : <ArrowDown size={10} style={{ verticalAlign: "middle", marginLeft: 4 }} />;
+  };
+
+  const Th = ({ columnKey, children, className }: { columnKey: SortKey; children: React.ReactNode; className?: string }) => (
+    <th onClick={() => handleSort(columnKey)} style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }} className={className}>
+      {children}<SortIcon columnKey={columnKey} />
+    </th>
+  );
 
   return (
     <>
       <div className="slab-page-head">
         <div>
           <div className="slab-eyebrow slab-eyebrow--gold">// Library</div>
-          <h1 className="slab-page-head__title">Available strategies.</h1>
+          <h1 className="slab-page-head__title">Strategy library.</h1>
           <p className="slab-page-head__lede">
             Select a strategy to backtest and deploy. To create a new strategy,
             open the <span style={{ color: "var(--slab-gold)" }}>terminal</span> and describe your idea to Claude Code.
           </p>
         </div>
         <div className="slab-page-head__meta">
-          <span>Browse</span>
-          <span className="slab-mono slab-mono--gold">STRATEGIES</span>
+          <span>{classes?.length ?? 0} strategies</span>
+          <span className="slab-mono slab-mono--gold">LIBRARY</span>
         </div>
       </div>
 
@@ -41,21 +108,38 @@ export function StepLibrary({ onSelectStrategy }: StepLibraryProps) {
             <p className="slab-prose" style={{ fontSize: 14 }}>
               No strategies found. Open the terminal and use Claude Code to generate one.
             </p>
-            <p className="slab-mono slab-mono--sm slab-mono--dim" style={{ marginTop: 8 }}>
-              Generated strategies live in <code>backend/app/services/strategies/</code>
-            </p>
           </div>
         )}
 
         {classes && classes.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 1280 }}>
-            {classes.map((c) => (
-              <StrategyCard
-                key={c.path}
-                entry={c}
-                onSelect={() => onSelectStrategy(c.path)}
-              />
-            ))}
+          <div className="slab-panel" style={{ maxWidth: 1400 }}>
+            <div style={{ maxHeight: 600, overflow: "auto" }}>
+              <table className="slab-table">
+                <thead>
+                  <tr>
+                    <Th columnKey="name">Strategy</Th>
+                    <Th columnKey="created_at">Created</Th>
+                    <Th columnKey="cagr_pct">CAGR%</Th>
+                    <Th columnKey="sharpe_ratio">Sharpe</Th>
+                    <Th columnKey="total_return_pct">Return</Th>
+                    <Th columnKey="win_rate">Win%</Th>
+                    <Th columnKey="total_trades">Trades</Th>
+                    <Th columnKey="last_backtest">Last Test</Th>
+                    <Th columnKey="deployed">Status</Th>
+                    <th style={{ textAlign: "center" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((c) => (
+                    <StrategyRow
+                      key={c.path}
+                      entry={c}
+                      onBacktest={() => onSelectStrategy(c.path)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -63,49 +147,85 @@ export function StepLibrary({ onSelectStrategy }: StepLibraryProps) {
   );
 }
 
-function StrategyCard({ entry, onSelect }: {
-  entry: { name: string; path: string; description: string };
-  onSelect: () => void;
-}) {
+function keyIsString(key: SortKey): boolean {
+  return key === "name" || key === "created_at" || key === "last_backtest";
+}
+
+function StrategyRow({ entry, onBacktest }: { entry: StrategyClassItem; onBacktest: () => void }) {
+  const fmtPct = (v: number | null) => {
+    if (v == null) return <span className="slab-mono slab-mono--xs slab-mono--faint">N/A</span>;
+    const isNeg = v < 0;
+    return (
+      <span className="slab-mono slab-mono--sm" style={{ color: isNeg ? "var(--slab-rose)" : "var(--slab-terminal)" }}>
+        {v >= 0 ? "+" : ""}{v.toFixed(1)}%
+      </span>
+    );
+  };
+
+  const fmtNum = (v: number | null) => {
+    if (v == null) return <span className="slab-mono slab-mono--xs slab-mono--faint">N/A</span>;
+    return <span className="slab-mono slab-mono--sm">{v.toLocaleString()}</span>;
+  };
+
+  const fmtDate = (v: string | null) => {
+    if (!v) return <span className="slab-mono slab-mono--xs slab-mono--faint">—</span>;
+    return <span className="slab-mono slab-mono--xs slab-mono--dim">{v.slice(0, 10)}</span>;
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="slab-panel"
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <Code size={12} style={{ color: "var(--slab-gold)" }} />
-            <span className="slab-eyebrow slab-eyebrow--gold">
+    <tr>
+      <td>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Code size={12} style={{ color: "var(--slab-gold)", flexShrink: 0 }} />
+          <div>
+            <div className="slab-mono slab-mono--sm" style={{ fontWeight: 600, color: "var(--slab-gold)" }}>
               {entry.name}
-            </span>
-          </div>
-
-          {entry.description && (
-            <p className="slab-mono slab-mono--sm slab-mono--dim" style={{ marginTop: 4 }}>
-              {entry.description}
-            </p>
-          )}
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <Terminal size={11} style={{ color: "var(--slab-paper-faint)" }} />
-            <span className="slab-mono slab-mono--xs slab-mono--dim">
-              {entry.path}
-            </span>
+            </div>
+            {entry.description && (
+              <div className="slab-mono slab-mono--xs slab-mono--faint" style={{ marginTop: 2, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {entry.description}
+              </div>
+            )}
           </div>
         </div>
-
+      </td>
+      <td>{fmtDate(entry.created_at)}</td>
+      <td className="slab-table__num">{fmtPct(entry.cagr_pct)}</td>
+      <td className="slab-table__num">
+        {entry.sharpe_ratio != null ? (
+          <span className="slab-mono slab-mono--sm" style={{ color: entry.sharpe_ratio >= 0.5 ? "var(--slab-terminal)" : entry.sharpe_ratio >= 0 ? "var(--slab-amber)" : "var(--slab-rose)" }}>
+            {entry.sharpe_ratio.toFixed(2)}
+          </span>
+        ) : (
+          <span className="slab-mono slab-mono--xs slab-mono--faint">N/A</span>
+        )}
+      </td>
+      <td className="slab-table__num">{fmtPct(entry.total_return_pct)}</td>
+      <td className="slab-table__num">{fmtPct(entry.win_rate)}</td>
+      <td className="slab-table__num">{fmtNum(entry.total_trades)}</td>
+      <td>{fmtDate(entry.last_backtest)}</td>
+      <td>
+        {entry.deployed ? (
+          <span className="slab-tag slab-tag--terminal" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <CheckCircle size={9} /> Active
+          </span>
+        ) : (
+          <span className="slab-tag" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <XCircle size={9} /> Idle
+          </span>
+        )}
+      </td>
+      <td style={{ textAlign: "center" }}>
         <button
           type="button"
-          onClick={onSelect}
-          className="slab-btn"
-          style={{ flexShrink: 0 }}
+          onClick={onBacktest}
+          className="slab-btn slab-btn--xs slab-btn--primary"
+          title="Backtest this strategy"
         >
-          <BarChart3 size={11} />
+          <Play size={10} />
           Backtest
         </button>
-      </div>
-    </motion.div>
+      </td>
+    </tr>
   );
 }

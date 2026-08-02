@@ -48,6 +48,17 @@ export interface StrategyClassItem {
   name: string;
   path: string;
   description: string;
+  created_at: string | null;
+  modified_at: string | null;
+  cagr_pct: number | null;
+  sharpe_ratio: number | null;
+  total_return_pct: number | null;
+  win_rate: number | null;
+  max_drawdown_pct: number | null;
+  total_trades: number | null;
+  last_backtest: string | null;
+  deployed: boolean;
+  deployed_at: string | null;
 }
 
 export interface ExperimentRow {
