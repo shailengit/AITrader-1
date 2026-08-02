@@ -365,6 +365,9 @@ def run_batch(
     )
     _RUNNING_BATCHES[batch_id] = batch
 
+    # Resolve session_id for DB storage (use a random UUID for placeholder '_')
+    _db_session_id = uuid.UUID(session_id) if session_id != '_' else uuid.uuid4()
+
     def _persist_event(event: Dict[str, Any]):
         """Persist one run's result to the DB. Called from worker threads."""
         try:
@@ -372,7 +375,7 @@ def run_batch(
             from app.models.strategy_lab import StrategyExperiment
             with SessionLocal() as db:
                 exp = StrategyExperiment(
-                    session_id=uuid.UUID(session_id),
+                    session_id=_db_session_id,
                     batch_id=uuid.UUID(batch_id),
                     run_index=event["run_index"],
                     start_date=event.get("start_date"),

@@ -248,7 +248,7 @@ class BatchStats(BaseModel):
 
 @router.post("/sessions/{session_id}/experiments", response_model=ExperimentStartResponse, status_code=202)
 def start_experiments(
-    session_id: uuid.UUID,
+    session_id: str,
     body: ExperimentRequest,
     db: Session = Depends(get_db),
 ):
@@ -257,16 +257,16 @@ def start_experiments(
     Supports two modes:
       - strategy_class_path: path to a Strategy subclass file (new mode)
       - session.code_text: legacy mode using the 4-function template
+
+    In strategy_class_path mode, session_id can be '_' (placeholder) since
+    no session lookup is needed.
     """
     from app.services.strategy_lab_orchestrator import run_batch
-    sess = svc_get_session(db, session_id)
-    if sess is None:
-        raise HTTPException(status_code=404, detail="session not found")
 
     if body.strategy_class_path:
-        # New mode: use a Strategy subclass file
+        # New mode: use a Strategy subclass file — no session needed
         batch_id = run_batch(
-            session_id=str(session_id),
+            session_id=session_id,
             n_runs=body.n_runs,
             end_date=body.end_date,
             start_date_min=body.start_date_min,
@@ -274,51 +274,59 @@ def start_experiments(
             fixed_start_dates=body.fixed_start_dates,
             strategy_class_path=body.strategy_class_path,
         )
-    elif sess.code_text:
-        # Legacy mode: use session's code_text
-        batch_id = run_batch(
-            session_id=str(session_id),
-            n_runs=body.n_runs,
-            code_text=sess.code_text,
-            end_date=body.end_date,
-            start_date_min=body.start_date_min,
-            start_date_max=body.start_date_max,
-            fixed_start_dates=body.fixed_start_dates,
-        )
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="no strategy_class_path or code_text provided",
-        )
+        return ExperimentStartResponse(batch_id=batch_id)
+
+    # Legacy mode: requires a valid session
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid session_id format")
+    sess = svc_get_session(db, sid)
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    if not sess.code_text:
+        raise HTTPException(status_code=400, detail="no code_text — generate code first")
+
+    batch_id = run_batch(
+        session_id=session_id,
+        n_runs=body.n_runs,
+        code_text=sess.code_text,
+        end_date=body.end_date,
+        start_date_min=body.start_date_min,
+        start_date_max=body.start_date_max,
+        fixed_start_dates=body.fixed_start_dates,
+    )
     return ExperimentStartResponse(batch_id=batch_id)
 
 
 @router.get("/sessions/{session_id}/experiments", response_model=List[ExperimentRow])
 def list_session_experiments(
-    session_id: uuid.UUID,
+    session_id: str,
     db: Session = Depends(get_db),
 ):
     """List all experiments for a session (across batches), newest first."""
     from app.services.strategy_lab_experiments import list_experiments
-    rows = list_experiments(db, session_id=session_id, limit=200)
+    sid = uuid.UUID(session_id) if session_id != '_' else None
+    rows = list_experiments(db, session_id=sid, limit=200)
     return [ExperimentRow(**r.to_dict()) for r in rows]
 
 
 @router.get("/sessions/{session_id}/batches/{batch_id}/experiments", response_model=List[ExperimentRow])
 def list_batch_experiments(
-    session_id: uuid.UUID,
+    session_id: str,
     batch_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
     """List experiments in a specific batch."""
     from app.services.strategy_lab_experiments import list_experiments
-    rows = list_experiments(db, session_id=session_id, batch_id=batch_id, limit=500)
+    sid = uuid.UUID(session_id) if session_id != '_' else None
+    rows = list_experiments(db, session_id=sid, batch_id=batch_id, limit=500)
     return [ExperimentRow(**r.to_dict()) for r in rows]
 
 
 @router.get("/sessions/{session_id}/batches/{batch_id}/stats", response_model=BatchStats)
 def batch_stats(
-    session_id: uuid.UUID,
+    session_id: str,
     batch_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
@@ -342,7 +350,7 @@ def get_equity_curve(
 
 @router.get("/sessions/{session_id}/batches/{batch_id}/events")
 async def batch_events(
-    session_id: uuid.UUID,
+    session_id: str,
     batch_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
@@ -355,10 +363,15 @@ async def batch_events(
     from app.services.strategy_lab_orchestrator import get_batch, drain_events
     from app.services.strategy_lab_experiments import create_experiment
 
-    # Verify the session exists
-    sess = svc_get_session(db, session_id)
-    if sess is None:
-        raise HTTPException(status_code=404, detail="session not found")
+    # Verify the session exists (skip for placeholder '_')
+    if session_id != '_':
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid session_id")
+        sess = svc_get_session(db, sid)
+        if sess is None:
+            raise HTTPException(status_code=404, detail="session not found")
 
     async def event_generator():
         import time
@@ -427,7 +440,7 @@ class DeploymentListItem(BaseModel):
 
 @router.post("/sessions/{session_id}/deploy", response_model=DeploymentResponse)
 def deploy(
-    session_id: uuid.UUID,
+    session_id: str,
     body: DeployRequest,
     db: Session = Depends(get_db),
 ):
@@ -445,9 +458,15 @@ def deploy(
     import importlib.util
     import sys
 
-    sess = svc_get_session(db, session_id)
-    if sess is None:
-        raise HTTPException(status_code=404, detail="session not found")
+    # session_id can be '_' placeholder for strategy_class_path mode
+    if session_id != '_':
+        try:
+            sid = uuid.UUID(session_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid session_id format")
+        sess = svc_get_session(db, sid)
+        if sess is None:
+            raise HTTPException(status_code=404, detail="session not found")
 
     # Resolve the strategy file path
     repo_root = Path(__file__).resolve().parent.parent.parent.parent
@@ -509,8 +528,10 @@ def deploy(
         active.is_active = False
         active.rolled_back_at = sa_text("now()")
 
+    # Use a random UUID for placeholder '_' session_id
+    deploy_session_id = uuid.uuid4() if session_id == '_' else uuid.UUID(session_id)
     deployment = StrategyDeployment(
-        session_id=session_id,
+        session_id=deploy_session_id,
         experiment_id=body.experiment_id,
         class_name=class_name,
         class_file_path=str(full_path),
