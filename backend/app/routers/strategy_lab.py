@@ -597,12 +597,18 @@ def deploy(
     alpaca_runner_path = repo_root / "backend" / "app" / "services" / "alpaca_runner.py"
     if alpaca_runner_path.exists():
         text = alpaca_runner_path.read_text()
-        # Replace the import line in main()
         import re
+        # Replace the import line
         new_import = f"from app.services.strategies.{full_path.stem} import {class_name}"
         text = re.sub(
             r"from app\.services\.strategies\.\w+ import \w+",
             new_import,
+            text,
+        )
+        # Replace the instantiation line too (was always GoldenCrossStrategy)
+        text = re.sub(
+            r"strategy\s*=\s*\w+\(\)",
+            f"strategy = {class_name}()",
             text,
         )
         alpaca_runner_path.write_text(text)
@@ -703,6 +709,12 @@ def rollback_deployment(
             text = re.sub(
                 r"from app\.services\.strategies\.\w+ import \w+",
                 new_import,
+                text,
+            )
+            # Also update the instantiation line
+            text = re.sub(
+                r"strategy\s*=\s*\w+\(\)",
+                f"strategy = {previous.class_name}()",
                 text,
             )
             alpaca_runner_path.write_text(text)

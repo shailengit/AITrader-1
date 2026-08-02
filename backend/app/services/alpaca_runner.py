@@ -6,7 +6,7 @@ The strategy (injected via constructor) answers only two questions:
 2. When should I exit?      (should_exit)
 
 Usage:
-    from app.services.strategies.phase3e2e4v20220607 import phase3e2e4V20220607
+    from app.services.strategies.golden_cross_rotation_v2 import GoldenCrossRotationV2
     runner = StrategyRunner(GoldenCrossStrategy())
     result = runner.run_daily()
 """
@@ -284,9 +284,9 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
-    from app.services.strategies.phase3e2e4v20220607 import phase3e2e4V20220607
+    from app.services.strategies.golden_cross_rotation_v2 import GoldenCrossRotationV2
 
-    strategy = GoldenCrossStrategy()
+    strategy = GoldenCrossRotationV2()
     runner = StrategyRunner(strategy)
     result = runner.run_daily()
 
