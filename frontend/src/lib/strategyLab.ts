@@ -200,6 +200,9 @@ export const strategyLabApi = {
   // ── Strategy class endpoints (new mode) ──
   listStrategyClasses: () => getJson<StrategyClassItem[]>(`${base}/strategy-classes`),
 
+  deleteStrategyClass: (path: string) =>
+    postJson<{ deleted: string; name: string }>(`${base}/strategy-classes/delete`, { path }),
+
   startExperimentsWithClass: (strategyClassPath: string, body: { n_runs: number; end_date: string; start_date_min?: string; start_date_max?: string }) =>
     postJson<{ batch_id: string }>(`${base}/sessions/_/experiments`, {
       ...body,

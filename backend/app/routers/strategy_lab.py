@@ -259,6 +259,40 @@ def list_strategy_classes():
     return classes
 
 
+class DeleteStrategyRequest(BaseModel):
+    path: str = Field(..., description="Path to the strategy file to delete (e.g. 'backend/app/services/strategies/my_strategy.py')")
+
+
+@router.post("/strategy-classes/delete", status_code=200)
+def delete_strategy_class(body: DeleteStrategyRequest):
+    """Delete a strategy file and its meta file from the strategies directory.
+
+    Only deletes files under backend/app/services/strategies/ for safety.
+    Does NOT delete files from the standalone strategies/ directory.
+    """
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    full_path = repo_root / body.path
+
+    # Safety: only allow deleting from backend/app/services/strategies/
+    strategies_dir = Path(__file__).resolve().parent.parent / "services" / "strategies"
+    try:
+        full_path.relative_to(strategies_dir)
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Can only delete files in backend/app/services/strategies/")
+
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail=f"Strategy file not found: {full_path}")
+
+    # Delete the .py file
+    full_path.unlink()
+    # Delete the .meta.json sidecar if it exists
+    meta_path = full_path.with_suffix(".meta.json")
+    if meta_path.exists():
+        meta_path.unlink()
+
+    return {"deleted": str(full_path), "name": full_path.stem}
+
+
 # ── Experiment endpoints (Phase 3) ────────────────────────────────────────
 
 class ExperimentRequest(BaseModel):

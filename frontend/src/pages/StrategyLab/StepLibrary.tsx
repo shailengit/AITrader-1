@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen, Code, ArrowUpDown,
-  ArrowUp, ArrowDown, CheckCircle, XCircle, Play,
+  ArrowUp, ArrowDown, CheckCircle, XCircle, Play, Trash2,
 } from "lucide-react";
 import { strategyLabApi } from "../../lib/strategyLab";
 
@@ -33,10 +33,20 @@ type SortDir = "asc" | "desc";
 export function StepLibrary({ onSelectStrategy }: StepLibraryProps) {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data: classes, isLoading } = useQuery({
     queryKey: ["strategy-classes"],
     queryFn: () => strategyLabApi.listStrategyClasses(),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (path: string) => strategyLabApi.deleteStrategyClass(path),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategy-classes"] });
+      setConfirmDelete(null);
+    },
   });
 
   const handleSort = (key: SortKey) => {
@@ -135,10 +145,53 @@ export function StepLibrary({ onSelectStrategy }: StepLibraryProps) {
                       key={c.path}
                       entry={c}
                       onBacktest={() => onSelectStrategy(c.path)}
+                      onDelete={() => setConfirmDelete(c.path)}
+                      isDeleting={deleteMut.isPending && confirmDelete === c.path}
                     />
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Delete confirmation modal */}
+        {confirmDelete && (
+          <div
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+              display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50,
+            }}
+            onClick={() => setConfirmDelete(null)}
+          >
+            <div
+              className="slab-panel"
+              style={{ maxWidth: 440, width: "100%" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="slab-panel__head">
+                <span className="slab-eyebrow slab-eyebrow--gold">// Confirm delete</span>
+              </div>
+              <div className="slab-panel__body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <p className="slab-prose">
+                  Delete <span className="slab-mono" style={{ color: "var(--slab-gold)" }}>{confirmDelete.split("/").pop()}</span>?
+                  This will remove the strategy file and its performance data.
+                </p>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button type="button" onClick={() => setConfirmDelete(null)} className="slab-btn">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMut.mutate(confirmDelete)}
+                    disabled={deleteMut.isPending}
+                    className="slab-btn"
+                    style={{ borderColor: "var(--slab-rose)", color: "var(--slab-rose)" }}
+                  >
+                    {deleteMut.isPending ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -151,7 +204,10 @@ function keyIsString(key: SortKey): boolean {
   return key === "name" || key === "created_at" || key === "last_backtest";
 }
 
-function StrategyRow({ entry, onBacktest }: { entry: StrategyClassItem; onBacktest: () => void }) {
+function StrategyRow({ entry, onBacktest, onDelete, isDeleting }: {
+  entry: StrategyClassItem; onBacktest: () => void;
+  onDelete: () => void; isDeleting: boolean;
+}) {
   const fmtPct = (v: number | null) => {
     if (v == null) return <span className="slab-mono slab-mono--xs slab-mono--faint">N/A</span>;
     const isNeg = v < 0;
@@ -215,15 +271,26 @@ function StrategyRow({ entry, onBacktest }: { entry: StrategyClassItem; onBackte
           </span>
         )}
       </td>
-      <td style={{ textAlign: "center" }}>
+      <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
         <button
           type="button"
           onClick={onBacktest}
           className="slab-btn slab-btn--xs slab-btn--primary"
           title="Backtest this strategy"
+          style={{ marginRight: 6 }}
         >
           <Play size={10} />
-          Backtest
+          Run
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={isDeleting}
+          className="slab-btn slab-btn--xs"
+          title="Delete this strategy"
+          style={{ borderColor: "var(--slab-rose)", color: "var(--slab-rose)" }}
+        >
+          <Trash2 size={10} />
         </button>
       </td>
     </tr>
