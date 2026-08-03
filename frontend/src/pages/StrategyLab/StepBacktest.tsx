@@ -53,7 +53,7 @@ export function StepBacktest({ strategyClassPath, onWinnerPicked }: StepBacktest
         setExperiments(rows);
         const completed = rows.filter((r) => r.status === "completed").length;
         const failed = rows.filter((r) => r.status === "failed").length;
-        setProgress({ completed, total: rows.length, failed });
+        setProgress({ completed, total: nRuns, failed });
         if (completed + failed >= nRuns) {
           if (pollRef.current) clearInterval(pollRef.current);
         }
