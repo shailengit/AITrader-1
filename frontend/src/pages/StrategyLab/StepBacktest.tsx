@@ -12,14 +12,42 @@ interface StepBacktestProps {
   onWinnerPicked: (experimentId: string) => void;
 }
 
+const STORAGE_KEY_BATCH = "strategy_lab_active_batch";
+
+function loadBatchState() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY_BATCH);
+    if (!raw) return null;
+    return JSON.parse(raw) as {
+      batchId: string;
+      strategyClassPath: string;
+      nRuns: number;
+      endDate: string;
+      startDateMin: string;
+      startDateMax: string;
+    };
+  } catch { return null; }
+}
+
+function saveBatchState(batchId: string, strategyClassPath: string, nRuns: number, endDate: string, startDateMin: string, startDateMax: string) {
+  sessionStorage.setItem(STORAGE_KEY_BATCH, JSON.stringify({ batchId, strategyClassPath, nRuns, endDate, startDateMin, startDateMax }));
+}
+
+function clearBatchState() {
+  sessionStorage.removeItem(STORAGE_KEY_BATCH);
+}
+
 export function StepBacktest({ strategyClassPath, onWinnerPicked }: StepBacktestProps) {
-  const [nRuns, setNRuns] = useState(10);
-  const [endDate, setEndDate] = useState("2026-06-01");
-  const [startDateMin, setStartDateMin] = useState("2000-01-01");
-  const [startDateMax, setStartDateMax] = useState("2020-01-01");
-  const [batchId, setBatchId] = useState<string | null>(null);
+  const savedBatch = loadBatchState();
+  const isResumed = savedBatch !== null && savedBatch.strategyClassPath === strategyClassPath;
+
+  const [nRuns, setNRuns] = useState(isResumed ? savedBatch!.nRuns : 10);
+  const [endDate, setEndDate] = useState(isResumed ? savedBatch!.endDate : "2026-06-01");
+  const [startDateMin, setStartDateMin] = useState(isResumed ? savedBatch!.startDateMin : "2000-01-01");
+  const [startDateMax, setStartDateMax] = useState(isResumed ? savedBatch!.startDateMax : "2020-01-01");
+  const [batchId, setBatchId] = useState<string | null>(isResumed ? savedBatch!.batchId : null);
   const [experiments, setExperiments] = useState<ExperimentRow[]>([]);
-  const [progress, setProgress] = useState({ completed: 0, total: 0, failed: 0 });
+  const [progress, setProgress] = useState(isResumed ? { completed: 0, total: savedBatch!.nRuns, failed: 0 } : { completed: 0, total: 0, failed: 0 });
   const [selectedWinner, setSelectedWinner] = useState<string | null>(null);
   const [equityExperimentId, setEquityExperimentId] = useState<string | null>(null);
 
@@ -42,6 +70,7 @@ export function StepBacktest({ strategyClassPath, onWinnerPicked }: StepBacktest
       setExperiments([]);
       setSelectedWinner(null);
       setProgress({ completed: 0, total: nRuns, failed: 0 });
+      saveBatchState(r.batch_id, strategyClassPath, nRuns, endDate, startDateMin, startDateMax);
     },
   });
 
@@ -118,6 +147,19 @@ export function StepBacktest({ strategyClassPath, onWinnerPicked }: StepBacktest
 
         {batchId && (
           <>
+            {isResumed && (
+              <div
+                className="slab-panel"
+                style={{ maxWidth: 1280, marginBottom: 16, borderColor: "var(--slab-cyan)" }}
+              >
+                <div style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "var(--slab-cyan)", fontSize: 13 }}>⏺</span>
+                  <span className="slab-mono slab-mono--sm" style={{ color: "var(--slab-cyan)" }}>
+                    Resumed — batch is running in the background
+                  </span>
+                </div>
+              </div>
+            )}
             <LiveTicker
               completed={progress.completed}
               total={progress.total}
@@ -203,7 +245,7 @@ export function StepBacktest({ strategyClassPath, onWinnerPicked }: StepBacktest
               <div style={{ maxWidth: 1280, marginTop: 24, display: "flex", gap: 12 }}>
                 <button
                   type="button"
-                  onClick={() => { setBatchId(null); }}
+                  onClick={() => { clearBatchState(); setBatchId(null); }}
                   className="slab-btn"
                 >
                   <RotateCcw size={11} />
