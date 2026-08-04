@@ -6,6 +6,10 @@ output format as the existing StrategyEngine. This lets Claude Code
 generate Strategy subclasses that can be both backtested in the app
 AND deployed to Alpaca — no translation layer needed.
 
+The adapter reads RotationConfig from the strategy to determine exit
+priority, sizing method, and rotation behavior. This ensures the same
+strategy produces identical results whether run standalone or from the app.
+
 Usage:
     from app.services.strategies.daily_golden_cross import DailyGoldenCrossRotation
     adapter = StrategyBacktestAdapter(DailyGoldenCrossRotation())
@@ -22,7 +26,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from app.db.database import engine as db_engine
-from app.services.strategy_base import Strategy, Signal, ExitCheck
+from app.services.strategy_base import Strategy, Signal, ExitCheck, RotationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +34,19 @@ logger = logging.getLogger(__name__)
 class StrategyBacktestAdapter:
     """Runs a daily backtest simulation for any Strategy ABC subclass.
 
-    The adapter handles the daily loop, portfolio state, position sizing,
-    trade logging, and KPI computation — everything that doesn't change
-    between strategies. The Strategy answers only two questions:
-      1. What should I buy/sell?  (get_signals)
-      2. When should I exit?      (should_exit)
+    The adapter reads RotationConfig from the strategy to determine:
+      - Exit priority order
+      - Position sizing method (linear or score-squared)
+      - Stop loss / take profit / trailing stop levels
+      - Whether to re-score holdings during rotation
+      - Sector diversification limits
+
+    This ensures the same strategy produces identical results whether
+    run standalone or through the app.
     """
 
     def __init__(self, strategy: Strategy):
         self.strategy = strategy
-        # Cache for get_signals results: date_str -> List[Signal]
         self._signals_cache: Dict[str, List[Signal]] = {}
         self._last_signal_date: Optional[str] = None
 
@@ -49,15 +56,15 @@ class StrategyBacktestAdapter:
         end: str = "2026-07-08",
         capital: float = 100_000.0,
         max_holdings: Optional[int] = None,
-        min_hold_days: int = 7,
-        trailing_stop: float = 0.20,
-        take_profit: float = 0.30,
-        time_stop_days: int = 60,
-        max_sector_count: int = 2,
     ) -> Dict[str, Any]:
-        """Run the daily simulation. Returns trades, daily_equity, summary."""
+        """Run the daily simulation. Returns trades, daily_equity, summary.
+
+        All risk/exit parameters are read from the strategy's RotationConfig.
+        The strategy is the single source of truth for its behavior.
+        """
         from collections import OrderedDict
 
+        cfg = self.strategy.get_rotation_config()
         cfg_max_holdings = max_holdings or self.strategy.max_holdings
 
         # ── 1. Build trading calendar from SPY ──────────────────────────
@@ -73,49 +80,65 @@ class StrategyBacktestAdapter:
             logger.warning("No SPY trading dates in range %s to %s", as_of, end)
             return {"trades": [], "daily_equity": [], "summary": _empty_summary(capital)}
 
-        # ── 2. Pre-fetch price cache for all tickers ─────────────────────
-        logger.info("Building price cache for %d dates...", len(all_dates))
-        with db_engine.connect() as conn:
-            res = conn.execute(text(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public'"
-            ))
-            skip = {
-                "stock_metadata", "stock_financials_quarterly",
-                "stock_financials_yearly",
-                "xlb", "xlc", "xle", "xlf", "xli", "xlk", "xlp",
-                "xlre", "xlu", "xlv", "xly",
-            }
-            all_tickers = [row[0] for row in res if row[0] not in skip]
+        # ── 2a. Precompute signals (if strategy supports it) ──────────────
+        logger.info("Attempting precompute_signals for %d dates...", len(all_dates))
+        precomputed_signals: Optional[Dict[str, List[Signal]]] = None
+        try:
+            precomputed_signals = self.strategy.precompute_signals(all_dates, db_engine)
+            if precomputed_signals is not None:
+                logger.info(
+                    "Using precomputed signals (%d dates with signals)",
+                    sum(1 for v in precomputed_signals.values() if v),
+                )
+        except Exception as e:
+            logger.warning("precompute_signals failed (falling back to per-day): %s", e)
+            precomputed_signals = None
 
-        # Cache: ticker -> {date_str -> close_price}
-        price_cache: Dict[str, Dict[str, float]] = {}
-        for ticker in all_tickers:
-            try:
-                from app.utils.security import get_safe_table_name
-                safe = get_safe_table_name(ticker)
-                with db_engine.connect() as conn:
-                    df = pd.read_sql(
-                        f'SELECT "Date", "Close" FROM "{safe}" '
-                        f'WHERE "Date" >= \'{as_of}\' AND "Date" <= \'{end}\' '
-                        f'ORDER BY "Date"',
-                        conn,
-                    )
-                cache: Dict[str, float] = {}
-                for _, row in df.iterrows():
-                    cache[str(pd.Timestamp(row["Date"]))[:10]] = float(row["Close"])
-                price_cache[ticker] = cache
-            except Exception:
-                continue
+        # ── 2b. Pre-fetch price cache for all tickers ────────────────────
+        strategy_price_cache = self.strategy.get_precomputed_price_cache()
+        if strategy_price_cache is not None:
+            logger.info("Using strategy-provided price cache (%d tickers)", len(strategy_price_cache))
+            price_cache = strategy_price_cache
+        else:
+            logger.info("Building price cache for %d dates...", len(all_dates))
+            with db_engine.connect() as conn:
+                res = conn.execute(text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public'"
+                ))
+                skip = {
+                    "stock_metadata", "stock_financials_quarterly",
+                    "stock_financials_yearly",
+                    "xlb", "xlc", "xle", "xlf", "xli", "xlk", "xlp",
+                    "xlre", "xlu", "xlv", "xly",
+                }
+                all_tickers = [row[0] for row in res if row[0] not in skip]
+
+            price_cache: Dict[str, Dict[str, float]] = {}
+            for ticker in all_tickers:
+                try:
+                    from app.utils.security import get_safe_table_name
+                    safe = get_safe_table_name(ticker)
+                    with db_engine.connect() as conn:
+                        df = pd.read_sql(
+                            f'SELECT "Date", "Close" FROM "{safe}" '
+                            f'WHERE "Date" >= \'{as_of}\' AND "Date" <= \'{end}\' '
+                            f'ORDER BY "Date" DESC LIMIT 3000',
+                            conn,
+                        )
+                    cache: Dict[str, float] = {}
+                    for _, row in df.iterrows():
+                        cache[str(pd.Timestamp(row["Date"]))[:10]] = float(row["Close"])
+                    price_cache[ticker] = cache
+                except Exception:
+                    continue
 
         def get_price(ticker: str, date_str: str) -> float:
             tc = price_cache.get(ticker.lower(), {})
             if not tc:
                 return 0.0
-            # Find the closest date <= date_str
             if date_str in tc:
                 return tc[date_str]
-            # Walk backwards to find the most recent price
             d = pd.Timestamp(date_str)
             for _ in range(10):
                 d -= pd.Timedelta(days=1)
@@ -124,16 +147,39 @@ class StrategyBacktestAdapter:
                     return tc[ds]
             return 0.0
 
+        # ── 2c. Precompute SPY SMA(200) for bear market detection ──────
+        spy_sma200: Optional[pd.Series] = None
+        spy_close_series: Optional[pd.Series] = None
+        if cfg.bear_exposure < 1.0:
+            try:
+                with db_engine.connect() as conn:
+                    spy_df = pd.read_sql(
+                        f'SELECT "Date", "Close" FROM spy '
+                        f'WHERE "Date" >= \'{as_of}\' AND "Date" <= \'{end}\' '
+                        f'ORDER BY "Date"',
+                        conn,
+                    )
+                if not spy_df.empty and len(spy_df) >= 200:
+                    spy_close_series = spy_df["Close"].astype(float)
+                    spy_sma200 = spy_close_series.rolling(200).mean()
+            except Exception:
+                pass
+
         # ── 3. Daily simulation loop ────────────────────────────────────
         holdings: Dict[str, Any] = OrderedDict()
         trades: List[Dict[str, Any]] = []
         daily_equity: List[Dict[str, Any]] = []
         cash = capital
         portfolio_value = capital
-        last_signal_date = ""
 
         for sim_idx, current_date in enumerate(all_dates):
-            # ── 3a. Check exits ─────────────────────────────────────────
+            # Check bear market (SPY < SMA(200))
+            is_bear = False
+            if spy_sma200 is not None and spy_close_series is not None and sim_idx < len(spy_close_series):
+                if pd.notna(spy_sma200.iloc[sim_idx]):
+                    is_bear = float(spy_close_series.iloc[sim_idx]) < float(spy_sma200.iloc[sim_idx])
+            exposure = cfg.bear_exposure if is_bear else 1.0
+            # ── 3a. Check exits (in strategy's priority order) ──────────
             to_remove: List[str] = []
             for ticker in list(holdings.keys()):
                 h = holdings[ticker]
@@ -144,44 +190,44 @@ class StrategyBacktestAdapter:
                 h["peak_price"] = max(h["peak_price"], current_price)
                 ret = (current_price - h["entry_price"]) / h["entry_price"]
                 pnl = h["shares"] * (current_price - h["entry_price"])
+                hold_days = (
+                    pd.Timestamp(current_date) -
+                    pd.Timestamp(h["entry_date"])
+                ).days
 
                 reason: Optional[str] = None
 
-                # Hard stop loss (overrides min hold)
-                if ret <= -0.10:
-                    reason = "Stop Loss"
+                for exit_type in cfg.exit_priority:
+                    if reason is not None:
+                        break
 
-                # Trailing stop
-                if reason is None and trailing_stop > 0:
-                    peak = h["peak_price"]
-                    drawdown = (peak - current_price) / peak
-                    if drawdown >= trailing_stop:
-                        reason = "Trailing Stop"
+                    if exit_type == "strategy_exit":
+                        try:
+                            exit_check = self.strategy.should_exit(
+                                ticker, current_date, db_engine, "long"
+                            )
+                            if exit_check.should_close:
+                                reason = exit_check.reason
+                        except Exception as e:
+                            logger.warning("should_exit failed for %s: %s", ticker, e)
 
-                # Take profit
-                if reason is None and take_profit > 0:
-                    if ret >= take_profit:
-                        reason = "Take Profit"
+                    elif exit_type == "hard_stop_loss" and cfg.hard_stop_loss > 0:
+                        if ret <= -cfg.hard_stop_loss:
+                            reason = "Stop Loss"
 
-                # Time stop
-                if reason is None and time_stop_days > 0:
-                    hold_days = (
-                        pd.Timestamp(current_date) -
-                        pd.Timestamp(h["entry_date"])
-                    ).days
-                    if hold_days >= time_stop_days:
-                        reason = "Time Stop"
+                    elif exit_type == "trailing_stop" and cfg.trailing_stop > 0:
+                        peak = h["peak_price"]
+                        drawdown = (peak - current_price) / peak
+                        if drawdown >= cfg.trailing_stop:
+                            reason = "Trailing Stop"
 
-                # Strategy-specific exit check
-                if reason is None:
-                    try:
-                        exit_check = self.strategy.should_exit(
-                            ticker, current_date, db_engine, "long"
-                        )
-                        if exit_check.should_close:
-                            reason = exit_check.reason
-                    except Exception as e:
-                        logger.warning("should_exit failed for %s: %s", ticker, e)
+                    elif exit_type == "take_profit" and cfg.take_profit > 0:
+                        if ret >= cfg.take_profit:
+                            reason = "Take Profit"
+
+                    elif exit_type == "time_stop" and cfg.time_stop_days > 0:
+                        if hold_days >= cfg.time_stop_days:
+                            reason = "Time Stop"
 
                 if reason is not None:
                     trades.append({
@@ -191,10 +237,7 @@ class StrategyBacktestAdapter:
                         "entry_price": round(h["entry_price"], 2),
                         "exit_price": round(current_price, 2),
                         "return_pct": round(ret * 100, 2),
-                        "holding_days": (
-                            pd.Timestamp(current_date) -
-                            pd.Timestamp(h["entry_date"])
-                        ).days,
+                        "holding_days": hold_days,
                         "exit_reason": reason,
                         "pnl_dollars": round(pnl, 2),
                     })
@@ -204,20 +247,17 @@ class StrategyBacktestAdapter:
             for t in to_remove:
                 del holdings[t]
 
-            # ── 3b. Get signals (cached, reuse for 5 days) ─────────────
+            # ── 3b. Get signals (new candidates for this date) ──────────
             signals: List[Signal] = []
-            slots = cfg_max_holdings - len(holdings)
-            if slots > 0:
-                # Reuse cached signals for up to 5 days to avoid re-scanning
-                # all 1500 stocks on every trading day. Golden crosses persist
-                # until a death cross, so 5-day-old signals are still valid.
+            if precomputed_signals is not None:
+                signals = precomputed_signals.get(current_date, [])
+            else:
                 use_cache = (
                     self._last_signal_date is not None
                     and self._signals_cache
                     and self._last_signal_date in self._signals_cache
                 )
                 if use_cache:
-                    # Check if last signal date is within 5 trading days
                     last_dt = pd.Timestamp(self._last_signal_date)
                     cur_dt = pd.Timestamp(current_date)
                     if (cur_dt - last_dt).days <= 7:
@@ -231,101 +271,162 @@ class StrategyBacktestAdapter:
                     except Exception as e:
                         logger.warning("get_signals failed for %s: %s", current_date, e)
 
-            signal_tickers = {s.ticker for s in signals}
+            # ── 3c. Build ranked candidate list (holdings + new signals) ─
+            # Re-score existing holdings if configured
+            all_candidates: List[Dict[str, Any]] = []
 
-            # ── 3c. Rotate out positions not in signals ────────────────
-            if signals:
-                to_drop = []
-                for ticker in list(holdings.keys()):
-                    if ticker not in signal_tickers:
-                        h = holdings[ticker]
-                        hold_days = (
-                            pd.Timestamp(current_date) -
-                            pd.Timestamp(h["entry_date"])
-                        ).days
-                        if hold_days < min_hold_days:
-                            continue
-                        to_drop.append(ticker)
+            if cfg.re_score_holdings:
+                # Re-score each holding using the strategy's score_holding()
+                for ticker, h in holdings.items():
+                    try:
+                        current_score = self.strategy.score_holding(
+                            ticker, current_date, db_engine,
+                            entry_price=h["entry_price"],
+                            market_cap=h.get("market_cap", 0),
+                            sector=h.get("sector", "Unknown"),
+                            side="long",
+                        )
+                    except Exception:
+                        current_score = h.get("score", 0.0)
+                    if current_score <= 0:
+                        current_score = h.get("score", 0.0)
+                    all_candidates.append({
+                        "ticker": ticker,
+                        "score": current_score,
+                        "market_cap": h.get("market_cap", 0),
+                        "sector": h.get("sector", "Unknown"),
+                        "price": 0.0,  # Will use get_price for existing holdings
+                        "is_holding": True,
+                    })
+            else:
+                # Keep holdings as-is with their original scores
+                for ticker, h in holdings.items():
+                    all_candidates.append({
+                        "ticker": ticker,
+                        "score": h.get("score", 0.0),
+                        "market_cap": h.get("market_cap", 0),
+                        "sector": h.get("sector", "Unknown"),
+                        "price": 0.0,
+                        "is_holding": True,
+                    })
 
-                for ticker in to_drop:
+            # Add new signals (not already held)
+            held_tickers = set(holdings.keys())
+            for s in signals:
+                if s.ticker not in held_tickers:
+                    all_candidates.append({
+                        "ticker": s.ticker,
+                        "score": s.score,
+                        "market_cap": s.market_cap,
+                        "sector": s.sector,
+                        "price": s.price if s.price > 0 else get_price(s.ticker, current_date),
+                        "is_holding": False,
+                    })
+
+            # Sort by score descending
+            all_candidates.sort(key=lambda x: x["score"], reverse=True)
+
+            # Apply sector cap to pick top N
+            top_n: List[Dict[str, Any]] = []
+            sector_counts: Dict[str, int] = {}
+            for c in all_candidates:
+                if len(top_n) >= cfg_max_holdings:
+                    break
+                sec = c.get("sector", "Unknown")
+                if sector_counts.get(sec, 0) >= cfg.max_sector_count:
+                    continue
+                top_n.append(c)
+                sector_counts[sec] = sector_counts.get(sec, 0) + 1
+
+            top_tickers = {c["ticker"] for c in top_n}
+
+            # ── 3d. Sell dropped holdings (after min hold days) ─────────
+            to_drop: List[str] = []
+            for ticker in list(holdings.keys()):
+                if ticker not in top_tickers:
                     h = holdings[ticker]
-                    current_price = get_price(ticker, current_date)
-                    if current_price > 0:
-                        ret = (current_price - h["entry_price"]) / h["entry_price"]
-                        pnl = h["shares"] * (current_price - h["entry_price"])
-                        hold_days = (
-                            pd.Timestamp(current_date) -
-                            pd.Timestamp(h["entry_date"])
-                        ).days
-                        trades.append({
-                            "ticker": ticker, "side": "SELL",
-                            "entry_date": h["entry_date"],
-                            "exit_date": current_date,
-                            "entry_price": round(h["entry_price"], 2),
-                            "exit_price": round(current_price, 2),
-                            "return_pct": round(ret * 100, 2),
-                            "holding_days": hold_days,
-                            "exit_reason": "Rotated Out",
-                            "pnl_dollars": round(pnl, 2),
-                        })
-                        cash += h["shares"] * current_price
-                    del holdings[ticker]
+                    hold_days = (
+                        pd.Timestamp(current_date) -
+                        pd.Timestamp(h["entry_date"])
+                    ).days
+                    if hold_days < cfg.min_hold_days:
+                        continue
+                    to_drop.append(ticker)
 
-            # ── 3d. Open new positions ─────────────────────────────────
+            for ticker in to_drop:
+                h = holdings[ticker]
+                current_price = get_price(ticker, current_date)
+                if current_price > 0:
+                    ret = (current_price - h["entry_price"]) / h["entry_price"]
+                    pnl = h["shares"] * (current_price - h["entry_price"])
+                    hold_days = (
+                        pd.Timestamp(current_date) -
+                        pd.Timestamp(h["entry_date"])
+                    ).days
+                    trades.append({
+                        "ticker": ticker, "side": "SELL",
+                        "entry_date": h["entry_date"],
+                        "exit_date": current_date,
+                        "entry_price": round(h["entry_price"], 2),
+                        "exit_price": round(current_price, 2),
+                        "return_pct": round(ret * 100, 2),
+                        "holding_days": hold_days,
+                        "exit_reason": "Rotated Out",
+                        "pnl_dollars": round(pnl, 2),
+                    })
+                    cash += h["shares"] * current_price
+                del holdings[ticker]
+
+            # ── 3e. Buy new top picks ───────────────────────────────────
             slots_available = cfg_max_holdings - len(holdings)
-            if slots_available > 0 and signals:
-                sector_counts: Dict[str, int] = {}
-                for t, h in holdings.items():
-                    sec = h.get("sector", "Unknown")
-                    sector_counts[sec] = sector_counts.get(sec, 0) + 1
+            if slots_available > 0:
+                new_entries = [c for c in top_n if c["ticker"] not in holdings][:slots_available]
 
-                new_entries = []
-                for s in signals:
-                    if len(new_entries) >= slots_available:
-                        break
-                    if s.ticker in holdings:
-                        continue
-                    sec = getattr(s, "sector", "Unknown")
-                    if sector_counts.get(sec, 0) >= max_sector_count:
-                        continue
-                    new_entries.append(s)
-                    sector_counts[sec] = sector_counts.get(sec, 0) + 1
+                if new_entries:
+                    if cfg.sizing_method == "score_squared":
+                        total_score = sum(c["score"] ** 2 for c in new_entries if c["score"] > 0)
+                    else:
+                        total_score = sum(c["score"] for c in new_entries if c["score"] > 0)
 
-                total_score = sum(s.score for s in new_entries if s.score > 0)
-                if total_score > 0:
-                    for s in new_entries:
-                        price = s.price if s.price > 0 else get_price(s.ticker, current_date)
-                        if price <= 0:
-                            continue
-                        weight = s.score / total_score
-                        target_value = portfolio_value * weight
-                        shares = int(target_value / price)
-                        cost = shares * price
-                        if cost > cash:
-                            shares = int(cash / price)
+                    if total_score > 0:
+                        for c in new_entries:
+                            price = c["price"] if c["price"] > 0 else get_price(c["ticker"], current_date)
+                            if price <= 0:
+                                continue
+
+                            if cfg.sizing_method == "score_squared":
+                                weight = (c["score"] ** 2) / total_score
+                            else:
+                                weight = c["score"] / total_score
+
+                            target_value = portfolio_value * weight * exposure
+                            shares = int(target_value / price)
                             cost = shares * price
-                        if shares <= 0:
-                            continue
-                        cash -= cost
-                        holdings[s.ticker] = {
-                            "entry_date": current_date,
-                            "entry_price": price,
-                            "peak_price": price,
-                            "shares": shares,
-                            "score": s.score,
-                            "angle": getattr(s, "angle", 0),
-                            "market_cap": 0,
-                            "sector": getattr(s, "sector", "Unknown"),
-                        }
-                        trades.append({
-                            "ticker": s.ticker, "side": "BUY",
-                            "entry_date": current_date, "exit_date": "",
-                            "entry_price": round(price, 2), "exit_price": 0,
-                            "return_pct": 0.0, "holding_days": 0,
-                            "exit_reason": "New Entry", "pnl_dollars": 0.0,
-                        })
+                            if cost > cash:
+                                shares = int(cash / price)
+                                cost = shares * price
+                            if shares <= 0:
+                                continue
 
-            # ── 3e. Track daily equity ──────────────────────────────────
+                            cash -= cost
+                            holdings[c["ticker"]] = {
+                                "entry_date": current_date,
+                                "entry_price": price,
+                                "peak_price": price,
+                                "shares": shares,
+                                "score": c["score"],
+                                "market_cap": c.get("market_cap", 0),
+                                "sector": c.get("sector", "Unknown"),
+                            }
+                            trades.append({
+                                "ticker": c["ticker"], "side": "BUY",
+                                "entry_date": current_date, "exit_date": "",
+                                "entry_price": round(price, 2), "exit_price": 0,
+                                "return_pct": 0.0, "holding_days": 0,
+                                "exit_reason": "New Entry", "pnl_dollars": 0.0,
+                            })
+
+            # ── 3f. Track daily equity ──────────────────────────────────
             holdings_value = 0.0
             for ticker, h in holdings.items():
                 price = get_price(ticker, current_date)
@@ -340,7 +441,7 @@ class StrategyBacktestAdapter:
                 "n_holdings": len(holdings),
             })
 
-        # ── 3. Summary KPIs ─────────────────────────────────────────────
+        # ── 4. Summary KPIs ─────────────────────────────────────────────
         summary = _compute_summary(trades, daily_equity, capital, as_of, end)
         return {"trades": trades, "daily_equity": daily_equity, "summary": summary}
 
@@ -352,7 +453,7 @@ def _compute_summary(
     as_of: str,
     end: str,
 ) -> Dict[str, Any]:
-    """Compute KPIs from trades and equity curve. Same format as StrategyEngine."""
+    """Compute KPIs from trades and equity curve."""
     if not daily_equity:
         return _empty_summary(capital)
 
